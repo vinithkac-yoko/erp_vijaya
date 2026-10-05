@@ -20,3 +20,9 @@ Non-negotiables (details in the prompt):
 - `docs/BUSINESS_FLOW.md` wins on any business question. If a rule is missing, ask Kasi.
 - Keep `docs/TOOL_CATALOG.md` and `docs/AGENT_PROMPT.md` in sync with the code in the same commit.
 - Stop at the end of each milestone and report to Kasi in plain words.
+
+## Commands
+- `pnpm dev` · `pnpm build` · `pnpm lint` · `pnpm typecheck`
+- `pnpm test` (Vitest, needs Postgres; uses `.env.test`) · `pnpm e2e` (Playwright, run `pnpm build` first)
+- `pnpm test:kit` (the kit's sandbox/export tests; needs Chromium via `CHROMIUM_PATH`, and `pandoc`)
+- Local database: `postgresql://vijaya:vijaya@localhost:5432/vijaya` (dev) and `vijaya_test` (tests). See `.env.example`.

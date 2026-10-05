@@ -1,0 +1,33 @@
+// Vijaya Stores — milestone 1 schema: users only.
+// Milestone 2 brings in the rest of reference/schema.prisma together with every ledger guard.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  STOREKEEPER
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  /// Login name. Stored lowercase.
+  email        String   @unique
+  phone        String?
+  role         UserRole
+  /// bcrypt hash. Never plaintext, never returned by any tool.
+  passwordHash String
+  isActive     Boolean  @default(true)
+  /// "light" | "dark" | null (follow the device)
+  theme        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("users")
+}
