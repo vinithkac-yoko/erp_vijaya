@@ -1,0 +1,9 @@
+---
+title: Diagram
+---
+```mermaid
+flowchart LR
+  A["<img src=x onerror=fetch('https://evil.test/m')>"] --> B
+  click A callback "tooltip"
+  click B href "https://evil.test/click"
+```

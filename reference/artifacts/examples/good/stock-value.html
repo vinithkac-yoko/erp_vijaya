@@ -1,0 +1,15 @@
+<script>
+(async () => {
+  const ui = vijaya.ui;
+  ui.heading('Stock value');
+  const r = await vijaya.read('get_stock_value', {});
+  ui.stats([{ label: 'Total value', value: r.total, format: 'inr' }]);
+  ui.chart({ title: 'Value by material', type: 'bar', rows: r.rows.slice(0, 10), x: 'material', y: 'value', format: 'inr' });
+  ui.table({ columns: [
+    { field: 'material', label: 'Material' },
+    { field: 'quantity', label: 'Quantity', format: 'qty', unitField: 'unit' },
+    { field: 'averageRate', label: 'Average rate', format: 'inr' },
+    { field: 'value', label: 'Value', format: 'inr' },
+  ], rows: r.rows });
+})();
+</script>

@@ -1,0 +1,6 @@
+---
+title: Value
+reads:
+  value: get_stock_value {}
+---
+Stock is worth ₹4,50,000 and we hold 1200 kg of copper.

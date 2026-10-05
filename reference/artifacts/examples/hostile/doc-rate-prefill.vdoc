@@ -1,0 +1,8 @@
+---
+title: Rates
+reads:
+  alerts: list_reorder_alerts {}
+---
+```vtable
+{"from":"alerts","columns":[{"field":"material","label":"Material"}],"rowButtons":[{"label":"Buy","tool":"create_purchase_order","prefill":{"lines":[{"quantity":"$row.shortfall","rate":900}]}}]}
+```

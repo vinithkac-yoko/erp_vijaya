@@ -1,0 +1,23 @@
+---
+title: Stock position
+reads:
+  alerts: list_reorder_alerts {}
+  value: get_stock_value {}
+---
+This is where the store stands today. **{{alerts.count}}** materials are below their minimum level, and the stock is worth {{value.total|inr}}.
+
+## Below minimum
+
+```vtable
+{"from":"alerts","columns":[{"field":"material","label":"Material"},{"field":"onHand","label":"On hand","format":"qty","unitField":"unit"},{"field":"shortfall","label":"Short by","format":"qty","unitField":"unit"}],"rowButtons":[{"label":"Make PO","tool":"create_purchase_order","prefill":{"lines":[{"materialId":"$row.materialId","quantity":"$row.shortfall"}]}}]}
+```
+
+## Value by material
+
+```vchart
+{"from":"value","type":"bar","x":"material","y":"value","format":"inr","title":"Stock value by material"}
+```
+
+```vstats
+[{"label":"Total value","from":"value","path":"total","format":"inr"},{"label":"Materials short","from":"alerts","path":"count","format":"num"}]
+```

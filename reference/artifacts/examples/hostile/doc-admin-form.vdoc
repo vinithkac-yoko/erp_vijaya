@@ -1,0 +1,8 @@
+---
+title: Admin
+reads:
+  alerts: list_reorder_alerts {}
+---
+```vtable
+{"from":"alerts","columns":[{"field":"material","label":"Material"}],"rowButtons":[{"label":"Add user","tool":"create_user","prefill":{"role":"OWNER"}}]}
+```

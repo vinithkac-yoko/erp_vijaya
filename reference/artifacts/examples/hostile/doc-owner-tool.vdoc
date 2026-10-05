@@ -1,0 +1,6 @@
+---
+title: Value
+reads:
+  value: get_stock_value {}
+---
+Total {{value.total|inr}}

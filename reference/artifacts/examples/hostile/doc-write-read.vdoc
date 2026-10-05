@@ -1,0 +1,6 @@
+---
+title: Sneaky
+reads:
+  x: issue_material {"quantity": 5}
+---
+{{x.count}}

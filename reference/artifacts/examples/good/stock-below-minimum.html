@@ -1,0 +1,19 @@
+<script>
+(async () => {
+  const ui = vijaya.ui;
+  ui.heading('Below minimum');
+  const r = await vijaya.read('list_reorder_alerts', {});
+  if (!r.rows.length) { ui.callout('ok', 'Nothing is below its minimum level.'); return; }
+  ui.stats([{ label: 'Materials short', value: r.rows.length }]);
+  ui.table({
+    columns: [
+      { field: 'material', label: 'Material' },
+      { field: 'onHand', label: 'On hand', format: 'qty', unitField: 'unit' },
+      { field: 'minimumLevel', label: 'Minimum', format: 'qty', unitField: 'unit' },
+      { field: 'shortfall', label: 'Short by', format: 'qty', unitField: 'unit' },
+    ],
+    rows: r.rows,
+    rowButtons: [{ label: 'Make PO', onClick: (row) => vijaya.openForm('create_purchase_order', { lines: [{ materialId: row.materialId, quantity: row.shortfall }] }) }],
+  });
+})();
+</script>

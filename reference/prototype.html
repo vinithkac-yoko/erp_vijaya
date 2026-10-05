@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vijaya ERP — Chat Terminal Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:      #ECE7DC;
+    --paper-dark: #E1DACB;
+    --surface:    #FFFDF8;
+    --ink:        #1B2A38;
+    --ink-soft:   #4B5C6B;
+    --ink-faint:  #8B95A0;
+    --copper:     #A8571E;
+    --copper-light:#C98A4B;
+    --copper-wash:#F1E3D3;
+    --alert:      #A63A2E;
+    --alert-wash: #F4DFDA;
+    --confirm:    #3F7A5C;
+    --confirm-wash:#DEEBE3;
+    --line:       #CBC2AE;
+    --radius:     3px;
+    --shadow: 0 1px 2px rgba(27,42,56,0.06), 0 4px 14px rgba(27,42,56,0.05);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse at top, #F3EEE2 0%, var(--paper) 55%);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+  .display{ font-family:'Space Grotesk', sans-serif; }
+
+  /* ── App shell ─────────────────────────────────────────── */
+  .app{
+    max-width:720px;
+    margin:0 auto;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    background:var(--paper);
+    position:relative;
+    border-left:1px solid var(--line);
+    border-right:1px solid var(--line);
+  }
+
+  /* ── Header: rating-plate motif ───────────────────────── */
+  header{
+    position:relative;
+    overflow:hidden;
+    background:var(--ink);
+    color:var(--paper);
+    padding:18px 22px 16px;
+    flex-shrink:0;
+    border-bottom:3px solid var(--copper);
+  }
+  header .coil{
+    position:absolute; inset:0;
+    opacity:0.14;
+    pointer-events:none;
+  }
+  .header-row{
+    position:relative;
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .plate-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:19px;
+    letter-spacing:0.02em;
+  }
+  .plate-sub{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--copper-light);
+    margin-top:3px;
+  }
+  .role-toggle{
+    display:flex;
+    background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.18);
+    border-radius:20px;
+    padding:3px;
+    flex-shrink:0;
+  }
+  .role-btn{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    padding:6px 12px;
+    border-radius:16px;
+    border:none;
+    background:transparent;
+    color:rgba(255,255,255,0.55);
+    cursor:pointer;
+    transition:background .18s ease, color .18s ease;
+  }
+  .role-btn.active{
+    background:var(--copper);
+    color:#fff;
+  }
+  .proto-note{
+    margin-top:12px;
+    font-size:11px;
+    color:rgba(236,231,220,0.5);
+    border-top:1px dashed rgba(236,231,220,0.18);
+    padding-top:9px;
+    line-height:1.5;
+  }
+
+  /* ── Thread ────────────────────────────────────────────── */
+  .thread{
+    flex:1;
+    overflow-y:auto;
+    padding:20px 18px 8px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .turn{ display:flex; flex-direction:column; max-width:100%; animation:rise .28s ease both; }
+  @keyframes rise{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  .turn.user{ align-items:flex-end; }
+  .bubble-user{
+    background:var(--ink);
+    color:var(--paper);
+    padding:10px 14px;
+    border-radius:14px 14px 3px 14px;
+    max-width:80%;
+    font-size:14.5px;
+    line-height:1.45;
+  }
+  .meta-ts{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    color:var(--ink-faint);
+    margin-top:4px;
+  }
+  .turn.user .meta-ts{ margin-right:2px; }
+  .turn.agent .meta-ts{ margin-left:2px; }
+
+  .agent-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-left:3px solid var(--copper);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:13px 16px;
+    max-width:92%;
+    font-size:14.5px;
+    line-height:1.5;
+  }
+  .agent-card.alert{ border-left-color:var(--alert); }
+  .agent-card.confirm{ border-left-color:var(--confirm); }
+  .agent-card .tag{
+    display:inline-block;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    margin-bottom:6px;
+  }
+  .stamp{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:0.06em;
+    color:var(--confirm);
+    border:1.5px dashed var(--confirm);
+    border-radius:20px;
+    padding:3px 10px;
+    transform:rotate(-2deg);
+    margin-top:9px;
+  }
+
+  /* alert list rows */
+  .alert-list{ display:flex; flex-direction:column; gap:9px; margin-top:8px; }
+  .alert-row{
+    display:flex; align-items:flex-start; gap:9px;
+    padding:8px 10px;
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    font-size:13.5px;
+  }
+  .dot{ width:7px; height:7px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+  .dot.red{ background:var(--alert); } .dot.amber{ background:var(--copper); } .dot.gray{ background:var(--ink-faint); }
+
+  /* ── Chips ─────────────────────────────────────────────── */
+  .chip-row{
+    display:flex; flex-wrap:wrap; gap:8px;
+    padding:10px 18px 4px;
+    flex-shrink:0;
+  }
+  .chip{
+    font-family:'IBM Plex Sans',sans-serif;
+    font-size:13px; font-weight:500;
+    background:var(--surface);
+    border:1.3px solid var(--copper);
+    color:var(--copper);
+    padding:7px 13px;
+    border-radius:18px;
+    cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+    white-space:nowrap;
+  }
+  .chip:hover{ background:var(--copper); color:#fff; }
+  .chip.ghost{ border-color:var(--line); color:var(--ink-soft); }
+  .chip.ghost:hover{ background:var(--ink-soft); color:#fff; }
+  .chip.danger{ border-color:var(--alert); color:var(--alert); }
+  .chip.danger:hover{ background:var(--alert); color:#fff; }
+
+  /* ── Input bar ─────────────────────────────────────────── */
+  .input-bar{
+    display:flex; gap:10px;
+    padding:12px 18px 18px;
+    flex-shrink:0;
+    background:linear-gradient(to bottom, transparent, var(--paper) 30%);
+  }
+  .input-bar input{
+    flex:1;
+    font-family:'IBM Plex Sans',sans-serif;
+    font-size:14.5px;
+    padding:12px 14px;
+    border-radius:22px;
+    border:1.4px solid var(--line);
+    background:var(--surface);
+    outline:none;
+    color:var(--ink);
+  }
+  .input-bar input:focus{ border-color:var(--copper); }
+  .send-btn{
+    width:44px; height:44px; border-radius:50%;
+    background:var(--ink); color:var(--paper);
+    border:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .send-btn:hover{ background:var(--copper); }
+
+  /* ── Form card (schema-bound, fixed shape) ────────────── */
+  .form-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    max-width:100%;
+    width:100%;
+    overflow:hidden;
+  }
+  .form-head{
+    background:var(--ink);
+    color:var(--paper);
+    padding:10px 15px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .form-head .fh-title{ font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.05em; }
+  .form-head .fh-badge{
+    font-family:'IBM Plex Mono',monospace; font-size:10px;
+    background:var(--copper); color:#fff;
+    padding:2px 8px; border-radius:10px; letter-spacing:0.05em;
+  }
+  .form-body{ padding:14px 15px 15px; }
+  .form-table{ width:100%; border-collapse:collapse; }
+  .form-table th{
+    text-align:left; font-family:'IBM Plex Mono',monospace;
+    font-size:10px; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--ink-faint); font-weight:500;
+    padding:0 6px 6px; border-bottom:1px solid var(--line);
+  }
+  .form-table td{ padding:7px 6px; border-bottom:1px solid var(--paper-dark); vertical-align:middle; }
+  .form-table select, .form-table input[type=number], .form-table input[type=text]{
+    width:100%;
+    font-family:'IBM Plex Sans',sans-serif;
+    font-size:13.5px;
+    border:none;
+    border-bottom:1.4px solid var(--line);
+    background:transparent;
+    padding:4px 2px;
+    outline:none;
+    color:var(--ink);
+  }
+  .form-table select:focus, .form-table input:focus{ border-bottom-color:var(--copper); }
+  .form-table .total-cell{ font-family:'IBM Plex Mono',monospace; font-weight:600; color:var(--ink); white-space:nowrap; }
+  .row-note{ font-size:11px; color:var(--ink-faint); margin-top:2px; }
+  .add-row-btn{
+    font-family:'IBM Plex Mono',monospace; font-size:11.5px;
+    color:var(--copper); background:none; border:1px dashed var(--copper-light);
+    border-radius:4px; padding:5px 10px; cursor:pointer; margin-top:10px;
+  }
+  .add-row-btn:hover{ background:var(--copper-wash); }
+  .form-actions{
+    display:flex; justify-content:flex-end; gap:9px; margin-top:14px;
+  }
+  .btn{
+    font-family:'IBM Plex Sans',sans-serif; font-weight:500; font-size:13.5px;
+    padding:8px 16px; border-radius:5px; cursor:pointer; border:1.4px solid transparent;
+  }
+  .btn-primary{ background:var(--ink); color:var(--paper); }
+  .btn-primary:hover{ background:var(--copper); }
+  .btn-ghost{ background:transparent; border-color:var(--line); color:var(--ink-soft); }
+  .btn-ghost:hover{ border-color:var(--ink-soft); }
+  .field-error{ color:var(--alert); font-size:11px; margin-top:4px; display:none; }
+  .field-error.show{ display:block; }
+  input.err{ border-bottom-color:var(--alert) !important; }
+
+  /* ── Approval card (owner) ──────────────────────────── */
+  .approval-card .amount{
+    font-family:'IBM Plex Mono',monospace; font-size:19px; font-weight:600; color:var(--ink);
+  }
+  .approval-actions{ display:flex; gap:9px; margin-top:12px; }
+
+  /* ── Count grid overlay ────────────────────────────── */
+  .overlay{
+    position:fixed; inset:0; background:rgba(27,42,56,0.45);
+    display:none; align-items:center; justify-content:center; z-index:50; padding:16px;
+  }
+  .overlay.show{ display:flex; }
+  .count-sheet{
+    background:var(--surface); border-radius:6px; max-width:640px; width:100%;
+    max-height:88vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.35);
+  }
+  .count-sheet-head{
+    background:var(--ink); color:var(--paper); padding:14px 18px;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .count-sheet-body{ padding:12px 18px; overflow-y:auto; }
+  .count-row{
+    display:grid; grid-template-columns: 1fr 84px 84px 84px 1.2fr;
+    gap:8px; align-items:center; padding:8px 0; border-bottom:1px solid var(--paper-dark);
+    font-size:13px;
+  }
+  .count-row.head-row{
+    font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.05em;
+    text-transform:uppercase; color:var(--ink-faint); border-bottom:1.4px solid var(--line);
+  }
+  .count-row input, .count-row select{
+    width:100%; font-family:'IBM Plex Mono',monospace; font-size:13px;
+    border:1px solid var(--line); border-radius:3px; padding:5px 6px; outline:none;
+  }
+  .count-row input:focus, .count-row select:focus{ border-color:var(--copper); }
+  .sys-qty{ font-family:'IBM Plex Mono',monospace; color:var(--ink-soft); }
+  .diff-cell{ font-family:'IBM Plex Mono',monospace; font-weight:600; }
+  .diff-cell.zero{ color:var(--ink-faint); }
+  .diff-cell.neg{ color:var(--alert); }
+  .diff-cell.pos{ color:var(--confirm); }
+  .count-sheet-foot{ padding:12px 18px; border-top:1px solid var(--line); display:flex; justify-content:flex-end; gap:9px; }
+
+  /* ── Report card ───────────────────────────────────── */
+  .report-card{
+    background:
+      linear-gradient(var(--surface), var(--surface)) padding-box,
+      repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(203,194,174,0.35) 23px, rgba(203,194,174,0.35) 24px) border-box;
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:14px 16px 12px;
+    box-shadow:var(--shadow);
+  }
+  .report-title{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14.5px; margin-bottom:2px; }
+  .report-sub{ font-size:11.5px; color:var(--ink-faint); margin-bottom:10px; }
+  .bar-row{ display:flex; align-items:center; gap:10px; margin-bottom:9px; }
+  .bar-label{ width:150px; font-size:12.5px; flex-shrink:0; }
+  .bar-track{ flex:1; height:9px; background:var(--paper-dark); border-radius:3px; overflow:hidden; }
+  .bar-fill{ height:100%; background:linear-gradient(90deg, var(--copper-light), var(--alert)); border-radius:3px; }
+  .bar-value{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; width:70px; text-align:right; flex-shrink:0; }
+
+  ::-webkit-scrollbar{ width:9px; }
+  ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:5px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <svg class="coil" viewBox="0 0 720 90" preserveAspectRatio="none">
+      <path d="M0,45 Q15,10 30,45 T60,45 T90,45 T120,45 T150,45 T180,45 T210,45 T240,45 T270,45 T300,45 T330,45 T360,45 T390,45 T420,45 T450,45 T480,45 T510,45 T540,45 T570,45 T600,45 T630,45 T660,45 T690,45 T720,45"
+        fill="none" stroke="#C98A4B" stroke-width="2"/>
+    </svg>
+    <div class="header-row">
+      <div>
+        <div class="plate-title">VIJAYA ELECTRONICS</div>
+        <div class="plate-sub">Inventory Terminal · Text-native</div>
+      </div>
+      <div class="role-toggle">
+        <button class="role-btn active" id="roleStorekeeper" onclick="setRole('store')">Storekeeper</button>
+        <button class="role-btn" id="roleOwner" onclick="setRole('owner')">Owner</button>
+      </div>
+    </div>
+    <div class="proto-note">Clickable walkthrough prototype — mock data, no live database. Tap the suggestions or type below to move through a real day's flow.</div>
+  </header>
+
+  <div class="thread" id="thread"></div>
+
+  <div class="chip-row" id="chipRow"></div>
+
+  <div class="input-bar">
+    <input type="text" id="freeInput" placeholder="Type a message, e.g. new job for Ashok Transformers 500 pcs..."
+      onkeydown="if(event.key==='Enter') handleFreeInput()">
+    <button class="send-btn" onclick="handleFreeInput()" aria-label="Send">➤</button>
+  </div>
+</div>
+
+<!-- Stock count overlay -->
+<div class="overlay" id="countOverlay">
+  <div class="count-sheet">
+    <div class="count-sheet-head">
+      <div>
+        <div class="mono" style="font-size:12px;letter-spacing:.05em;">CNT-2627-0004</div>
+        <div style="font-size:12.5px;opacity:.75;margin-top:2px;">Monthly physical count — 8 of 200 shown</div>
+      </div>
+      <button class="chip ghost" style="border-color:rgba(255,255,255,.3);color:#fff;" onclick="closeCount()">Close</button>
+    </div>
+    <div class="count-sheet-body">
+      <div class="count-row head-row">
+        <div>Material</div><div>System</div><div>Counted</div><div>Diff</div><div>Reason</div>
+      </div>
+      <div id="countRows"></div>
+    </div>
+    <div class="count-sheet-foot">
+      <button class="btn btn-ghost" onclick="closeCount()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCount()">Submit count</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   MOCK STATE — stands in for the tool catalog / DB in this demo
+   ══════════════════════════════════════════════════════════════ */
+const materials = {
+  wire:   { name:'22 SWG Copper Wire', uom:'kg',  rate: 812 },
+  core:   { name:'Ferrite Core E-30',  uom:'pcs', rate: 65, onHand: 18, min: 50 },
+  bobbin: { name:'Bobbin type-B',      uom:'pcs', rate: 9,  onHand: 640 },
+  tape:   { name:'Insulation Tape',    uom:'mtr', rate: 3 },
+  varnish:{ name:'Varnish',            uom:'ltr', rate: 340 },
+};
+let role = 'store';
+let stage = 'start';
+let bomRows = [
+  { key:'wire',   qtyPer:18.4 },
+  { key:'core',   qtyPer:2 },
+  { key:'bobbin', qtyPer:1 },
+];
+const JOB_QTY = 500;
+const PO_THRESHOLD = 50000;
+
+const thread = document.getElementById('thread');
+const chipRow = document.getElementById('chipRow');
+
+function now(){
+  return new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+}
+function scrollDown(){ thread.scrollTop = thread.scrollHeight + 200; }
+
+function addUser(text){
+  const t = document.createElement('div');
+  t.className='turn user';
+  t.innerHTML = `<div class="bubble-user">${text}</div><div class="meta-ts">${now()}</div>`;
+  thread.appendChild(t); scrollDown();
+}
+
+function addAgent(html, opts={}){
+  const t = document.createElement('div');
+  t.className='turn agent';
+  const cardClass = opts.tone ? ` ${opts.tone}` : '';
+  t.innerHTML = `<div class="agent-card${cardClass}">${opts.tag ? `<div class="tag">${opts.tag}</div>`:''}${html}${opts.stamp? `<div class="stamp">✓ ${opts.stamp}</div>`:''}</div><div class="meta-ts">Agent · ${now()}</div>`;
+  thread.appendChild(t); scrollDown();
+  return t;
+}
+
+function addCustom(node){
+  const t = document.createElement('div');
+  t.className='turn agent';
+  t.style.width='100%';
+  t.appendChild(node);
+  thread.appendChild(t); scrollDown();
+  return t;
+}
+
+function setChips(list){
+  chipRow.innerHTML='';
+  list.forEach(c=>{
+    const b=document.createElement('button');
+    b.className='chip'+(c.type?` ${c.type}`:'');
+    b.textContent=c.label;
+    b.onclick=c.action;
+    chipRow.appendChild(b);
+  });
+}
+
+function setRole(r){
+  role = r;
+  document.getElementById('roleStorekeeper').classList.toggle('active', r==='store');
+  document.getElementById('roleOwner').classList.toggle('active', r==='owner');
+  renderForStage();
+}
+
+function typingDelay(fn, ms=550){ setTimeout(fn, ms); }
+
+/* ══════════════════════════════════════════════════════════════
+   FREE TEXT — fuzzy keyword routing, so typing also works
+   ══════════════════════════════════════════════════════════════ */
+function handleFreeInput(){
+  const inp = document.getElementById('freeInput');
+  const val = inp.value.trim();
+  if(!val) return;
+  addUser(val);
+  inp.value='';
+  const v = val.toLowerCase();
+  if(stage==='start' && v.includes('new job')){ startJobFlow(); return; }
+  if(stage==='start' && (v.includes('stock')||v.includes('check'))){ showLeakReport(); return; }
+  typingDelay(()=>addAgent(`I didn't catch a matching action for that in this walkthrough — try one of the suggestions below.`, {tag:'Agent'}));
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STAGE 0 — morning proactive alert
+   ══════════════════════════════════════════════════════════════ */
+function boot(){
+  addAgent(`
+    <div class="tag">Proactive · 08:02</div>
+    <strong>3 things need your attention this morning</strong>
+    <div class="alert-list">
+      <div class="alert-row"><span class="dot amber"></span><div><strong>PO-2627-0014</strong> — ₹62,000 — waiting on owner approval</div></div>
+      <div class="alert-row"><span class="dot red"></span><div><strong>Ferrite Core E-30</strong> is below minimum — 18 left, minimum 50</div></div>
+      <div class="alert-row"><span class="dot gray"></span><div><strong>JOB-2627-0029</strong> has material issued but no return logged — was it closed?</div></div>
+    </div>
+  `);
+  setChips([
+    {label:'New job', action:startJobFlow},
+    {label:'Check leak report', action:showLeakReport},
+    {label:'Show all alerts', action:()=>addAgent('That would open the full alerts list — kept short for this walkthrough.')},
+  ]);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STAGE 1 — job intake
+   ══════════════════════════════════════════════════════════════ */
+function startJobFlow(){
+  if(stage==='start'){ addUser('New job for Ashok Transformers, 500 pcs, SMPS transformer'); }
+  stage='job-created';
+  typingDelay(()=>{
+    addAgent(`Created <span class="mono" style="color:var(--copper)">JOB-2627-0031</span> for <strong>Ashok Transformers</strong> — 500 pcs, SMPS transformer. Add the BOM now?`);
+    setChips([
+      {label:'Add BOM', action:renderBomForm},
+      {label:'Not now', type:'ghost', action:()=>setChips([{label:'Add BOM', action:renderBomForm}])},
+    ]);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STAGE 2 — BOM form (schema-bound, fixed shape, live totals)
+   ══════════════════════════════════════════════════════════════ */
+function renderBomForm(){
+  stage='bom-form';
+  const wrap = document.createElement('div');
+  wrap.style.maxWidth='100%';
+  wrap.appendChild(buildBomCard());
+  addCustom(wrap);
+  setChips([]);
+}
+
+function buildBomCard(){
+  const card = document.createElement('div');
+  card.className='form-card';
+  card.innerHTML = `
+    <div class="form-head">
+      <span class="fh-title">JOB-2627-0031 · BOM</span>
+      <span class="fh-badge">500 PCS</span>
+    </div>
+    <div class="form-body">
+      <table class="form-table">
+        <thead><tr><th>Material</th><th style="width:90px">Qty / piece</th><th style="width:110px">Total needed</th></tr></thead>
+        <tbody id="bomBody"></tbody>
+      </table>
+      <button class="add-row-btn" id="addRowBtn">+ add material</button>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="this.closest('.form-card').style.opacity=0.4; setChips([])">Cancel</button>
+        <button class="btn btn-primary" id="saveBomBtn">Save BOM</button>
+      </div>
+    </div>
+  `;
+  const body = card.querySelector('#bomBody');
+  function renderRows(){
+    body.innerHTML='';
+    bomRows.forEach((row,i)=>{
+      const tr=document.createElement('tr');
+      const total = (row.qtyPer * JOB_QTY);
+      const totalStr = materials[row.key].uom==='kg' ? (total/1000).toFixed(2)+' kg' : total.toLocaleString('en-IN')+' '+materials[row.key].uom;
+      tr.innerHTML = `
+        <td>
+          <select data-i="${i}" class="mat-select">
+            ${Object.keys(materials).map(k=>`<option value="${k}" ${k===row.key?'selected':''}>${materials[k].name}</option>`).join('')}
+          </select>
+        </td>
+        <td><input type="number" step="0.01" class="qty-input mono" data-i="${i}" value="${row.qtyPer}"> <span class="row-note">${materials[row.key].uom==='kg'?'g':materials[row.key].uom}</span></td>
+        <td class="total-cell">${totalStr}</td>
+      `;
+      body.appendChild(tr);
+    });
+    body.querySelectorAll('.qty-input').forEach(inp=>{
+      inp.addEventListener('input', e=>{
+        const i=+e.target.dataset.i;
+        bomRows[i].qtyPer = parseFloat(e.target.value)||0;
+        renderRows();
+      });
+    });
+    body.querySelectorAll('.mat-select').forEach(sel=>{
+      sel.addEventListener('change', e=>{
+        const i=+e.target.dataset.i;
+        bomRows[i].key = e.target.value;
+        renderRows();
+      });
+    });
+  }
+  renderRows();
+  card.querySelector('#addRowBtn').onclick = ()=>{
+    bomRows.push({key:'tape', qtyPer:0});
+    renderRows();
+  };
+  card.querySelector('#saveBomBtn').onclick = ()=>{
+    card.style.borderLeft='3px solid var(--confirm)';
+    confirmBom();
+  };
+  return card;
+}
+
+function confirmBom(){
+  stage='bom-confirm';
+  const lines = bomRows.map(r=>{
+    const t = r.qtyPer*JOB_QTY;
+    const tStr = materials[r.key].uom==='kg' ? (t/1000).toFixed(2)+'kg' : Math.round(t)+' '+materials[r.key].uom;
+    return `${materials[r.key].name} — ${tStr}`;
+  }).join(', ');
+  typingDelay(()=>{
+    addAgent(`<strong>Confirm BOM for JOB-2627-0031:</strong><br>${lines}.`, {tone:'confirm'});
+    setChips([
+      {label:'Confirm', action:saveBom},
+      {label:'Edit again', type:'ghost', action:renderBomForm},
+    ]);
+  });
+}
+
+function saveBom(){
+  typingDelay(()=>{
+    addAgent(`Saved.`, {stamp:'BOM CONFIRMED', tone:'confirm'});
+    typingDelay(runShortageCheck, 500);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STAGE 3 — automatic shortage check
+   ══════════════════════════════════════════════════════════════ */
+function runShortageCheck(){
+  stage='shortage';
+  const coreRow = bomRows.find(r=>r.key==='core');
+  const required = coreRow.qtyPer * JOB_QTY;
+  const onHand = materials.core.onHand;
+  const short = required - onHand;
+  addAgent(`
+    <div class="tag">Auto shortage check</div>
+    <strong>Ferrite Core E-30:</strong> need ${required}, have ${onHand}. Short by <span style="color:var(--alert);font-weight:600">${short}</span>.
+  `, {tone:'alert'});
+  setChips([
+    {label:'Raise PO for shortfall', action:()=>renderPoForm(short)},
+    {label:'Later', type:'ghost', action:()=>setChips([{label:'Raise PO for shortfall', action:()=>renderPoForm(short)}])},
+  ]);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STAGE 4 — PO form (validation demo: rate required)
+   ══════════════════════════════════════════════════════════════ */
+function renderPoForm(qty){
+  stage='po-form';
+  const card = document.createElement('div');
+  card.className='form-card';
+  card.innerHTML = `
+    <div class="form-head"><span class="fh-title">NEW PURCHASE ORDER</span><span class="fh-badge">DRAFT</span></div>
+    <div class="form-body">
+      <table class="form-table">
+        <thead><tr><th>Material</th><th style="width:90px">Qty</th><th style="width:110px">Rate (₹)</th><th style="width:110px">Amount</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Ferrite Core E-30</td>
+            <td class="mono">${qty} pcs</td>
+            <td><input type="number" id="poRate" placeholder="required"></td>
+            <td class="total-cell" id="poAmount">—</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="field-error" id="poErr">Rate is required — the agent won't invent one.</div>
+      <div style="margin-top:12px;font-size:13px;">
+        <label class="row-note">Supplier</label><br>
+        <select id="poSupplier" style="margin-top:3px;padding:6px 4px;border:1px solid var(--line);border-radius:4px;font-family:'IBM Plex Sans';width:220px;">
+          <option>Sundaram Ferrites Pvt Ltd</option>
+          <option>Chennai Core Traders</option>
+        </select>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="this.closest('.form-card').remove(); setChips([])">Cancel</button>
+        <button class="btn btn-primary" id="poSubmit">Create PO</button>
+      </div>
+    </div>
+  `;
+  addCustom(card);
+  setChips([]);
+  const rateInp = card.querySelector('#poRate');
+  const amountCell = card.querySelector('#poAmount');
+  rateInp.addEventListener('input', ()=>{
+    const r = parseFloat(rateInp.value)||0;
+    amountCell.textContent = r ? '₹'+(r*qty).toLocaleString('en-IN') : '—';
+    rateInp.classList.remove('err');
+    card.querySelector('#poErr').classList.remove('show');
+  });
+  card.querySelector('#poSubmit').onclick = ()=>{
+    const r = parseFloat(rateInp.value);
+    if(!r){
+      rateInp.classList.add('err');
+      card.querySelector('#poErr').classList.add('show');
+      return;
+    }
+    const total = r*qty;
+    card.style.opacity=0.55;
+    submitPO(total, qty, r);
+  };
+}
+
+function submitPO(total, qty, rate){
+  stage='po-submitted';
+  const pending = total > PO_THRESHOLD;
+  typingDelay(()=>{
+    if(pending){
+      addAgent(`<strong>PO-2627-0015</strong> created — ${qty} pcs Ferrite Core E-30 @ ₹${rate} = <span class="mono">₹${total.toLocaleString('en-IN')}</span>.<br>That's above the ₹${PO_THRESHOLD.toLocaleString('en-IN')} approval threshold — sent to the owner.`, {tone:'alert'});
+      setChips([{label:'Switch to Owner view →', action:()=>setRole('owner')}]);
+    } else {
+      addAgent(`<strong>PO-2627-0015</strong> created and approved automatically — under threshold.`, {stamp:'PO APPROVED'});
+      setChips([{label:'Material arrived for PO-15', action:renderGrnForm}]);
+    }
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   OWNER VIEW — approval cards
+   ══════════════════════════════════════════════════════════════ */
+function renderForStage(){
+  if(role==='owner'){
+    thread.querySelectorAll('.owner-injected').forEach(n=>n.remove());
+    if(stage==='po-submitted'){
+      renderPoApproval();
+    } else if(stage==='count-submitted'){
+      renderCountApproval();
+    } else {
+      const t=document.createElement('div');
+      t.className='turn agent owner-injected';
+      t.innerHTML=`<div class="agent-card"><div class="tag">Owner inbox</div>Nothing needs your approval right now.</div>`;
+      thread.appendChild(t); scrollDown();
+      setChips([{label:'Back to Storekeeper', action:()=>setRole('store')}]);
+    }
+  } else {
+    // returning to storekeeper — chips already reflect current stage from prior calls
+  }
+}
+
+function renderPoApproval(){
+  const card = document.createElement('div');
+  card.className='agent-card approval-card owner-injected';
+  card.style.maxWidth='92%';
+  card.innerHTML = `
+    <div class="tag">Owner inbox · Pending approval</div>
+    <strong>PO-2627-0015</strong> — Sundaram Ferrites Pvt Ltd<br>
+    982 pcs Ferrite Core E-30 · <span class="amount">₹63,830</span><br>
+    <span class="row-note">Triggered by JOB-2627-0031 shortfall</span>
+    <div class="approval-actions">
+      <button class="btn btn-primary" id="approvePoBtn">Approve</button>
+      <button class="btn btn-ghost">Reject</button>
+    </div>
+  `;
+  const t=document.createElement('div'); t.className='turn agent owner-injected'; t.style.width='100%';
+  t.appendChild(card);
+  thread.appendChild(t); scrollDown();
+  card.querySelector('#approvePoBtn').onclick=()=>{
+    card.querySelector('.approval-actions').innerHTML = `<div class="stamp">✓ APPROVED BY OWNER</div>`;
+    stage='po-approved';
+    typingDelay(()=>{
+      const t2=document.createElement('div'); t2.className='turn agent owner-injected';
+      t2.innerHTML=`<div class="agent-card confirm">PO-2627-0015 approved. I'll notify the storekeeper when material arrives.</div><div class="meta-ts">Agent · ${now()}</div>`;
+      thread.appendChild(t2); scrollDown();
+    });
+    setChips([{label:'Switch to Storekeeper →', action:()=>{setRole('store'); typingDelay(()=>{
+      addAgent(`PO-2627-0015 was approved by the owner.`, {tone:'confirm'});
+      setChips([{label:'Material arrived for PO-15', action:renderGrnForm}]);
+    },200);}}]);
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STAGE 5 — GRN form (prefilled from PO, split accepted/rejected)
+   ══════════════════════════════════════════════════════════════ */
+function renderGrnForm(){
+  stage='grn-form';
+  const card = document.createElement('div');
+  card.className='form-card';
+  card.innerHTML = `
+    <div class="form-head"><span class="fh-title">GOODS RECEIPT · PO-2627-0015</span><span class="fh-badge">982 PCS ORDERED</span></div>
+    <div class="form-body">
+      <table class="form-table">
+        <thead><tr><th>Material</th><th style="width:80px">Accepted</th><th style="width:80px">Rejected</th><th style="width:110px">Rate (₹)</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Ferrite Core E-30</td>
+            <td><input type="number" id="grnAccept" value="982"></td>
+            <td><input type="number" id="grnReject" value="0"></td>
+            <td class="mono">65.00 <span class="row-note">(from PO)</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="this.closest('.form-card').remove(); setChips([])">Cancel</button>
+        <button class="btn btn-primary" id="grnSubmit">Record receipt</button>
+      </div>
+    </div>
+  `;
+  addCustom(card);
+  setChips([]);
+  card.querySelector('#grnSubmit').onclick = ()=>{
+    const acc = parseInt(card.querySelector('#grnAccept').value)||0;
+    card.style.opacity=0.55;
+    materials.core.onHand += acc;
+    typingDelay(()=>{
+      addAgent(`Added to stock: <strong>${acc} Ferrite Core E-30</strong> @ ₹65. New balance: <span class="mono">${materials.core.onHand}</span>.`, {stamp:'RECEIPT RECORDED'});
+      setChips([{label:'Issue material for JOB-31', action:renderIssueConfirm}]);
+    });
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STAGE 6 — issue (conversational, no form — see catalog note)
+   ══════════════════════════════════════════════════════════════ */
+function renderIssueConfirm(){
+  stage='issue-confirm';
+  addUser('Issue for job 31');
+  typingDelay(()=>{
+    const lines = bomRows.map(r=>{
+      const t=r.qtyPer*JOB_QTY;
+      return materials[r.key].uom==='kg' ? (t/1000).toFixed(2)+'kg '+materials[r.key].name : Math.round(t)+' '+materials[r.key].name;
+    }).join(', ');
+    addAgent(`Issuing to <strong>JOB-2627-0031</strong>: ${lines}. Confirm?`);
+    setChips([
+      {label:'Confirm', action:issueMaterial},
+      {label:'Adjust quantities', type:'ghost', action:renderBomForm},
+    ]);
+  });
+}
+function issueMaterial(){
+  typingDelay(()=>{
+    addAgent(`Issued. Job status: <strong>Material Issued</strong>.`, {stamp:'ISSUED'});
+    setChips([{label:'Run stock count', action:openCount}]);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STAGE 7 — physical count (full grid, the one real form-screen)
+   ══════════════════════════════════════════════════════════════ */
+const countData = [
+  {key:'wire', sys:142.60, counted:142.60},
+  {key:'core', sys: materials.core.onHand, counted: materials.core.onHand},
+  {key:'bobbin', sys:640, counted:612},
+  {key:'tape', sys:820, counted:820},
+  {key:'varnish', sys:38, counted:34},
+];
+function openCount(){
+  const overlay=document.getElementById('countOverlay');
+  overlay.classList.add('show');
+  renderCountRows();
+}
+function closeCount(){ document.getElementById('countOverlay').classList.remove('show'); }
+function renderCountRows(){
+  const wrap = document.getElementById('countRows');
+  wrap.innerHTML='';
+  countData.forEach((row,i)=>{
+    const diff = +(row.counted - row.sys).toFixed(2);
+    const diffClass = diff===0?'zero':(diff<0?'neg':'pos');
+    const div = document.createElement('div');
+    div.className='count-row';
+    div.innerHTML = `
+      <div>${materials[row.key].name}</div>
+      <div class="sys-qty">${row.sys} ${materials[row.key].uom}</div>
+      <div><input type="number" step="0.01" class="counted-inp" data-i="${i}" value="${row.counted}"></div>
+      <div class="diff-cell ${diffClass}">${diff>0?'+':''}${diff}</div>
+      <div>${diff!==0 ? `
+        <select class="reason-sel" data-i="${i}">
+          <option value="UNEXPLAINED">Unexplained</option>
+          <option value="SPILLAGE">Spillage</option>
+          <option value="EXTRA_WASTAGE">Extra wastage</option>
+          <option value="MISSING">Missing</option>
+          <option value="ENTRY_ERROR">Entry error</option>
+        </select>` : `<span class="row-note">—</span>`}</div>
+    `;
+    wrap.appendChild(div);
+  });
+  wrap.querySelectorAll('.counted-inp').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      countData[+e.target.dataset.i].counted = parseFloat(e.target.value)||0;
+      renderCountRows();
+    });
+  });
+}
+function submitCount(){
+  closeCount();
+  stage='count-submitted';
+  const mismatched = countData.filter(r=>r.counted!==r.sys);
+  const variance = mismatched.reduce((sum,r)=>sum + Math.abs(r.counted-r.sys)*materials[r.key].rate, 0);
+  typingDelay(()=>{
+    addAgent(`Sent to owner for approval — <strong>${mismatched.length} materials mismatched</strong>, ₹${Math.round(variance).toLocaleString('en-IN')} total variance.`, {tone:'alert'});
+    setChips([{label:'Switch to Owner view →', action:()=>setRole('owner')}]);
+  });
+}
+function renderCountApproval(){
+  const mismatched = countData.filter(r=>r.counted!==r.sys);
+  const variance = mismatched.reduce((sum,r)=>sum + Math.abs(r.counted-r.sys)*materials[r.key].rate, 0);
+  const card = document.createElement('div');
+  card.className='agent-card approval-card owner-injected';
+  card.style.maxWidth='92%';
+  card.innerHTML = `
+    <div class="tag">Owner inbox · Pending approval</div>
+    <strong>CNT-2627-0004</strong> — monthly physical count<br>
+    ${mismatched.length} materials mismatched · <span class="amount">₹${Math.round(variance).toLocaleString('en-IN')}</span> variance
+    <div class="alert-list">
+      ${mismatched.map(r=>`<div class="alert-row"><span class="dot ${r.counted<r.sys?'red':'amber'}"></span><div>${materials[r.key].name}: system ${r.sys}, counted ${r.counted} (${r.counted-r.sys>0?'+':''}${(r.counted-r.sys).toFixed(2)})</div></div>`).join('')}
+    </div>
+    <div class="approval-actions">
+      <button class="btn btn-primary" id="approveCountBtn">Approve</button>
+      <button class="btn btn-ghost">Reject</button>
+    </div>
+  `;
+  const t=document.createElement('div'); t.className='turn agent owner-injected'; t.style.width='100%';
+  t.appendChild(card); thread.appendChild(t); scrollDown();
+  card.querySelector('#approveCountBtn').onclick=()=>{
+    card.querySelector('.approval-actions').innerHTML=`<div class="stamp">✓ APPROVED BY OWNER</div>`;
+    setChips([{label:'Show leak report', action:showLeakReport}]);
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   REPORT — read-only, freely-styled, no form contract
+   ══════════════════════════════════════════════════════════════ */
+function showLeakReport(){
+  const rows = [
+    {name:'Bobbin type-B', value:1980, pct:100},
+    {name:'Varnish', value:1360, pct:69},
+    {name:'22 SWG Copper Wire', value:0, pct:0},
+    {name:'Ferrite Core E-30', value:0, pct:0},
+  ].filter(r=>r.value>0);
+  const card = document.createElement('div');
+  card.className='report-card';
+  card.innerHTML = `
+    <div class="report-title">Material Leak Report</div>
+    <div class="report-sub">Approved count variance, by rupee value — this month</div>
+    ${rows.map(r=>`
+      <div class="bar-row">
+        <div class="bar-label">${r.name}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${r.pct}%"></div></div>
+        <div class="bar-value">₹${r.value.toLocaleString('en-IN')}</div>
+      </div>
+    `).join('')}
+    <div class="row-note" style="margin-top:6px;">Generated fresh from the ledger — recomputes every time it's asked for.</div>
+  `;
+  addCustom(card);
+  setChips([{label:'Back to today', action:()=>{setRole('store'); setChips([{label:'New job', action:startJobFlow},{label:'Check leak report', action:showLeakReport}]);}}]);
+}
+
+/* ── boot ── */
+boot();
+</script>
+</body>
+</html>

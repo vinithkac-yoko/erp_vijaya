@@ -1,0 +1,13 @@
+<script>
+(async () => {
+  const ui = vijaya.ui;
+  ui.heading('If the copper rate changes');
+  const r = await vijaya.read('estimate_job_cost', { materialNames: ['Copper wire'], newRate: 900 });
+  ui.table({ columns: [
+    { field: 'job', label: 'Job' }, { field: 'customer', label: 'Customer' },
+    { field: 'currentCost', label: 'Now', format: 'inr' },
+    { field: 'estimatedCost', label: 'Estimated', format: 'inr' },
+    { field: 'changePct', label: 'Change', format: 'percent' },
+  ], rows: r.rows });
+})();
+</script>

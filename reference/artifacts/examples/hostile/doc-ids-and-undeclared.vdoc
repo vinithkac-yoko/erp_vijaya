@@ -1,0 +1,10 @@
+---
+title: Ids
+reads:
+  alerts: list_reorder_alerts {}
+---
+{{ghost.total|inr}} and {{alerts.rows.materialId}}
+
+```vtable
+{"from":"alerts","columns":[{"field":"materialId","label":"Id"}]}
+```

@@ -1,0 +1,19 @@
+---
+title: How we receive material
+---
+Follow these steps every time a delivery comes in.
+
+```mermaid
+flowchart LR
+  A[Delivery arrives] --> B{Matches the PO?}
+  B -->|yes| C[Record the receipt]
+  B -->|no| D[Call the supplier]
+  D --> C
+  C --> E[Shelf and label it]
+```
+
+1. Check the challan against the purchase order.
+2. Weigh or count what came.
+3. Record the receipt in the app and type the rate from the invoice.
+
+> If the count differs from the challan, note it on the receipt. Do not adjust it later.
