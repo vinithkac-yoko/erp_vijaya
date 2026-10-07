@@ -78,13 +78,19 @@ const EDIT_TOOL: Anthropic.Tool = {
 type Msg = Anthropic.MessageParam;
 
 async function ask(m: BuilderModel, system: string, tool: Anthropic.Tool, messages: Msg[], usage: { input: number; output: number }): Promise<{ input: Record<string, unknown>; useId: string; content: Anthropic.ContentBlock[] }> {
-  const stream = m.client.messages.stream({ model: m.model, max_tokens: 16_000, system, tools: [tool], tool_choice: { type: 'tool', name: tool.name }, messages });
-  const reply = await stream.finalMessage();
-  usage.input += (reply.usage.input_tokens ?? 0) + (reply.usage.cache_creation_input_tokens ?? 0) + Math.ceil((reply.usage.cache_read_input_tokens ?? 0) / 10);
-  usage.output += reply.usage.output_tokens ?? 0;
-  const use = reply.content.find((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === tool.name);
-  if (!use) throw new BuilderError('NO_ANSWER', "I couldn't build that. Try asking a little differently.");
-  return { input: use.input as Record<string, unknown>, useId: use.id, content: reply.content };
+  // This model family does not accept a forced tool choice, so the one tool is offered, and a reply in plain words gets one reminder.
+  const sent: Msg[] = [...messages];
+  for (let tries = 0; tries < 2; tries++) {
+    const stream = m.client.messages.stream({ model: m.model, max_tokens: 16_000, system, tools: [tool], tool_choice: { type: 'auto' }, messages: sent });
+    const reply = await stream.finalMessage();
+    usage.input += (reply.usage.input_tokens ?? 0) + (reply.usage.cache_creation_input_tokens ?? 0) + Math.ceil((reply.usage.cache_read_input_tokens ?? 0) / 10);
+    usage.output += reply.usage.output_tokens ?? 0;
+    const use = reply.content.find((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === tool.name);
+    if (use) return { input: use.input as Record<string, unknown>, useId: use.id, content: reply.content };
+    sent.push({ role: 'assistant', content: reply.content.length ? reply.content : [{ type: 'text', text: '(no answer)' }] });
+    sent.push({ role: 'user', content: `Answer only by calling the ${tool.name} tool.` });
+  }
+  throw new BuilderError('NO_ANSWER', "I couldn't build that. Try asking a little differently.");
 }
 
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');

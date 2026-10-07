@@ -12,7 +12,7 @@ function builder(r: StubRequest): StubReply {
   const system = JSON.stringify(r.body.system ?? '');
   const request = /<request>\\n([\s\S]*?)\\n<\/request>/.exec(system)?.[1]?.toLowerCase() ?? system.toLowerCase();
   const repair = (r.body.messages as unknown[]).length > 1;
-  if (r.body.tool_choice.name === 'return_edit') {
+  if (r.body.tools?.[0]?.name === 'return_edit') {
     if (request.includes('supplier column')) return call('return_edit', { patches: [{ old: '"label":"Material"}', new: '"label":"Material"},{"field":"supplier","label":"Supplier"}' }], summary: 'Added a Supplier column.' });
     if (request.includes('nothing matches')) return call('return_edit', { patches: [{ old: 'THIS TEXT IS NOT THERE', new: 'x' }], summary: 'Changed it.' });
     return call('return_edit', { patches: [], summary: 'Nothing to change.' });
@@ -43,7 +43,7 @@ function script(r: StubRequest): StubReply {
   const answered = r.toolResults.length > 0;
   const owner = r.body.system?.[1]?.text?.includes('the OWNER') as boolean;
 
-  if (r.body.tool_choice?.type === 'tool') return builder(r);
+  if (/^return_(artifact|edit)$/.test(r.body.tools?.[0]?.name ?? '')) return builder(r);
   if (t.includes('trigger api down')) return { httpError: 529 };
   if (t.includes('how much') && t.includes('copper')) return answered ? say('There is no 22 SWG Copper Wire in the list yet.') : call('get_material_balance', { materialNames: ['copper wire'] }, 'Let me check.');
   if (t.includes('below its minimum')) return answered ? say('These are below their minimum.') : call('list_reorder_alerts', {});

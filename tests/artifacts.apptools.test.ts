@@ -17,7 +17,7 @@ const PAGE = `<script>(async () => { const r = await vijaya.read('list_reorder_a
 
 function builder(answers: Record<string, unknown>[]): BuilderModel {
   let n = 0;
-  const client = { messages: { stream: (p: { tool_choice: { name: string } }) => ({ finalMessage: async () => ({ content: [{ type: 'tool_use', id: `t${n}`, name: p.tool_choice.name, input: answers[Math.min(n++, answers.length - 1)] }], usage: { input_tokens: 10, output_tokens: 5 } }) }) } } as unknown as Anthropic;
+  const client = { messages: { stream: (p: { tools: { name: string }[] }) => ({ finalMessage: async () => ({ content: [{ type: 'tool_use', id: `t${n}`, name: p.tools[0]!.name, input: answers[Math.min(n++, answers.length - 1)] }], usage: { input_tokens: 10, output_tokens: 5 } }) }) } } as unknown as Anthropic;
   return { client, model: 'test', effort: 'low' };
 }
 const ctx = async (who: 'OWNER' | 'STOREKEEPER', over: Partial<AppToolContext> = {}): Promise<AppToolContext> => {

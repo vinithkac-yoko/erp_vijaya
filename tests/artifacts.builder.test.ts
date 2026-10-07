@@ -7,11 +7,11 @@ function fake(answers: Record<string, unknown>[]) {
   const calls: { system: string; messages: { role: string; content: unknown }[]; tool_choice: unknown; tools: { name: string }[] }[] = [];
   const client = {
     messages: {
-      stream: (p: { system: string; messages: { role: string; content: unknown }[]; tool_choice: { name: string }; tools: { name: string }[] }) => ({
+      stream: (p: { system: string; messages: { role: string; content: unknown }[]; tool_choice: unknown; tools: { name: string }[] }) => ({
         finalMessage: async () => {
           calls.push({ system: p.system, messages: JSON.parse(JSON.stringify(p.messages)), tool_choice: p.tool_choice, tools: p.tools });
           const input = answers[Math.min(calls.length - 1, answers.length - 1)]!;
-          return { content: [{ type: 'tool_use', id: `tu_${calls.length}`, name: p.tool_choice.name, input }], usage: { input_tokens: 1000, output_tokens: 200 } };
+          return { content: [{ type: 'tool_use', id: `tu_${calls.length}`, name: p.tools[0]!.name, input }], usage: { input_tokens: 1000, output_tokens: 200 } };
         },
       }),
     },
@@ -31,7 +31,8 @@ describe('the builder: the server decides if it is good (ARTIFACTS §3)', () => 
     expect(r).toMatchObject({ kind: 'document', title: 'Below minimum', usage: { input: 1000, output: 200 } });
     expect(r.report).toMatchObject({ ok: true, reads: ['list_reorder_alerts'] });
     expect(calls).toHaveLength(1);
-    expect(calls[0]!.tool_choice).toEqual({ type: 'tool', name: 'return_artifact' });
+    expect(calls[0]!.tools.map((t) => t.name)).toEqual(['return_artifact']);
+    expect(calls[0]!.tool_choice).toEqual({ type: 'auto' });
   });
 
   it('what fails the checks goes back in the checker\'s own words, and the repaired one is kept (one repair)', async () => {
@@ -98,7 +99,7 @@ describe('edits are patches that must match exactly once (ARTIFACTS §3.1)', () 
     expect(r.source).toContain('alerts: list_reorder_alerts {}');
     expect(r.summary).toBe('Changed the wording.');
     expect(JSON.stringify(calls[1]!.messages)).toContain('PATCH_NO_MATCH');
-    expect(calls[0]!.tool_choice).toEqual({ type: 'tool', name: 'return_edit' });
+    expect(calls[0]!.tools.map((t) => t.name)).toEqual(['return_edit']);
   });
 
   it('the whole result is checked again: an edit that types a number is sent back', async () => {
