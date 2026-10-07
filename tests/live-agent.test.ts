@@ -271,4 +271,86 @@ live('the real assistant (needs LIVE_ANTHROPIC_API_KEY)', () => {
     expect(q.calls).toContain('get_scrap_summary');
     expect(q.said).toMatch(/1\.8/);
   }, 240_000);
+
+  /** The floor, plus bobbins and two approved monthly counts with differences (ACCEPTANCE §11–§13). */
+  async function reports() {
+    const f = await floor();
+    const db = await import('./helpers/db');
+    const wire = await prisma.material.findFirstOrThrow({ where: { name: '22 SWG Copper Wire' } });
+    const bobbin = await db.makeMaterial({ name: 'Bobbin Type-B', uom: 'NOS' });
+    await db.receive(bobbin.id, 652, 9);
+    const day = (ymd: string) => new Date(`${ymd}T00:00:00+05:30`);
+    const opening = await db.makeCount({ isOpening: true, countDate: day('2026-08-01') });
+    await db.addLine(opening.id, bobbin.id, { system: 0, counted: 0 });
+    await db.approveCount(opening.id); // go-live is done, so a monthly count can start
+    const sep = await db.makeCount({ countDate: day('2026-09-30') });
+    await db.addLine(sep.id, wire.id, { system: 100, counted: 98, reason: 'MISSING' });
+    await db.addLine(sep.id, bobbin.id, { system: 652, counted: 612, reason: 'UNEXPLAINED' });
+    await db.approveCount(sep.id);
+    return { ...f, bobbin };
+  }
+
+  it('reports: "where is my stock leaking" reads the leak report; "is someone stealing" gets facts and no accusation', async () => {
+    const { o } = await reports();
+    const r = await say(o, 'Where is my stock leaking?');
+    expect(r.calls).toContain('get_leak_report');
+    expect(r.forms).toHaveLength(0);
+    const t = await say(o, 'Is someone stealing from me?');
+    expect(t.forms).toHaveLength(0);
+    expect(t.said).not.toMatch(/\b(is|are|has been|have been)\s+(stealing|a thief|thieves)\b/i);
+    expect(t.said.toLowerCase()).toMatch(/fact|number|count|differ|cannot tell|can't tell|doesn't|does not|not track|who/);
+  }, 240_000);
+
+  it('reports: "how many unexplained differences this month" reads the leak report for the month; the storekeeper is told it is the owner\'s', async () => {
+    const { o, s } = await reports();
+    const r = await say(o, 'How many unexplained differences this month?');
+    expect(r.calls).toContain('get_leak_report');
+    const sk = await say(s, 'Where is my stock leaking?');
+    expect(sk.calls).not.toContain('get_leak_report');
+    expect(sk.said.toLowerCase()).toContain('owner');
+  }, 240_000);
+
+  it('reports: the bobbin count history, for the storekeeper; who counted it, for the owner', async () => {
+    const { s, o } = await reports();
+    const h = await say(s, 'Show the bobbin count history');
+    expect(h.calls).toContain('get_count_history');
+    const w = await say(o, 'Who counted the bobbins?');
+    expect(w.calls).toContain('get_count_history');
+  }, 240_000);
+
+  it('reports: "how many bobbins should there be" during a count says the System quantity plainly; changing it or setting stock directly is refused', async () => {
+    const { s } = await reports();
+    const today = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
+    await ok(save(s, 'start_stock_count', { countDate: today }));
+    const q = await say(s, 'How many bobbins should there be?');
+    expect(q.said).toMatch(/652/);
+    const c = await say(s, 'Change the system quantity for bobbins to 612 so it matches');
+    expect(c.forms).toHaveLength(0);
+    const d = await say(s, 'Just set the bobbin stock to 612 directly');
+    expect(d.forms).toHaveLength(0);
+    expect(d.said.toLowerCase()).toContain('owner');
+  }, 300_000);
+
+  it('reports: the copper what-if uses the estimate tool and saves nothing; everything done today reads the activity log', async () => {
+    const { o, job } = await reports();
+    await ok(save(o, 'issue_material', { jobId: job.id }));
+    const before = await prisma.auditEvent.count();
+    const w = await say(o, 'What if copper wire goes to ₹900 a kg? What happens to my open jobs?');
+    expect(w.calls).toContain('estimate_job_cost');
+    expect(w.forms).toHaveLength(0);
+    const a = await say(o, 'Show me everything the agent did today');
+    expect(a.calls).toContain('get_activity');
+    expect(await prisma.auditEvent.count()).toBe(before);
+  }, 300_000);
+
+  it('reports: which jobs have material issued but are not closed; job costs and the value of one material are the owner\'s reads', async () => {
+    const { s, o, job } = await reports();
+    await ok(save(s, 'issue_material', { jobId: job.id }));
+    const j = await say(s, 'Which jobs have material issued but are not closed?');
+    expect(j.calls).toContain('list_jobs');
+    const v = await say(o, 'What is the value of copper wire in stock?');
+    expect(v.calls).toContain('get_stock_value');
+    const c = await say(o, 'What do my jobs cost so far?');
+    expect(c.calls).toContain('get_job_cost_report');
+  }, 300_000);
 });

@@ -25,6 +25,8 @@ export interface ContextInput {
   now: Date;
   /** Owner only: what is waiting for him. */
   waiting?: { purchaseOrders: number; counts: number };
+  /** A stock count that is open for counting (or sent back): a bare "material and a quantity" means a count entry. */
+  counting?: { number: string; opening: boolean; counted: number; total: number };
 }
 
 /** "2026-27", from the same function that numbers the documents. */
@@ -38,5 +40,6 @@ export function sessionContext(i: ContextInput): string {
     `Today is ${dateText(i.now)}. Financial year ${financialYearLabel(i.now)}.`,
   ];
   if (i.role === 'OWNER' && i.waiting) lines.push(`Waiting for you: ${i.waiting.purchaseOrders} purchase orders, ${i.waiting.counts} stock counts.`);
+  if (i.counting) lines.push(`A ${i.counting.opening ? 'opening count' : 'stock count'} is open: ${i.counting.number}, ${i.counting.counted} of ${i.counting.total} materials counted. A material and a quantity typed on their own is the count of that material; use list_count_lines and submit_count_line.`);
   return lines.join('\n');
 }

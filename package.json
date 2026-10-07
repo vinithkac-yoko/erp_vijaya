@@ -19,7 +19,8 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "db:seed:if-empty": "tsx prisma/seed.ts --if-empty"
+    "db:seed:if-empty": "tsx prisma/seed.ts --if-empty",
+    "eval": "vitest run -c vitest.eval.config.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

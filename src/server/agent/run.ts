@@ -45,6 +45,7 @@ const STATUS: Record<string, string> = {
   list_reorder_alerts: 'Checking what is low…', list_pending_approvals: 'Checking what is waiting…', list_settings: 'Looking at the settings…', list_users: 'Looking up the logins…',
 };
 
+const SAY_IT = 'Now write the one short sentence the user needs before they check the form: what is filled in and what to check, following the rules for what it says. Plain words. Do not say it is done or saved.';
 const FORM_OPENED = 'A form is now open for the user with those details filled in. Nothing is saved until the user checks it and presses its button. Do not say it is done.';
 /**
  * One turn of the assistant. It can look things up (reads run and show as tables) and it can open a form (a write tool
@@ -99,9 +100,10 @@ export function createAgent(deps: AgentDeps) {
     let failure: string | undefined;
     try {
       const waiting = session.role === 'OWNER' ? await ownerWaiting(session) : undefined;
+      const counting = await countingNow(session);
       const system = [
         { type: 'text' as const, text: systemPrompt(), cache_control: { type: 'ephemeral' as const } },
-        { type: 'text' as const, text: sessionContext({ name: session.name, role: session.role, now: now(), waiting }) },
+        { type: 'text' as const, text: sessionContext({ name: session.name, role: session.role, now: now(), waiting, counting }) },
       ];
 
       let toolCalls = 0;
@@ -146,6 +148,7 @@ export function createAgent(deps: AgentDeps) {
         const uses = reply.content.filter((b): b is Anthropic.Beta.Messages.BetaToolUseBlock => b.type === 'tool_use');
         const results: { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }[] = [];
         let formOpened = false;
+        let formCard: Card | undefined;
         let limited = false;
 
         for (const use of uses) {
@@ -191,11 +194,28 @@ export function createAgent(deps: AgentDeps) {
           }
           if (tool.kind !== 'write') continue;
           formOpened = true;
-          await show(conversationId, await pending.formCard(session, opened.data), emit, run.id);
+          formCard = await pending.formCard(session, opened.data);
           results.push({ type: 'tool_result', tool_use_id: use.id, content: FORM_OPENED });
         }
 
-        await store.append(conversationId, 'USER', { kind: 'tool_results', blocks: results }, run.id);
+        // A form ends the turn, so what the person should check has to be said now. If the message that opened it had no
+        // words, ask for the one sentence (no tools) and show it above the form.
+        const spoke = reply.content.some((b) => b.type === 'text' && b.text.trim().length > 0);
+        const silent = formOpened && !spoke;
+        await store.append(conversationId, 'USER', { kind: 'tool_results', blocks: silent ? [...results, { type: 'text', text: SAY_IT }] : results }, run.id);
+        if (silent) {
+          const say = client.beta.messages.stream({
+            model: config.model, max_tokens: 600, system, tools, tool_choice: { type: 'none' }, messages: toApiMessages(await store.rows(conversationId)),
+            output_config: { effort: config.effort },
+          }, { signal: timeout.signal });
+          const sayId = randomUUID();
+          say.on('text', (delta) => emit({ type: 'text', id: sayId, delta }));
+          const said = await say.finalMessage();
+          usage.inputTokens += (said.usage.input_tokens ?? 0) + (said.usage.cache_creation_input_tokens ?? 0) + Math.ceil((said.usage.cache_read_input_tokens ?? 0) / 10);
+          usage.outputTokens += said.usage.output_tokens ?? 0;
+          await store.append(conversationId, 'ASSISTANT', { kind: 'api', blocks: said.content }, run.id);
+        }
+        if (formCard) await show(conversationId, formCard, emit, run.id);
 
         if (formOpened) break; // the turn ends with the form on the screen
         if (limited) {
@@ -222,6 +242,14 @@ export function createAgent(deps: AgentDeps) {
       await store.finishRun(run.id, status, usage, calls, t0, failure);
       emit({ type: 'done' });
     }
+  }
+
+  /** A count open for counting (or sent back for a recount), so "tape 820" is understood as a count entry. */
+  async function countingNow(session: ToolSession) {
+    const r = await runTool(session, 'list_counts', {});
+    if (!r.ok) return undefined;
+    const open = (r.data as { rows: { number: string; type: string; status: string; counted: number; total: number }[] }).rows.find((c) => c.status === 'DRAFT' || c.status === 'REJECTED');
+    return open ? { number: open.number, opening: /opening/i.test(open.type), counted: open.counted, total: open.total } : undefined;
   }
 
   /** The owner's context line: how many things wait for him (the same read tool the opening card uses). */

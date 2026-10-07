@@ -203,11 +203,26 @@ describe('writes only ever open a form', () => {
     const agent = await setup((r) => (r.n === 0 ? call('create_material', { name: 'Varnish', uom: 'LTR', stockType: 'PER_JOB' }) : say('ok')));
     const a = await turn(agent, s, 'add varnish');
     await turn(agent, s, 'thanks', a.id);
-    const msgs = (stub as Stub).requests[1]?.body.messages as { role: string; content: { type: string; tool_use_id?: string; id?: string }[] }[];
+    // request 0 opens the form in silence, request 1 is the server asking for the one sentence (no tools), request 2 is "thanks"
+    const msgs = (stub as Stub).requests[2]?.body.messages as { role: string; content: { type: string; tool_use_id?: string; id?: string }[] }[];
     const use = msgs[1]?.content.find((b) => b.type === 'tool_use');
     const res = msgs[2]?.content.find((b) => b.type === 'tool_result');
-    expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'user']);
+    expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'assistant', 'user']);
     expect(res?.tool_use_id).toBe(use?.id);
+  });
+
+  it('a form opened with no words gets one sentence above it, asked for with no tools; one opened with words does not', async () => {
+    const s = await storekeeper();
+    const silent = await setup((r) => (r.body.tool_choice?.type === 'none' ? say('Check the unit and the minimum first.') : call('create_material', { name: 'Varnish', uom: 'LTR', stockType: 'PER_JOB' })));
+    const a = await turn(silent, s, 'add varnish');
+    const items = await conversations.items(s.userId, a.id);
+    const kinds = (items ?? []).map((i) => (i.role === 'card' ? i.card.kind : i.role));
+    expect(kinds).toEqual(['user', 'assistant', 'form']); // the sentence comes first, the form after it
+    expect((stub as Stub).requests.map((r) => r.body.tool_choice?.type ?? 'auto')).toEqual(['auto', 'none']);
+    await prisma.pendingAction.deleteMany();
+    const spoken = await setup((r) => call('create_material', { name: 'Paint', uom: 'LTR', stockType: 'PER_JOB' }, `Check the unit (${r.n}).`));
+    await turn(spoken, s, 'add paint');
+    expect((stub as Stub).requests).toHaveLength(1);
   });
 
   it('a new form for the same tool in the same chat replaces the old one', async () => {

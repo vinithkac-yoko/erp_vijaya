@@ -11,3 +11,4 @@ tsconfig.tsbuildinfo
 test-results/
 playwright-report/
 next-env.d.ts
+evals/reports/*.transcripts.json

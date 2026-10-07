@@ -61,7 +61,8 @@ export async function startStub(script: Script, port = 0): Promise<Stub> {
       };
       requests.push(r);
 
-      const reply = await script(r);
+      // the server's own "say it" step after a form opened without words: no tools, one sentence
+      const reply = body.tool_choice?.type === 'none' ? say('Here is the form. Check it, then press its button.') : await script(r);
       if (reply.delayMs) await new Promise((ok) => setTimeout(ok, reply.delayMs));
       if (reply.httpError) {
         res.writeHead(reply.httpError, { 'content-type': 'application/json' });

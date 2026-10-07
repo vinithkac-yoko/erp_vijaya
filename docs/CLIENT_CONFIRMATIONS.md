@@ -169,3 +169,17 @@ Last updated: after milestone 7 (section J).
 | J13 | ❓ | **Corrections (reversals).** | **Owner only**, with a reason. Both rows stay. Can be reversed: an issue, a return, scrap in, a scrap sale, and a whole receipt. Cannot: opening stock and count adjustments (the next count corrects them), a reversal, goods sent back, a receipt that had part sent back, anything on a closed job. Once per entry. | ☐ OK ☐ Change: |
 | J14 | ❓ | **At what price a reversal comes back.** | An entry that took stock out comes back at the price it went out at. An entry that brought stock in is taken out at the current average. | ☐ OK ☐ Change: |
 | J15 | ❓ | **Who is told of a reversal.** | The person who made the entry, with the owner's reason, at the top of their next new chat. | ☐ OK ☐ Also all storekeepers: |
+
+## K. Added in milestone 8 — the leak report, count history, job costs, what-ifs and activity
+
+| # | Status | The question | What we did | Owner says |
+|---|---|---|---|---|
+| K1 | ❓ | **What counts as "a leak".** | The leak report reads only **approved monthly counts**. The opening count is never in it, and a count still with you (or sent back) is not in it yet. For each material it says: differed in X of Y counts, how much was short in total, what that is worth, how many differences nobody explained, and the reasons given. Biggest rupee value first. | ☐ OK ☐ Change: |
+| K2 | ❓ | **What a difference is "worth".** | Quantity × the material's **average price today** (not the price on the day of the count). It is the same sum the database view does. | ☐ OK ☐ Use the price on the day of the count: |
+| K3 | ❓ | **"Not explained".** | A difference with no reason, or with "Don't know", counts as not explained. A count that matches is never counted as one. | ☐ OK ☐ Change: |
+| K4 | ✅ | **Nothing about who is to blame.** | The assistant gives numbers and facts and says the system records differences and who counted, not who is at fault. Asked "is someone stealing?", it does not guess. | ☐ OK ☐ Change: |
+| K5 | ❓ | **Who may see a count's history and who counted.** | **Both** the storekeeper and the owner see every count of a material: what the system said, what was counted, the reason and who counted. The leak report and everything below are the owner's. | ☐ OK ☐ Owner only: |
+| K6 | ❓ | **Who counted.** | The person who entered that line (the count sheet's save counts too). If that is not recorded, the person who started the count. | ☐ OK ☐ Change: |
+| K7 | ❓ | **Job cost report.** | By default the jobs **closed** in the period, with the cost stored when they closed. "Include open jobs" adds the cost so far. All jobs under one customer PO can be shown, each costed separately. Cancelled jobs are never in it. | ☐ OK ☐ Change: |
+| K8 | ❓ | **The what-if ("if copper goes to ₹900").** | Prices what each job that is not closed **needs** (its BOM, or more if more has gone out) at today's average prices, against the same with one material's price changed. Nothing is saved and no price changes. A material with no price yet counts as nothing, and the answer says so. | ☐ OK ☐ Change how it is worked out: |
+| K9 | ❓ | **Activity log.** | The owner can ask who did what and when, from today or any day, for one person, one kind of action or one job, and whether it came through the chat assistant, a form, a button or a page. Newest first, 50 at a time. | ☐ OK ☐ Change: |

@@ -25,4 +25,5 @@ Non-negotiables (details in the prompt):
 - `pnpm dev` · `pnpm build` · `pnpm lint` · `pnpm typecheck`
 - `pnpm test` (Vitest, needs Postgres; uses `.env.test`) · `pnpm e2e` (Playwright, run `pnpm build` first)
 - `pnpm test:kit` (the kit's sandbox/export tests; needs Chromium via `CHROMIUM_PATH`, and `pandoc`)
+- `pnpm eval` (agent evals, real model, costs money, never in CI; needs `LIVE_ANTHROPIC_API_KEY` set inline, never in a file; `EVAL_RUNS`, `EVAL_ONLY`, `EVAL_SEED_ONLY=1`; see `evals/README.md`)
 - Local database: `postgresql://vijaya:vijaya@localhost:5432/vijaya` (dev) and `vijaya_test` (tests). See `.env.example`.
