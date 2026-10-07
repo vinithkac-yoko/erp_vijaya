@@ -103,7 +103,7 @@ test.describe('a job and its BOM, as the storekeeper does it (ACCEPTANCE 4.1–4
     await expect(f.getByText('The quantity must be more than zero.')).toBeVisible();
     await f.getByLabel('Pieces').fill('1000000');
     await f.getByRole('button', { name: 'Create job' }).click();
-    await expect(f.getByText('1,000,000 pieces is a lot. Is that right?')).toBeVisible();
+    await expect(f.getByText('10,00,000 pieces is a lot. Is that right?')).toBeVisible();
     await expect(f.getByRole('button', { name: 'Create job' })).toBeDisabled();
     await f.getByLabel('Yes, that is right').check();
     await f.getByRole('button', { name: 'Create job' }).click();

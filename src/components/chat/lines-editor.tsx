@@ -44,6 +44,8 @@ export function LinesEditor({ id, value, onChange, jobQuantity, invalid, describ
       decided.current.add(key);
       const n = parse(r.text);
       if (n !== null && !Number.isNaN(n) && n > 0 && n < 1) return { ...r, unit: o.unit as string, small: true, text: toText(n * 1000) };
+      // a fresh line for wire or varnish starts in grams or millilitres: that is how the shop says it. A saved quantity of 1 or more stays in kg or L.
+      if (n === null) return { ...r, unit: o.unit as string, small: true };
       return { ...r, unit: o.unit as string };
     }));
   };
