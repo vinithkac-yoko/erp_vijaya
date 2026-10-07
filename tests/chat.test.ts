@@ -82,15 +82,15 @@ describe('starting a chat', () => {
 });
 
 describe('the buttons above the input', () => {
-  it('storekeeper: his own buttons, no owner chips; forms stay off until their tools exist, Count stock is on (21.3)', async () => {
+  it('storekeeper: his own buttons, no owner chips; forms stay off until their tools exist; Count stock and New job are on (21.3)', async () => {
     const s = await storekeeper();
     const st = await launcherState(s, true);
     expect(st.launcher.forms.map((f) => f.label)).toEqual(['Receive stock', 'Issue to a job', 'Return', 'Count stock']);
     expect(st.launcher.moreForms.map((f) => f.label)).toEqual(['New PO', 'New job']);
     const chips = [...st.launcher.chips, ...st.launcher.moreChips].map((c) => c.label);
     expect(chips).toEqual(['Low stock', 'Open jobs', 'Stock today']);
-    expect(st.formEnabled).toEqual({ record_goods_receipt: false, issue_material: false, return_material: false, start_stock_count: true, create_purchase_order: false, create_job: false });
-    expect(st.chipEnabled).toEqual({ 'Low stock': true, 'Open jobs': false, 'Stock today': true });
+    expect(st.formEnabled).toEqual({ record_goods_receipt: false, issue_material: false, return_material: false, start_stock_count: true, create_purchase_order: false, create_job: true });
+    expect(st.chipEnabled).toEqual({ 'Low stock': true, 'Open jobs': true, 'Stock today': true });
   });
 
   it('owner: gets Waiting for me, with Stock value behind More; those that need unbuilt tools stay off', async () => {
@@ -142,14 +142,14 @@ describe('contextual chips after an answer', () => {
   it('2–3 questions that fit what just happened, never the one just asked, never a form', () => {
     const chips = contextualChips('STOREKEEPER', ['search_materials'], 'What is below its minimum level?', has);
     expect(chips.length).toBeLessThanOrEqual(3);
-    expect(chips.map((c) => c.label)).toEqual(['Stock today']); // Low stock was just asked; Open jobs isn't built yet, so it isn't offered
+    expect(chips.map((c) => c.label)).toEqual(['Stock today', 'Open jobs']); // Low stock was just asked
     for (const c of chips) expect(c).toHaveProperty('ask');
   });
   it('is never blank, and never offers owner questions to the storekeeper', () => {
     const sk = contextualChips('STOREKEEPER', [], '', has);
-    expect(sk.map((c) => c.label)).toEqual(['Low stock', 'Stock today']);
+    expect(sk.map((c) => c.label)).toEqual(['Low stock', 'Open jobs', 'Stock today']);
     const ow = contextualChips('OWNER', ['list_reorder_alerts'], '', has);
-    expect(ow.map((c) => c.label)).toEqual(['Stock today', 'Waiting for me', 'Low stock']);
+    expect(ow.map((c) => c.label)).toEqual(['Stock today', 'Open jobs', 'Waiting for me']);
     expect(ow.length).toBeGreaterThanOrEqual(2);
   });
 });
@@ -249,7 +249,7 @@ describe('type-ahead in forms', () => {
     const s = await storekeeper();
     await ok(save(s, 'create_material', { name: 'Ferrite Core E-30', uom: 'NOS', stockType: 'PER_JOB' }));
     const r = await pickerOptions(s, 'material', 'ferite core e30');
-    expect(r).toEqual([{ id: expect.any(String), label: 'Ferrite Core E-30', secondary: 'pcs' }]);
+    expect(r).toEqual([{ id: expect.any(String), label: 'Ferrite Core E-30', secondary: 'pcs', unit: 'NOS' }]);
     expect(JSON.stringify(r)).not.toMatch(/MAT-/);
   });
   it('a party is picked, not typed: name, type and city', async () => {

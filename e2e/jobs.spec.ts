@@ -21,6 +21,12 @@ async function seed() {
   await addStock('Ferrite Core E-30', 18, 65);
 }
 
+/** New job sits behind More: the four most used forms take the row. */
+async function openNewJob(page: Page) {
+  await buttons(page).getByRole('button', { name: 'More' }).first().click();
+  await page.getByRole('menuitem', { name: /New job/ }).click();
+}
+
 /** Pick from a type-ahead: type a few letters, press the option. */
 async function pick(page: Page, label: string | RegExp, typed: string, option: string | RegExp) {
   const box = typeof label === 'string' ? page.getByLabel(label, { exact: true }) : page.getByLabel(label);
@@ -29,7 +35,7 @@ async function pick(page: Page, label: string | RegExp, typed: string, option: s
 }
 
 async function newJob(page: Page, over: { customer?: string; po?: string; product?: string; pieces?: string; type?: 'Sample' } = {}) {
-  await buttons(page).getByRole('button', { name: /New job/ }).click();
+  await openNewJob(page);
   const f = form(page, 'New job');
   if (over.type) await f.getByLabel('What kind of job?').selectOption({ label: 'Sample (before the main order)' });
   await pick(f, 'Customer', (over.customer ?? 'Ashok').slice(0, 5), new RegExp(over.customer ?? 'Ashok Transformers'));
@@ -121,7 +127,7 @@ test.describe('a job and its BOM, as the storekeeper does it (ACCEPTANCE 4.1–4
     await prisma.customerPo.create({ data: { customerId: ashok?.id ?? '', number: 'AT/2627/118' } });
     await prisma.customerPo.create({ data: { customerId: ids.find((p) => p.name === 'Brightline LED')?.id ?? '', number: 'BL-77' } });
     await login(page, STOREKEEPER);
-    await buttons(page).getByRole('button', { name: /New job/ }).click();
+    await openNewJob(page);
     const f = form(page, 'New job');
     await expect(f.getByPlaceholder('Pick the customer first')).toBeVisible();
     await pick(f, 'Customer', 'Ashok', /Ashok Transformers/);
@@ -162,10 +168,10 @@ test.describe('the assistant opens a customer PO, a button carries it on to a jo
 });
 
 test.describe('looking at jobs', () => {
-  test('the Open jobs chip is on, shows the table, and the job button works with the assistant off', async ({ page }) => {
+  test('the Open jobs chip is on and shows the table', async ({ page }) => {
     await seed();
     await login(page, STOREKEEPER);
-    await expect(buttons(page).getByRole('button', { name: 'Open jobs' })).toBeDisabled(); // no jobs yet
+    await expect(buttons(page).getByRole('button', { name: 'Open jobs' })).toBeEnabled(); // it asks the assistant, and says so if there are none
     const f = await newJob(page);
     await f.getByRole('button', { name: 'Create job' }).click();
     await expect(saved(page)).toContainText('JOB CREATED');

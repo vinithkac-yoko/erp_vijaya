@@ -41,7 +41,7 @@ test.describe('the first card and the buttons', () => {
     for (const l of ['Receive stock', 'Issue to a job', 'Return']) await expect(nav.getByRole('button', { name: new RegExp(l) })).toBeDisabled();
     await expect(nav.getByRole('button', { name: 'Low stock' })).toBeEnabled();
     await expect(nav.getByRole('button', { name: 'Stock today' })).toBeEnabled();
-    await expect(nav.getByRole('button', { name: 'Open jobs' })).toBeDisabled(); // no jobs yet
+    await expect(nav.getByRole('button', { name: 'Open jobs' })).toBeEnabled(); // jobs exist as a tool now
     await expect(box(page)).toBeEnabled();
   });
 });
