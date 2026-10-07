@@ -10,7 +10,7 @@ bottom of each milestone's section.
 - ✅ = Kasi already agreed. The owner should still hear it once.
 - ❓ = nobody has agreed yet. **These are the important ones.**
 
-Last updated: after milestone 5 (section H).
+Last updated: after milestone 6 (section I).
 
 ---
 
@@ -128,3 +128,22 @@ Last updated: after milestone 5 (section H).
 | H10 | ❓ | **Cancelling a job.** | Only while nothing has been issued, with a reason, and not while a sample job still hangs under it. The job stays in the list as "Cancelled". | ☐ OK ☐ Change: |
 | H11 | ❓ | **The shortage check.** | After a BOM is saved the system compares what the job still needs with what is in stock (it does not count what other open jobs also need) and offers a purchase order for the shortfall. | ☐ OK ☐ Also count other jobs: |
 | H12 | ❓ | **Settings for the owner.** | The owner has "Settings" in the menu under his name. It is a form, so it works even when the assistant is off. | ☐ OK ☐ Change: |
+
+---
+
+## I. Added in milestone 6 — purchasing and receiving
+
+| # | Status | The question | What we did | Owner says |
+|---|---|---|---|---|
+| I1 | ✅ | **The approval limit.** | Read from Settings every time (₹50,000 to start). A PO **above** it waits for the owner; **at or below** is approved at once. The storekeeper is told which happened. The limit is compared with the total **including GST**. | ☐ OK ☐ Change: |
+| I2 | ✅ | **Rates are typed, never invented.** | The form shows the last rate paid as a hint with a "Use ₹812" button; nobody and nothing fills a rate in. | ☐ OK ☐ Change: |
+| I3 | ❓ | **A rate far from the last one.** | Under **half** or over **double** the last rate paid for that material: the form asks "is that right?" once. | ☐ OK ☐ Limits: |
+| I4 | ❓ | **Approved POs cannot be edited.** | Cancel it (only while nothing has come) and raise it again. | ☐ OK ☐ Change: |
+| I5 | ✅ | **The owner approves or rejects, one at a time,** with what he needs on the card: supplier, every line, the total, the job. A rejection needs a reason; quick picks: "The rate is too high", "Not needed now", "Wrong supplier", "Order less". | | ☐ OK ☐ Other picks: |
+| I6 | ❓ | **Rejected goods in the ledger.** (A2, the same question) | A receipt posts a RECEIPT for **everything that arrived** and a REJECT_RETURN for what was sent back. Stock ends right. **One side effect: the average price is worked out as if the rejected pieces had come in. Example: 100 kg at ₹800 in stock, 50 kg arrive at ₹812 and 3 kg go back: this way the average is ₹804.00; "accepted only" gives ₹803.81.** The other way posts only the accepted quantity and notes the rejection on the receipt. | ☐ (b) as built ☐ (a) accepted only: |
+| I7 | ❓ | **A receipt's date.** | Today or earlier, never the future, and not before the **first of this month**. | ☐ OK ☐ Change: |
+| I8 | ❓ | **Material arriving for a PO the owner has not approved.** | Allowed after a tick ("has it really arrived?"); the PO stays waiting for him and he is told. | ☐ OK ☐ Not allowed: |
+| I9 | ❓ | **A rate that moved after a receipt.** | More than **5%** from the last receipt of that material: the storekeeper is told, and so is the owner. (The acceptance script's example, ₹812 to ₹845, is 4.1%, so at 5% it would not be flagged.) | ☐ 5% ☐ Lower: ___% |
+| I10 | ❓ | **Email to the owner.** | If email is set up on Railway, the owner gets an email for: a PO or a count waiting, a rate that moved. Only him. It goes to the "Owner notification email" in Settings. | Which address: ____________ |
+| I11 | ❓ | **Over-delivery.** | If more arrives than was ordered it is received as it is (no stop). The PO shows as received. | ☐ OK ☐ Warn / refuse: |
+| I12 | ❓ | **Who may receive stock or raise a PO.** | Storekeeper and owner both. | ☐ OK ☐ Change: |

@@ -47,7 +47,16 @@ Good to know:
 - The `SEED_*` variables are read **only the first time**, when the database has no users. After that, changing them does nothing.
 - If you leave a password out, the app makes a strong one and prints it **once** in the deploy log
   (Deployments → the latest one → **Deploy Logs**, look for `FIRST PASSWORDS`). Copy it then.
-- Later milestones add `DEMO_MODE`, `UPLOAD_DIR` and, if the owner wants emails, `SMTP_URL` and `NOTIFY_FROM`. Not needed yet.
+- Later milestones add `DEMO_MODE` and `UPLOAD_DIR`. Not needed yet.
+
+**Email to the owner (milestone 6, optional).** The owner is always told inside the app. If you also want an email for approvals and alerts, add:
+
+| Name | Value | Why |
+|---|---|---|
+| `SMTP_URL` | your mail provider's address, e.g. `smtps://user:password@smtp.example.com:465` | Turns email on. Leave it out for no email. |
+| `NOTIFY_FROM` | e.g. `Vijaya Stores <stores@example.com>` | The sender shown on the email |
+
+The address the email goes to is the **Owner notification email** the owner sets in Settings; if that is empty, it goes to the owner's login email. Only the owner is emailed (a purchase order or a count waiting for him, a rate that moved more than 5%). If sending fails nothing else is affected.
 
 **The assistant (milestone 3).** Without a key the app still works: the buttons, the opening card and everything else run, and the chat box says the assistant is off.
 

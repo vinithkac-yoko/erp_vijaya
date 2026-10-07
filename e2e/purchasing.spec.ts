@@ -170,7 +170,7 @@ test.describe('approving, rejecting, receiving (ACCEPTANCE 5.14–5.17, 6.1–6.
     await expect(rj.getByLabel(/Why\?/)).toHaveValue('The rate is too high');
     await rj.getByRole('button', { name: 'Reject' }).click();
     await expect(saved(owner)).toContainText('✓ PO REJECTED');
-    expect(await prisma.stockMovement.count({ where: { type: 'RECEIPT' } })).toBe(0);
+    expect(await prisma.stockMovement.count({ where: { type: 'RECEIPT' } })).toBe(1); // only the 18 cores that were already there
     await page.goto('/');
     await expect(page.getByText(/Purchase order rejected: PO-\d{4}-0001 to Sundaram Ferrites was rejected: The rate is too high/)).toBeVisible();
     await ctx.close();
@@ -216,7 +216,7 @@ test.describe('approving, rejecting, receiving (ACCEPTANCE 5.14–5.17, 6.1–6.
     await f.getByLabel('Rate on the invoice, line 1').fill('65');
     await f.getByRole('button', { name: 'Add to stock' }).click();
     await expect(f.getByText(/is still waiting for the owner to approve it. Has the material really arrived\?/)).toBeVisible();
-    expect(await prisma.goodsReceipt.count()).toBe(0);
+    expect(await prisma.goodsReceipt.count({ where: { purchaseOrderId: { not: null } } })).toBe(0);
     await f.getByLabel('Yes, that is right').check();
     await f.getByRole('button', { name: 'Add to stock' }).click();
     await expect(saved(page)).toContainText('STOCK RECEIVED');

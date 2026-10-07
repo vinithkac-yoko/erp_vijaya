@@ -112,6 +112,14 @@ APPROVED → "Approved; can be sent to the supplier."
 **approve / reject** — `NOT_PENDING`. Confirmation shows supplier, lines, total, triggering job.
 *Follow-ups (must):* notify the storekeeper (approved, or rejected with the reason).
 
+**As built (milestone 6):**
+- The approval limit is read from Settings on every `create_purchase_order`; a missing limit is the error `SETTING_MISSING`, never a default. The **total including GST** is compared: above → `PENDING_APPROVAL` (the owner is told, in the app and by email if email is set up), at or below → `APPROVED` at once. Approving or rejecting needs the owner; the storekeeper is told either way (rejection with the owner's reason).
+- A rate is only ever typed by a person. The form shows "Last paid ₹812/kg · Chennai Copper Wires · 12 Sep" under the rate box with a "Use ₹812" button (pressing it is the person typing it). Under half or over double the last rate paid → `CONFIRM_UNUSUAL_RATE`: asked once, with a tick. Pieces and sets are ordered whole; a material is on a PO once.
+- `create_purchase_order` takes the supplier by `supplierName` (the assistant) or `supplierId` (the picker). The total and the limit are shown live on the form ("Above ₹50,000: it goes to the owner to approve").
+- `cancel_purchase_order` only while nothing has been received (`PO_HAS_RECEIPTS`). There is no tool to edit a PO.
+- `approve_purchase_order` / `reject_purchase_order` forms open on the PO named, or on the oldest one waiting, and show the supplier, every line, the total and the job (why). "Reject" on the approval card opens the reject form for the same PO, with quick picks.
+- `get_purchase_order` and the picker accept the PO number or the end of it ("15"). `get_purchase_price_history` gives each receipt rate, the move from the one before (any supplier) and the lead time (PO date to receipt).
+
 There is no PO line editing after approval. Changes = cancel and raise again.
 
 ## 5. Goods receipt
@@ -129,6 +137,8 @@ beside the empty rate field — **never filled in**; the rate comes from the sup
 *Follow-ups (must):* compare each rate with the previous receipt of that material — over 5% →
 say it and notify the owner. Rejections → say what goes back. If the PO's job now has no
 shortfall → offer "Issue material to JOB-…".
+
+**As built (milestone 6):** the receipt form is "what arrived" and "sent back": accepted = arrived − sent back is worked out and shown read-only. `receivedQty` and `rejectedQty` are checked against `acceptedQty` (`GRN_SPLIT_MISMATCH` names the material and the numbers). **The ledger shows both movements: a RECEIPT for everything that arrived and a REJECT_RETURN for what went back** (kit assumption B, BUSINESS_FLOW §20 item 6; to confirm). The PO line's received quantity follows the *accepted* quantity; the PO becomes `PARTIALLY_RECEIVED` and then `RECEIVED`. A receipt can be dated today or earlier but not before the first day of this month (`RECEIPT_TOO_OLD`); never in the future. Receiving against a PO still waiting for the owner needs a tick (`CONFIRM_PO_NOT_APPROVED`); the PO then stays waiting for him and he is told that material has arrived. The rate on the form is empty with the PO's rate as a hint. A rate that moved more than **5%** from the last receipt of that material is said aloud and the owner is told (in the app, and by email if set up). A receipt that leaves the PO's job with nothing short offers "Issue material to JOB-…".
 
 ## 6. Issue, return, close
 

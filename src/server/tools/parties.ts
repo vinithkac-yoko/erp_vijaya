@@ -116,7 +116,7 @@ export const createParty = defineTool({
     return {
       facts: [],
       chips: [
-        ...(r.isSupplier ? [{ label: `Raise a purchase order to ${r.name}`, form: 'create_purchase_order', prefill: { supplierId: r.id } }] : []),
+        ...(r.isSupplier ? [{ label: `Raise a purchase order to ${r.name}`, form: 'create_purchase_order', prefill: { supplierName: r.name } }] : []),
         ...(r.isCustomer ? [{ label: 'Record a customer PO', form: 'create_customer_po', prefill: { customerName: r.name } }] : []),
       ],
     };

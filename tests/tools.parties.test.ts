@@ -82,7 +82,7 @@ describe('create_party', () => {
     const s = await storekeeper();
     const tool = (await import('@/server/tools')).registry.get('create_party') as unknown as { followUps: (c: unknown, i: unknown, r: unknown) => Promise<{ chips: unknown[] }> };
     const sup = await tool.followUps({}, {}, { id: 'p1', name: 'Sundaram Ferrites', isSupplier: true, isCustomer: false });
-    expect(sup.chips).toEqual([{ label: 'Raise a purchase order to Sundaram Ferrites', form: 'create_purchase_order', prefill: { supplierId: 'p1' } }]);
+    expect(sup.chips).toEqual([{ label: 'Raise a purchase order to Sundaram Ferrites', form: 'create_purchase_order', prefill: { supplierName: 'Sundaram Ferrites' } }]);
     const cus = await tool.followUps({}, {}, { id: 'p2', name: 'Ashok Transformers', isSupplier: false, isCustomer: true });
     expect(cus.chips).toEqual([{ label: 'Record a customer PO', form: 'create_customer_po', prefill: { customerName: 'Ashok Transformers' } }]);
     void s;
