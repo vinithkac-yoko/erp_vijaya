@@ -47,8 +47,19 @@ Good to know:
 - The `SEED_*` variables are read **only the first time**, when the database has no users. After that, changing them does nothing.
 - If you leave a password out, the app makes a strong one and prints it **once** in the deploy log
   (Deployments → the latest one → **Deploy Logs**, look for `FIRST PASSWORDS`). Copy it then.
-- Later milestones add `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AGENT_ENABLED`, `AGENT_DAILY_TOKENS`,
-  `DEMO_MODE`, `UPLOAD_DIR` and, if the owner wants emails, `SMTP_URL` and `NOTIFY_FROM`. Not needed yet.
+- Later milestones add `DEMO_MODE`, `UPLOAD_DIR` and, if the owner wants emails, `SMTP_URL` and `NOTIFY_FROM`. Not needed yet.
+
+**The assistant (milestone 3).** Without a key the app still works: the buttons, the opening card and everything else run, and the chat box says the assistant is off.
+
+| Name | Value | Why |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | the key from console.anthropic.com | Lets the assistant answer. Keep it private. |
+| `ANTHROPIC_MODEL` | optional, default `claude-sonnet-5-5` | Which model answers |
+| `ANTHROPIC_EFFORT` | optional, `low`, `medium` (default) or `high` | How hard it thinks. Higher is slower and costs more. |
+| `AGENT_ENABLED` | optional, `false` to switch the assistant off for everyone | The kill switch. The owner can also switch it off from the chat (a Setting). Either one turns it off. |
+| `AGENT_DAILY_TOKENS` | optional, default `500000` | Most one person can use in a day. After that the assistant says so; the buttons keep working. |
+| `AGENT_MESSAGES_PER_MINUTE` | optional, default `20` | Most messages one person can send in a minute |
+| `ANTHROPIC_REFUSAL_FALLBACK` | optional, `off` to turn off the automatic fallback when the model declines | Leave it as it is unless Anthropic's support says otherwise |
 
 ## 5. Get the web address
 

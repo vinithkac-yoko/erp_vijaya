@@ -39,19 +39,24 @@ export const call = (name: string, input: Record<string, unknown> = {}, lead?: s
 
 let toolSeq = 0;
 
-export async function startStub(script: Script): Promise<Stub> {
+export async function startStub(script: Script, port = 0): Promise<Stub> {
   const requests: StubRequest[] = [];
   const server: Server = createServer((req, res) => {
+    if (req.method === 'GET') { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('stub ok'); return; } // for a readiness check
     const chunks: Buffer[] = [];
     req.on('data', (c) => chunks.push(c));
     req.on('end', async () => {
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
       const msgs = (body.messages ?? []) as { role: string; content: unknown }[];
       const last = [...msgs].reverse().find((m) => m.role === 'user');
-      const blocks = Array.isArray(last?.content) ? (last?.content as { type: string; text?: string; tool_use_id?: string; content?: string; is_error?: boolean }[]) : [];
+      type Block = { type: string; text?: string; tool_use_id?: string; content?: string; is_error?: boolean };
+      const blocksOf = (m?: { content: unknown }) => (Array.isArray(m?.content) ? (m?.content as Block[]) : []);
+      const textOf = (m: { content: unknown }) => (typeof m.content === 'string' ? m.content : blocksOf(m).filter((b) => b.type === 'text').map((b) => b.text).join('\n'));
+      const blocks = blocksOf(last);
+      const lastWithText = [...msgs].reverse().find((m) => m.role === 'user' && textOf(m).trim() !== '');
       const r: StubRequest = {
         n: requests.length, body, headers: req.headers, path: req.url ?? '',
-        userText: typeof last?.content === 'string' ? last.content : blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n'),
+        userText: lastWithText ? textOf(lastWithText) : '',
         toolResults: blocks.filter((b) => b.type === 'tool_result').map((b) => ({ tool_use_id: b.tool_use_id as string, content: String(b.content), is_error: b.is_error })),
       };
       requests.push(r);
@@ -88,7 +93,7 @@ export async function startStub(script: Script): Promise<Stub> {
       res.end();
     });
   });
-  await new Promise<void>((ok) => server.listen(0, '127.0.0.1', ok));
-  const { port } = server.address() as AddressInfo;
-  return { url: `http://127.0.0.1:${port}`, requests, close: () => new Promise((ok) => { server.closeAllConnections?.(); server.close(() => ok()); }) };
+  await new Promise<void>((ok) => server.listen(port, '127.0.0.1', ok));
+  const { port: bound } = server.address() as AddressInfo;
+  return { url: `http://127.0.0.1:${bound}`, requests, close: () => new Promise((ok) => { server.closeAllConnections?.(); server.close(() => ok()); }) };
 }

@@ -7,11 +7,11 @@ import { currentUser } from '../auth/session';
 import { conversations, pendingActions, registry } from '../tools';
 import type { ToolSession } from '../tools/types';
 import { ensureConversation } from './conversation';
-import { pickerOptions } from './pickers';
+import { pickerLabel, pickerOptions } from './pickers';
 import { assistantRuntime } from './runtime';
 import { submitAndFollow, type SubmitResult } from './submit';
 
-const LOGGED_OUT = { ok: false as const, code: 'LOGGED_OUT', message: 'Please log in again.' };
+const LOGGED_OUT: { ok: false; code: string; message: string; field?: string; details?: unknown } = { ok: false, code: 'LOGGED_OUT', message: 'Please log in again.' };
 const uuid = z.string().uuid();
 
 async function who(): Promise<ToolSession | null> {
@@ -44,7 +44,7 @@ export async function openFormAction(input: { tool: string; conversationId?: str
 }
 
 /** The form's button. The server does the save and draws the "Saved" card; a refusal comes back with the field it belongs to. */
-export async function submitFormAction(input: { pendingId: string; values: Record<string, unknown> }): Promise<SubmitResult | typeof LOGGED_OUT> {
+export async function submitFormAction(input: { pendingId: string; values: Record<string, unknown> }): Promise<SubmitResult> {
   const session = await who();
   if (!session) return LOGGED_OUT;
   const p = z.object({ pendingId: uuid, values: z.record(z.unknown()) }).safeParse(input);
@@ -80,4 +80,12 @@ export async function loadChatAction(id: string): Promise<{ ok: boolean; items: 
   if (!session || !uuid.safeParse(id).success) return { ok: false, items: [] };
   const items = await conversations.items(session.userId, id);
   return items ? { ok: true, items } : { ok: false, items: [] };
+}
+
+/** The name behind an id the assistant filled into a picker. */
+export async function pickerLabelAction(input: { kind: 'material' | 'party' | 'user'; id: string }): Promise<PickerOption | null> {
+  const session = await who();
+  const p = z.object({ kind: z.enum(['material', 'party', 'user']), id: z.string().min(1).max(64) }).safeParse(input);
+  if (!session || !p.success) return null;
+  return pickerLabel(session, p.data.kind, p.data.id);
 }

@@ -21,10 +21,10 @@ export async function openingFor(session: ToolSession): Promise<Opening> {
   const waits = waiting?.ok ? (waiting.data as { purchaseOrders: unknown[]; counts: unknown[] }) : null;
   const pendingApprovals = waits ? waits.purchaseOrders.length + waits.counts.length : 0;
 
-  const lines: { text: string; ask?: string }[] = [];
+  const lines: { text: string; ask?: string; button?: string }[] = [];
   if (session.role === 'OWNER') {
-    lines.push(pendingApprovals > 0 ? { text: `${pendingApprovals} waiting for you`, ask: ASK['Waiting for me'] } : { text: 'Nothing is waiting for you.' });
+    lines.push(pendingApprovals > 0 ? { text: `${pendingApprovals} waiting for you`, ask: ASK['Waiting for me'], button: 'Review approvals' } : { text: 'Nothing is waiting for you.' });
   }
-  lines.push(below > 0 ? { text: `${below} below minimum`, ask: ASK['Low stock'] } : { text: 'Nothing is below its minimum.' });
+  lines.push(below > 0 ? { text: `${below} below minimum`, ask: ASK['Low stock'], button: 'Low stock' } : { text: 'Nothing is below its minimum.' });
   return { card: { kind: 'opening', title: `Welcome, ${first(session.name)}.`, lines }, badges: { pendingApprovals, belowMinimum: below } };
 }

@@ -2,7 +2,61 @@
 
 Read this at the start of every session (CLAUDE.md). Newest on top.
 
-## Milestone 2 — Ledger core — **built, waiting for Kasi's go-ahead for milestone 3**
+## Milestone 3 — Agent and forms — **built; waiting for Kasi's test and go-ahead for milestone 4**
+
+Kasi's answers to the milestone 2 questions: the client-confirmations file is the place for every decision (`docs/CLIENT_CONFIRMATIONS.md`), go ahead with
+milestone 3 ✓. Items A1–A3 (negative-stock average, rejected goods, non-reversible opening/count) are still open with the owner.
+
+Done
+- **Chat with streaming.** `POST /api/chat` streams newline-delimited events (status, words as they arrive, cards, suggestion chips). The assistant is the
+  real Anthropic SDK (`client.beta.messages.stream`), model `claude-sonnet-5-5`, effort `medium`, no temperature/tool_choice/thinking settings. The system
+  prompt (from `docs/AGENT_PROMPT.md`) is cached; the per-request block (who is asking, their role, today's date) is not. Tools are sorted and **only the
+  person's role's tools are sent**. If the model declines, the server-side fallback is on (`ANTHROPIC_REFUSAL_FALLBACK`).
+- **The assistant never writes.** A write tool the model calls only makes a PendingAction and ends the turn; the form card in the chat opens filled in, marked
+  "assistant filled this in — check it". Nothing is saved until the person presses the button (the verb, never "Submit"). Reads run and appear as tables
+  drawn by the server; the model only receives their data wrapped in `<business_data>` and told it is data, not instructions.
+- **Limits.** 8 tool calls per turn, 60 seconds, 500,000 tokens per person per day, 20 messages a minute. If the API is down, the person is told in plain
+  words and the buttons still work. A dangling tool call from a dropped connection is repaired before the next turn.
+- **Kill switch.** `AGENT_ENABLED=false` or the Setting `agent.enabled` (the owner can say "switch the assistant off"). Off means the chat box explains and the
+  buttons keep working.
+- **Passwords never reach the assistant or the chat history.** Typing one in the chat hides it (shown as ••••••) before it is stored or sent; the
+  assistant is told to use the form's password box. Password boxes are not in the tool schema the model sees.
+- **The opening card, buttons and chips.** The opening card is drawn by the server from read tools (no model). Launcher buttons switch on only when their
+  tool exists for that role and the data allows it (forms not built yet stay off); chips ask a canned question and show a table. Badges show waiting approvals and
+  low stock. Follow-up chips after a save or an answer are rule-based, never model-written.
+- **Form cards.** Real labels, Enter moves to the next box, Ctrl+Enter saves, picker for existing businesses and materials, the "was → now" stamp for
+  settings, duplicate and similar-name questions in plain words ("Is this the same as…?"). Saved cards are drawn from the audit row.
+- **History.** Chats are kept per person, titled by their first words, listed in the top bar's Chats menu, and reopened from there. Someone else's link opens a
+  fresh chat, never their history.
+- **Master-data tools** (all through the Tool Gateway, one transaction and one audit row each): materials (search, balance, add, change, stop), parties
+  (add supplier/customer/both, "ROLE ADDED" when one business is both), settings (approval limit, assistant on/off, owner's email), users (add, owner resets
+  a password, stop; last owner and yourself protected), `list_reorder_alerts`, `list_pending_approvals`. `docs/TOOL_CATALOG.md` and the kit catalog are in sync
+  (65 tools), including the new owner-only `reset_user_password` and `confirmNotDuplicate`.
+- Fuzzy matching (`src/lib/similar.ts`) for names: same name ignoring case/spaces/punctuation is refused; the same words in another order, or a one-letter slip, asks
+  "is this the same?"; different numbers (22 vs 24 SWG) are never questioned; "M/s", "Pvt Ltd" and so on are ignored for businesses.
+
+Proof (all run in this session)
+- `pnpm test`: 279 tests, real Postgres. Includes the agent (28) and chat layer (23) tests against a **local stand-in for Anthropic's streaming API** that the real SDK
+  talks to (`tests/helpers/anthropic-stub.ts`).
+- `pnpm e2e`: 77 browser tests passed (5 skipped on purpose), desktop and phone: opening card, buttons, streaming answer and table, chip, password hidden, API down,
+  form open / save / Not now / mistake / duplicate / similar, keyboard, supplier form, accessibility scans light and dark, phone fit, storekeeper refused the approval limit,
+  owner changes it and sees the old and new value, owner adds a login, chat list and ownership, kill switch.
+- `pnpm test:kit`: 200/200. `pnpm lint`, `pnpm typecheck`, `pnpm build` clean.
+- **Not verified:** a real run against Anthropic. There is no `ANTHROPIC_API_KEY` in this session, so the model's actual wording and tool choices are untested; the
+  protocol, limits and safety rules are tested against the stand-in. A real Railway login is also still unchecked.
+
+Things to know
+- The e2e suite uses the stand-in on port 3199 (`tests/stub-server.ts`), set through `ANTHROPIC_BASE_URL`; the app code has no test branches.
+- **Known gap:** if the owner switches the assistant off from the chat (the Setting), they cannot switch it on again from the chat; a Settings button is not in the kit's launcher. It is switched back on from the server for now (CLIENT_CONFIRMATIONS F4).
+- Forms for stock movements (receive, issue, return, count) come with milestones 4–7, so those launcher buttons are switched off on purpose.
+
+Questions for Kasi
+- The M3 decisions for the owner are listed in `docs/CLIENT_CONFIRMATIONS.md` section F.
+- Please add `ANTHROPIC_API_KEY` to the session (or to Railway) so a real conversation can be tried before the demo.
+
+Next: milestone 4 — the opening count (count sheet form in the panel, the opening flow). This is go-live, so it needs Kasi's go-ahead and, ideally, the owner's answers to A1–A3.
+
+## Milestone 2 — Ledger core — built (milestone 3 followed)
 
 Kasi's answers to the milestone 1 questions: login by email ✓, 7-day sessions ✓, owner can reset passwords (a form, milestone 3) ✓,
 brand line ✓, Railway deploys `main` ✓, go ahead with milestone 2 ✓. (A real Railway login check is still not confirmed.)

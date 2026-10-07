@@ -55,7 +55,7 @@ test.describe('the shell, by role', () => {
     await expect(nav.getByRole('button', { name: 'Waiting for me' })).toHaveCount(0);
     await expect(nav.getByRole('button', { name: 'Stock value' })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Welcome, Test.' })).toBeVisible();
-    await expect(page.getByLabel('Type a message')).toBeDisabled();
+    await expect(page.getByLabel('Type a message')).toBeEnabled();
   });
 
   test('owner: gets the owner chips; the rest sit behind More', async ({ page }) => {

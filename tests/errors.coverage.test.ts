@@ -55,7 +55,7 @@ describe('mapError', () => {
   it('passes a tool error through, and turns a validation error into its first plain message', () => {
     expect(mapError(new ToolError('JOB_NOT_OPEN', 'That job is already running.'))).toEqual({ code: 'JOB_NOT_OPEN', message: 'That job is already running.' });
     const parsed = z.object({ qty: z.number({ required_error: 'How much?' }) }).safeParse({});
-    expect(mapError((parsed as { error: ZodError }).error)).toEqual({ code: 'INVALID_INPUT', message: 'How much?' });
+    expect(mapError((parsed as { error: ZodError }).error)).toEqual({ code: 'INVALID_INPUT', message: 'How much?', field: 'qty' });
   });
 
   it('never leaks the raw database text of something unexpected', () => {

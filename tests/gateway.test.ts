@@ -89,7 +89,7 @@ describe('input', () => {
   it('bad input is refused in plain words, before anything is touched', async () => {
     const s = await session();
     const form = await openForm(s, 'create_material');
-    expect(await runTool(s, 'create_material', { name: '', uom: 'NOS' }, { confirmation: form })).toEqual({ ok: false, code: 'INVALID_INPUT', message: 'Type the name.' });
+    expect(await runTool(s, 'create_material', { name: '', uom: 'NOS' }, { confirmation: form })).toEqual({ ok: false, code: 'INVALID_INPUT', message: 'Type the name.', field: 'name' });
     expect(await runTool(s, 'create_material', 'not an object', { confirmation: form })).toMatchObject({ ok: false, code: 'INVALID_INPUT' });
     expect(await runTool(s, 'create_material', { name: 'x', uom: 'BAGS' }, { confirmation: form })).toMatchObject({ ok: false, code: 'INVALID_INPUT' });
     expect(await count()).toBe(0);

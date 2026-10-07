@@ -21,10 +21,10 @@ const chipClass =
   'inline-flex min-h-11 md:min-h-9 shrink-0 items-center gap-2 rounded-full border border-line bg-copper-wash px-4 text-base text-ink ' +
   'enabled:hover:border-copper disabled:cursor-not-allowed disabled:text-ink-faint disabled:bg-surface';
 
-function FormBtn({ b, enabled }: { b: FormButton; enabled: boolean }) {
+function FormBtn({ b, enabled, onForm }: { b: FormButton; enabled: boolean; onForm: (tool: string) => void }) {
   const Icon = ICONS[b.tool] ?? FilePlus2;
   return (
-    <button type="button" disabled={!enabled} data-tool={b.tool} aria-keyshortcuts={b.shortcut} className={formClass}
+    <button type="button" disabled={!enabled} data-tool={b.tool} aria-keyshortcuts={b.shortcut} className={formClass} onClick={() => onForm(b.tool)}
       title={enabled ? undefined : 'This button switches on in a later step.'}>
       <Icon aria-hidden className="size-5 shrink-0" />
       <span>{b.label}</span>
@@ -33,15 +33,20 @@ function FormBtn({ b, enabled }: { b: FormButton; enabled: boolean }) {
   );
 }
 
-function ChipBtn({ c, enabled }: { c: AskChip; enabled: boolean }) {
+function ChipBtn({ c, enabled, badge, onChip }: { c: AskChip; enabled: boolean; badge?: number; onChip: (label: string, ask: string) => void }) {
   return (
-    <button type="button" disabled={!enabled} className={chipClass} title={enabled ? undefined : 'This button switches on in a later step.'}>
+    <button type="button" disabled={!enabled} className={chipClass} onClick={() => onChip(c.label, c.prompt)}
+      title={enabled ? undefined : 'This is switched off for now.'}>
       {c.label}
+      {badge !== undefined && badge > 0 && <span className="num rounded-full bg-copper px-2 text-sm text-on-copper" aria-label={`${badge}`}>{badge}</span>}
     </button>
   );
 }
 
-function More({ forms, chips }: { forms: FormButton[]; chips: AskChip[] }) {
+function More({ forms, chips, formEnabled, chipEnabled, onForm, onChip }: {
+  forms: FormButton[]; chips: AskChip[]; formEnabled: Record<string, boolean>; chipEnabled: Record<string, boolean>;
+  onForm: (tool: string) => void; onChip: (label: string, ask: string) => void;
+}) {
   if (forms.length + chips.length === 0) return null;
   return (
     <DropdownMenu>
@@ -49,28 +54,35 @@ function More({ forms, chips }: { forms: FormButton[]; chips: AskChip[] }) {
         More <ChevronDown aria-hidden className="size-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {[...forms, ...chips].map((i) => (
-          <DropdownMenuItem key={i.kind === 'form' ? i.tool : i.label} disabled>{i.label}</DropdownMenuItem>
+        {forms.map((f) => (
+          <DropdownMenuItem key={f.tool} disabled={!formEnabled[f.tool]} onSelect={() => onForm(f.tool)}>
+            <span className="flex-1">{f.label}</span><kbd className="num text-xs text-ink-faint">{f.shortcut}</kbd>
+          </DropdownMenuItem>
         ))}
+        {chips.map((c) => <DropdownMenuItem key={c.label} disabled={!chipEnabled[c.label]} onSelect={() => onChip(c.label, c.prompt)}>{c.label}</DropdownMenuItem>)}
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
 /**
- * The buttons above the chat input. Built on the server from the role (and, later, the person's own use), never
- * by the model. In milestone 1 they are all switched off; the row is here so it never moves when they switch on.
+ * The buttons above the chat input. Built on the server from the role and the person's own use, never by the model.
+ * Form buttons open the form directly (no model, so they work with the assistant off); chips ask the assistant.
  */
-export function LauncherRow({ launcher, enabled = false }: { launcher: Launcher; enabled?: boolean }) {
+export function LauncherRow({ launcher, formEnabled, chipEnabled, badges, onForm, onChip }: {
+  launcher: Launcher; formEnabled: Record<string, boolean>; chipEnabled: Record<string, boolean>; badges: { pendingApprovals: number; belowMinimum: number };
+  onForm: (tool: string) => void; onChip: (label: string, ask: string) => void;
+}) {
+  const badge = (c: AskChip) => (c.badge === 'pendingApprovals' ? badges.pendingApprovals : c.badge === 'belowMinimum' ? badges.belowMinimum : undefined);
   return (
     <nav aria-label="Quick buttons" className="space-y-2">
       <div className="scroll-row -mx-4 flex gap-2 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
-        {launcher.forms.map((b) => <FormBtn key={b.tool} b={b} enabled={enabled} />)}
-        <More forms={launcher.moreForms} chips={[]} />
+        {launcher.forms.map((b) => <FormBtn key={b.tool} b={b} enabled={!!formEnabled[b.tool]} onForm={onForm} />)}
+        <More forms={launcher.moreForms} chips={[]} formEnabled={formEnabled} chipEnabled={chipEnabled} onForm={onForm} onChip={onChip} />
       </div>
       <div className="scroll-row -mx-4 flex gap-2 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
-        {launcher.chips.map((c) => <ChipBtn key={c.label} c={c} enabled={enabled} />)}
-        <More forms={[]} chips={launcher.moreChips} />
+        {launcher.chips.map((c) => <ChipBtn key={c.label} c={c} enabled={!!chipEnabled[c.label]} badge={badge(c)} onChip={onChip} />)}
+        <More forms={[]} chips={launcher.moreChips} formEnabled={formEnabled} chipEnabled={chipEnabled} onForm={onForm} onChip={onChip} />
       </div>
     </nav>
   );

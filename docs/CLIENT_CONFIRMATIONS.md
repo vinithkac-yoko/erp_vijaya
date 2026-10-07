@@ -10,7 +10,7 @@ bottom of each milestone's section.
 - ✅ = Kasi already agreed. The owner should still hear it once.
 - ❓ = nobody has agreed yet. **These are the important ones.**
 
-Last updated: after milestone 2. Milestone 3 decisions are added when it is built (see the end).
+Last updated: after milestone 3 (section F).
 
 ---
 
@@ -67,6 +67,23 @@ Last updated: after milestone 2. Milestone 3 decisions are added when it is buil
 
 ---
 
-## F. Added in milestone 3
+## F. Added in milestone 3 — the assistant, masters and logins
 
-*(filled in when milestone 3 is built)*
+| # | Status | The question | What we did | Owner says |
+|---|---|---|---|---|
+| F1 | ✅ | **The approval limit's name and start.** | One setting, **₹50,000** at the start. Only the owner can change it, by asking the assistant; the screen shows what it was and what it is now. | ☐ OK ☐ Change: |
+| F2 | ❓ | **What the owner can change from the chat.** | Three things only: the PO approval limit, the assistant on/off, and the email that gets the owner's notices. Nothing else is a setting. | ☐ OK ☐ Also: |
+| F3 | ❓ | **The assistant: how much may one person use?** | At most **8 steps** for one question, **60 seconds**, **20 messages a minute**, and a daily allowance of **500,000 tokens** per person (a long day of chatting is about a fifth of that). Past the allowance the buttons keep working and the assistant says so. | ☐ OK ☐ Change allowance: |
+| F4 | ❓ | **The off switch for the assistant.** | The owner can say "switch the assistant off" in the chat, or we can turn it off on the server. Either one switches it off for everyone; the buttons keep working. **Gap:** once it is off, the chat box is off too, so the owner cannot switch it back on from the chat. For now we switch it back on from the server. | ☐ OK for now ☐ Add a **Settings** button the owner can always press: |
+| F5 | ✅ | **Passwords typed in the chat.** | The assistant never sees or keeps one. If someone types a password into the chat, it is hidden at once (shown as ••••••) and they are told to use the form's password box. | ☐ OK ☐ Change: |
+| F6 | ✅ | **Login names.** | A login must be a real-looking email. Minimum password **10 characters**. | ☐ OK ☐ Change: |
+| F7 | ✅ | **Passwords and the owner.** | The owner can set a new password for anyone. The **last owner**, and **yourself**, cannot be stopped from using the system. | ☐ OK ☐ Change: |
+| F8 | ❓ | **Stopping a material.** | Allowed only when its stock is **exactly zero**. A stopped material is not deleted; the history stays. | ☐ OK ☐ Change: |
+| F9 | ❓ | **Stopping a supplier or customer.** | Not allowed while there are open purchase orders, customer orders or jobs for them. | ☐ OK ☐ Change: |
+| F10 | ❓ | **Same material typed twice.** | A name that is the same apart from capitals, spaces or punctuation is **refused**. The same words in another order ("Copper Wire 22 SWG" / "22 SWG Copper Wire") or a one-letter slip gets the question **"Is this the same as…?"** before it is added. Different numbers (22 vs 24 SWG) are **never** questioned. | ☐ OK ☐ Change: |
+| F11 | ❓ | **Same business typed twice.** | "M/s", "Pvt Ltd", "Private Limited", "& Co" and similar are ignored when comparing names. A very similar name asks the same question. One business can be both supplier and customer: adding the other role shows "ROLE ADDED" on the same record. | ☐ OK ☐ Change: |
+| F12 | ❓ | **GSTIN.** | If one is typed, it is checked for the right shape (15 characters). We do not check it with the government site. | ☐ OK ☐ Change: |
+| F13 | ✅ | **Unit and stock type of a material.** | Cannot be changed once the material exists (the history was counted in that unit). Make a new material if it was wrong. | ☐ OK ☐ Change: |
+| F14 | ✅ | **Suggestion buttons after an answer.** | Chosen by fixed rules (for example after adding a supplier, "Add its first purchase order" once that exists). They are never written by the assistant. | ☐ OK ☐ Change: |
+| F15 | ✅ | **Chat history.** | Each person sees only their own chats, titled by their first words. The owner cannot read the storekeeper's chats. Chats are kept for now (we can set a clean-up period). | ☐ OK ☐ Owner may read all: ☐ Delete after ___ days |
+| F16 | ❓ | **Whose key and bill for the assistant.** | The Anthropic key is set on Railway. Cost depends on use; the daily allowance (F3) is the brake. See E3 for who pays. | Who pays: ____________ |

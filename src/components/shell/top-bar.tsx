@@ -1,13 +1,15 @@
 'use client';
 
+import Link from 'next/link';
 import { useTransition } from 'react';
-import { Bookmark, Check, ChevronDown, CircleHelp, History, LogOut, Monitor, Moon, Sun } from 'lucide-react';
+import { Bookmark, Check, ChevronDown, CircleHelp, History, LogOut, Monitor, Moon, Plus, Sun } from 'lucide-react';
 import { logoutAction, setThemeAction } from '@/server/auth/actions';
 import { CoilLine, BrandMark } from '@/components/brand';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/cn';
 
 export interface ShellUser { name: string; role: 'OWNER' | 'STOREKEEPER'; theme: string | null }
+export interface ChatLink { id: string; title: string }
 export const roleLabel = (r: ShellUser['role']) => (r === 'OWNER' ? 'Owner' : 'Storekeeper');
 
 const barButton =
@@ -19,7 +21,7 @@ function applyTheme(value: 'light' | 'dark' | 'system') {
   if (value === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', value);
 }
 
-export function TopBar({ user, onHelp }: { user: ShellUser; onHelp: () => void }) {
+export function TopBar({ user, chats, currentChatId, onHelp }: { user: ShellUser; chats: ChatLink[]; currentChatId: string | null; onHelp: () => void }) {
   const [, startTransition] = useTransition();
   const current = user.theme === 'light' || user.theme === 'dark' ? user.theme : 'system';
   const choose = (v: 'light' | 'dark' | 'system') => { applyTheme(v); startTransition(() => { void setThemeAction(v); }); };
@@ -49,8 +51,18 @@ export function TopBar({ user, onHelp }: { user: ShellUser; onHelp: () => void }
           <DropdownMenuTrigger className={barButton}>
             <History aria-hidden className="size-5 sm:size-4" /><span className="sr-only sm:not-sr-only">Chats</span><ChevronDown aria-hidden className="hidden size-4 sm:block" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuLabel>No earlier chats yet.</DropdownMenuLabel>
+          <DropdownMenuContent align="start" className="w-72">
+            <DropdownMenuItem asChild>
+              <Link href="/" className="font-medium"><Plus aria-hidden className="size-4" />New chat</Link>
+            </DropdownMenuItem>
+            {chats.length === 0 ? <DropdownMenuLabel>No earlier chats yet.</DropdownMenuLabel> : <DropdownMenuSeparator />}
+            {chats.map((c) => (
+              <DropdownMenuItem key={c.id} asChild>
+                <Link href={`/?c=${c.id}`} aria-current={c.id === currentChatId ? 'page' : undefined} className={c.id === currentChatId ? 'bg-copper-wash' : undefined}>
+                  <span className="truncate">{c.title}</span>
+                </Link>
+              </DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
 
