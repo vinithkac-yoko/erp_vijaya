@@ -1,6 +1,7 @@
 'use client';
 
-import { Info, TriangleAlert } from 'lucide-react';
+import { useState } from 'react';
+import { Download, FileText, Info, LayoutDashboard, Printer, TriangleAlert } from 'lucide-react';
 import type { Card } from '@/lib/cards';
 import { cn } from '@/lib/cn';
 
@@ -72,6 +73,58 @@ export function SavedCard({ card }: { card: Of<'saved'> }) {
       <ul className="mt-3 space-y-0.5">
         {card.lines.map((l, i) => <li key={i} className={i === 0 ? 'font-medium' : 'text-ink-soft'}>{l}</li>)}
       </ul>
+    </section>
+  );
+}
+
+const openButton = 'inline-flex min-h-11 md:min-h-9 shrink-0 items-center gap-2 rounded-md border border-copper bg-copper px-4 font-semibold text-on-copper hover:bg-copper-deep';
+
+/** "Below minimum · v1 — Open": always in the chat, so an artifact is never only a side effect. One tap opens it beside the chat. */
+export function ArtifactCard({ card, onOpen }: { card: Of<'artifact'>; onOpen: (id: string) => void }) {
+  const Icon = card.artifactKind === 'page' ? LayoutDashboard : FileText;
+  return (
+    <section aria-label={`${card.title}, version ${card.version}`} className="flex flex-wrap items-center gap-3 rounded-md border border-line border-l-4 border-l-copper bg-surface px-4 py-3">
+      <Icon aria-hidden className="size-6 shrink-0 text-copper-deep" />
+      <div className="min-w-0 flex-1"><p className="truncate font-medium">{card.title}</p><p className="text-sm text-ink-soft">{card.artifactKind === 'page' ? 'Page' : 'Document'} · version {card.version}</p></div>
+      <button type="button" onClick={() => onOpen(card.artifactId)} className={openButton}>Open</button>
+    </section>
+  );
+}
+
+export function PrintoutCard({ card, onOpen }: { card: Of<'printout'>; onOpen: (c: Of<'printout'>) => void }) {
+  return (
+    <section aria-label={card.title} className="flex flex-wrap items-center gap-3 rounded-md border border-line border-l-4 border-l-copper bg-surface px-4 py-3">
+      <Printer aria-hidden className="size-6 shrink-0 text-copper-deep" />
+      <div className="min-w-0 flex-1"><p className="truncate font-medium">{card.title}</p><p className="text-sm text-ink-soft">Printout, ready to print or save as PDF</p></div>
+      <button type="button" onClick={() => onOpen(card)} className={openButton}>Open</button>
+    </section>
+  );
+}
+
+/** Saves a file the server makes when the button is pressed (with the person's own role), and says what is happening. */
+export async function saveFile(href: string): Promise<string | null> {
+  try {
+    const res = await fetch(href, { credentials: 'same-origin' });
+    if (!res.ok) { const e = (await res.json().catch(() => null)) as { error?: string } | null; return e?.error ?? "Couldn't make that file. Try again."; }
+    const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'download';
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    return null;
+  } catch { return "Couldn't make that file. Try again."; }
+}
+
+export function DownloadCard({ card }: { card: Of<'download'> }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'done'>('idle');
+  const [err, setErr] = useState<string | null>(null);
+  const go = async () => { setState('busy'); setErr(null); const e = await saveFile(card.href); setErr(e); setState(e ? 'idle' : 'done'); };
+  return (
+    <section aria-label="Download" className="flex flex-wrap items-center gap-3 rounded-md border border-line bg-surface px-4 py-3">
+      <Download aria-hidden className="size-6 shrink-0 text-copper-deep" />
+      <p className="min-w-0 flex-1 font-medium">{card.label}</p>
+      <button type="button" onClick={() => void go()} disabled={state === 'busy'} className={openButton}>{state === 'busy' ? 'Preparing…' : state === 'done' ? 'Download again' : 'Download'}</button>
+      {err && <p role="alert" className="basis-full text-alert">{err}</p>}
     </section>
   );
 }

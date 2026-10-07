@@ -279,6 +279,8 @@ corrected by a later count). *Follow-ups:* new balance; notify the storekeeper.
 | `reset_user_password` | W | **OW** | A new password for someone who forgot theirs (min 10 characters). The owner types it in the form |
 | `deactivate_user` | W | **OW** | Never the last active owner |
 
+**As built (milestone 9):** the settings list now holds the company letterhead used on printouts: `company.name`, `company.address`, `company.gstin`, `company.state`, `company.phone` (type `text`). The state decides CGST+SGST (same state as the supplier) or IGST on the purchase order printout. Resetting a password also signs that person out everywhere (`sessionEpoch`).
+
 Tools that need a setting read it server-side; they never take it from the caller.
 
 ## A. Artifact, printout and download tools (see `docs/ARTIFACTS.md`)
@@ -296,6 +298,9 @@ business data only through the R tools above, **as the viewer**, via `vijaya.rea
 | `share_artifact` | W | **OW** | Share one frozen version with the storekeeper. Form shows the title, the version and who gets it. **Refused** if the artifact uses an owner-only tool |
 | `unshare_artifact` | W | **OW** | Stop sharing; it disappears from the storekeeper's Saved |
 | `download_data` | — | SK OW | A file of a table or of an artifact. Formats: for a `document` artifact **pdf, docx, xlsx, csv, png, md**; for a `page` **pdf, png, xlsx, csv**; for a table in the chat xlsx or csv. Made on the server; re-reads the data with the **downloader's** role (a storekeeper cannot download owner data). Offered as a button (Download ▾); the agent offers the format the person names |
+
+| `get_print_data` | R, **internal** | SK OW | The facts one printout needs (company letterhead, the document, its lines), read as the person printing. Never offered to the assistant or to artifacts (`internal: true` keeps it out of `readToolsFor`); only the printout route calls it |
+| `reset_demo_data` | W | **OW**, demo copy only (`DEMO_MODE=true`) | "Start the demo again": clears every business table and rebuilds a month of sample activity through the tools. Keeps users, settings and chats. Refused when `DEMO_MODE` is not set, so the real copy can never run it. The reseed runs after the commit (`afterCommit`) |
 
 Save (★), Delete (archive) and Restore-version are **UI actions** by the person (Server Actions on their
 own artifacts, audited), not agent tools.

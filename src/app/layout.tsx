@@ -7,11 +7,14 @@ import '@fontsource/ibm-plex-mono/500.css';
 import '@fontsource-variable/space-grotesk';
 import './globals.css';
 import { currentUser } from '@/server/auth/session';
+import { ServiceWorker } from '@/components/pwa';
 
 export const metadata: Metadata = {
   title: { default: 'Vijaya Stores', template: '%s · Vijaya Stores' },
   description: 'Stores and stock for Vijaya Electronics.',
   robots: { index: false, follow: false },
+  icons: { apple: '/icons/apple-touch-icon.png' },
+  appleWebApp: { capable: true, title: 'Vijaya Stores', statusBarStyle: 'black-translucent' },
 };
 
 export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#1B2A38' };
@@ -22,7 +25,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const theme = user?.theme === 'light' || user?.theme === 'dark' ? user.theme : undefined;
   return (
     <html lang="en" data-theme={theme}>
-      <body>{children}</body>
+      <body>{children}<ServiceWorker /></body>
     </html>
   );
 }

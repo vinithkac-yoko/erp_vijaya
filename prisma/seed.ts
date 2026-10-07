@@ -44,10 +44,27 @@ async function ensureSettings() {
   }
 }
 
+/**
+ * DEMO_MODE=true: a realistic finished month, built through the tools. Only when there is no stock at all (so a restart never
+ * adds a second demo on top of a first, and a real copy, where DEMO_MODE is off, is never touched).
+ */
+async function maybeSeedDemo() {
+  if (process.env.DEMO_MODE !== 'true') return;
+  if ((await prisma.material.count()) > 0) { console.log('[seed] Demo data is already there.'); return; }
+  const owner = await prisma.user.findFirst({ where: { role: 'OWNER', isActive: true }, orderBy: { createdAt: 'asc' } });
+  const sk = await prisma.user.findFirst({ where: { role: 'STOREKEEPER', isActive: true }, orderBy: { createdAt: 'asc' } });
+  if (!owner) { console.log('[seed] No owner to build the demo with.'); return; }
+  const { seedDemo } = await import('../src/server/demo/seed');
+  const who = (u: typeof owner, role: 'OWNER' | 'STOREKEEPER') => ({ userId: u.id, name: u.name, role });
+  await seedDemo({ owner: who(owner, 'OWNER'), storekeeper: sk ? who(sk, 'STOREKEEPER') : who(owner, 'OWNER') });
+  console.log('[seed] Demo month built.');
+}
+
 async function main() {
   await ensureSettings();
   if (ifEmpty && (await prisma.user.count()) > 0) {
     console.log('[seed] Users already exist. Nothing to do.');
+    await maybeSeedDemo();
     return;
   }
 
@@ -76,6 +93,7 @@ async function main() {
     for (const s of generated) console.log(`[seed]   ${s.email}  →  ${s.password}`);
     console.log('[seed] ──────────────────────────────────────────────────────────────');
   }
+  await maybeSeedDemo();
 }
 
 main().catch((e) => { console.error('[seed] Failed:', e instanceof Error ? e.message : e); process.exitCode = 1; }).finally(() => prisma.$disconnect());

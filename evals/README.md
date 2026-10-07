@@ -111,11 +111,12 @@ PendingAction rows it created, and the AuditEvents written during the turn (alwa
 LIVE_ANTHROPIC_API_KEY=… pnpm eval                          # every case that can run now, 5 times each
 EVAL_RUNS=1 EVAL_ONLY=11.,12. LIVE_ANTHROPIC_API_KEY=… pnpm eval   # sections 11 and 12, once
 EVAL_SEED_ONLY=1 pnpm eval                                  # build every starting state, no model, no cost
-EVAL_DEFERRED=1 …                                           # also the cases that need milestone 9
 ```
 
-- Starting states built so far: the 21 that need no artifact. The 9 artifact and document states, and the cases that expect
-  an artifact, printout, download or share, are listed as **deferred** in the report and run at milestone 9.
+- Starting states: all 30 (milestone 9 added the 9 artifact and document states, made through the same store the app uses and
+  checked by the same checker; an open one is told to the agent the way the page tells it, as the artifact open in the panel).
+  The runner uses the real builder (a separate call) and records what was made or edited (the new versions in the database),
+  what was opened, printed and downloaded (from the agent's tool calls and their results) and the share forms it opened.
 - Only the mechanical checks and global rules are graded. The `judge` rubrics are for a person (or a judge model) to read;
   the transcripts of failing cases are written beside the report (`*.transcripts.json`, not committed).
 - Reports: `evals/reports/<date>.md`, with the token cost.

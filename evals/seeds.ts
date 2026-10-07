@@ -5,6 +5,11 @@
  * Numbers follow docs/ACCEPTANCE_TESTS.md: JOB-…31 to 34, PO-…15 (Sundaram, 982 cores at ₹65, waiting for the owner),
  * bobbins 652, tape 820, varnish 38 when a count starts.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import * as artifacts from '@/server/artifacts/store';
+import { checkSource } from '@/server/artifacts/builder';
+import { db } from '@/server/db';
 import { conversations, pendingActions, runTool } from '@/server/tools';
 import type { ToolSession } from '@/server/tools/types';
 import { prisma, receive, resetDb } from '../tests/helpers/db';
@@ -16,6 +21,8 @@ export interface SeedContext {
   /** The conversation the case will type into, for the person the case runs as. */
   conversationId: string;
   role: 'STOREKEEPER' | 'OWNER';
+  /** Set by a seed that leaves an artifact open in the panel: the runner tells the agent which one is open (as the page does). */
+  openArtifactId?: string;
 }
 type Seed = (c: SeedContext) => Promise<void>;
 type Row = Record<string, unknown> & { id: string; material: string; systemQty: number };
@@ -245,7 +252,66 @@ const liveManyReceipts: Seed = async (c) => {
   }
 };
 
+// ── artifacts and documents (milestone 9): made through the same store the app uses, as the people would have ──────────────
+const example = (name: string) => readFileSync(join(__dirname, '..', 'reference', 'artifacts', 'examples', 'good', name), 'utf8');
+const copperPage = (type: 'line' | 'bar') => `<script>
+(async () => {
+  const ui = vijaya.ui;
+  ui.heading('Copper wire rates');
+  const r = await vijaya.read('get_purchase_price_history', { materialNames: ['22 SWG Copper Wire'] });
+  ui.chart({ title: 'Rate by date and supplier', type: '${type}', rows: r.rows, x: 'date', y: 'rate', series: 'supplier', format: 'inr', xFormat: 'date' });
+})();
+</script>`;
+const issuedPage = `<script>
+(async () => {
+  const ui = vijaya.ui;
+  ui.heading('Issued this week');
+  const r = await vijaya.read('get_movement_history', { from: '@today-7d' });
+  ui.table({ columns: [{ field: 'date', label: 'Date', format: 'date' }, { field: 'material', label: 'Material' }, { field: 'quantity', label: 'Quantity', format: 'qty', unitField: 'unit' }, { field: 'job', label: 'Job' }], rows: r.rows });
+})();
+</script>`;
+
+/** One artifact, version 1 (and more), made as `who`; the source must pass the same checker the server uses. */
+async function makeArtifact(who: ToolSession, a: { title: string; kind: 'page' | 'document'; versions: string[]; saved?: boolean; conversationId?: string | null }) {
+  const check = (src: string) => {
+    const r = checkSource(a.kind, src, who.role);
+    if (!r.ok) throw new Error(`eval seed "${a.title}" does not pass its own checker: ${r.issues.map((i) => i.code).join(', ')}`);
+    return JSON.parse(JSON.stringify(r));
+  };
+  const made = await artifacts.createArtifact(db, { ownerId: who.userId, conversationId: a.conversationId ?? null, kind: a.kind, title: a.title, source: a.versions[0]!, request: `seeded: ${a.title}`, checkReport: check(a.versions[0]!) });
+  for (const src of a.versions.slice(1)) await artifacts.addVersion(db, made.artifactId, { source: src, request: 'seeded: a change', summary: 'Changed it.', madeBy: 'AGENT', checkReport: check(src) });
+  if (a.saved) await artifacts.setSaved(db, who, made.artifactId, true);
+  return made.artifactId;
+}
+
+const artifactCopperOpen: Seed = async (c) => { await live(c); c.openArtifactId = await makeArtifact(c.ow, { title: 'Copper wire rates', kind: 'page', versions: [copperPage('line')], conversationId: c.conversationId }); };
+const artifactCopperSaved: Seed = async (c) => { await live(c); await makeArtifact(c.ow, { title: 'Copper wire rates', kind: 'page', versions: [copperPage('line'), copperPage('bar')], saved: true }); };
+const artifactBelowMinSaved: Seed = async (c) => { await live(c); await makeArtifact(c.ow, { title: 'Below minimum', kind: 'page', versions: [example('stock-below-minimum.html')], saved: true }); };
+const artifactBelowMinShared: Seed = async (c) => {
+  await live(c);
+  const v1 = example('stock-below-minimum.html');
+  const v2 = v1.replace("ui.heading('Below minimum');", "ui.heading('Below minimum');\n  ui.callout('info', 'Raise purchase orders for these first.');");
+  const idA = await makeArtifact(c.ow, { title: 'Below minimum', kind: 'page', versions: [v1, v2], saved: true });
+  await artifacts.shareVersion(db, { artifactId: idA, n: 1, byId: c.ow.userId });
+};
+const artifactOwnerStockValue: Seed = async (c) => { await live(c); await makeArtifact(c.ow, { title: 'Stock value', kind: 'page', versions: [example('stock-value.html')], saved: true }); };
+const skArtifactSaved: Seed = async (c) => { await live(c); await makeArtifact(c.sk, { title: 'Issued this week', kind: 'page', versions: [issuedPage], saved: true }); };
+const documentReceivingFlowOpen: Seed = async (c) => { await live(c); c.openArtifactId = await makeArtifact(c.ow, { title: 'How we receive material', kind: 'document', versions: [example('receiving-sop.vdoc')], conversationId: c.conversationId }); };
+const documentsSaved: Seed = async (c) => {
+  await live(c);
+  await makeArtifact(c.ow, { title: 'Stock position', kind: 'document', versions: [example('stock-report.vdoc')], saved: true });
+  await makeArtifact(c.ow, { title: 'How we receive material', kind: 'document', versions: [example('receiving-sop.vdoc')], saved: true });
+};
+const documentsSavedSk: Seed = async (c) => {
+  await documentsSaved(c);
+  const sop = await prisma.artifact.findFirstOrThrow({ where: { title: 'How we receive material' } });
+  await artifacts.shareVersion(db, { artifactId: sop.id, n: 1, byId: c.ow.userId });
+};
+
 export const SEEDS: Record<string, Seed> = {
+  'artifact-copper-open': artifactCopperOpen, 'artifact-copper-saved': artifactCopperSaved, 'artifact-below-min-saved': artifactBelowMinSaved,
+  'artifact-below-min-shared': artifactBelowMinShared, 'artifact-owner-stock-value': artifactOwnerStockValue, 'sk-artifact-saved': skArtifactSaved,
+  'document-receiving-flow-open': documentReceivingFlowOpen, 'documents-saved': documentsSaved, 'documents-saved-sk': documentsSavedSk,
   'masters-no-parties': materialsOnly, masters, 'opening-in-progress': openingInProgress, 'opening-submitted': openingSubmitted,
   live, 'live-with-leak': liveWithLeak, 'live-job31-issued': liveJob31Issued, 'live-issue-form-open': liveIssueFormOpen,
   'job-31-no-bom': job31NoBom, 'job-32-no-bom': job32NoBom, 'po-pending': poPending, 'po-tape-approved': poTapeApproved,

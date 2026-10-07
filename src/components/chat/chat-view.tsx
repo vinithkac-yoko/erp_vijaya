@@ -9,7 +9,8 @@ import type { ChatEvent } from '@/server/agent/events';
 import { redactSecrets } from '@/server/agent/redact'; // pure text function: safe in the browser
 import { LauncherRow } from '@/components/shell/launcher';
 import { cn } from '@/lib/cn';
-import { NoticeCard, OpeningCard, SavedCard, TableCard } from './cards';
+import { openArtifactFormAction } from '@/server/artifacts/actions';
+import { ArtifactCard, DownloadCard, NoticeCard, OpeningCard, PrintoutCard, SavedCard, TableCard } from './cards';
 import { FormCard } from './form-card';
 
 export interface ChatViewProps {
@@ -22,10 +23,17 @@ export interface ChatViewProps {
   assistantOn: boolean;
   offMessage: string;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
-  /** The shell calls this with a function that opens a form (for Alt+R and friends). */
-  registerOpenForm: (fn: (tool: string) => void) => void;
+  /** The shell calls this with a function that opens a form (for Alt+R, the Share button and friends). */
+  registerOpenForm: (fn: (tool: string, prefill?: Record<string, unknown>) => void) => void;
   /** Opens the count sheet in the panel. */
   onOpenSheet: () => void;
+  /** Opens an artifact, or a printout, beside the chat. */
+  onOpenArtifact: (id: string) => void;
+  onOpenPrintout: (card: Extract<import('@/lib/cards').Card, { kind: 'printout' }>) => void;
+  /** The artifact open beside the chat: "change it" and "download it" mean this one. */
+  openArtifactId: string | null;
+  /** The shell calls this with a function that opens a tool's form from inside an artifact (a row button). */
+  registerArtifactForm: (fn: (artifactId: string, tool: string, prefill: Record<string, unknown>) => Promise<void>) => void;
 }
 
 const NOTICE = (text: string): ChatItem => ({ id: `n-${Date.now()}-${Math.random()}`, role: 'card', card: { kind: 'notice', tone: 'info', text } });
@@ -42,6 +50,12 @@ export function ChatView(p: ChatViewProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const convRef = useRef(conversationId);
   convRef.current = conversationId;
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const artifactRef = useRef(p.openArtifactId);
+  artifactRef.current = p.openArtifactId;
+  const open = useRef({ artifact: p.onOpenArtifact, printout: p.onOpenPrintout });
+  open.current = { artifact: p.onOpenArtifact, printout: p.onOpenPrintout };
 
   useEffect(() => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight; }, [items, status, chips]);
 
@@ -69,6 +83,11 @@ export function ChatView(p: ChatViewProps) {
     } else if (e.type === 'item') {
       setStatus(null);
       if (e.item.role === 'card' && e.item.card.kind === 'form') setNewForm(e.item.id);
+      // What the person asked for opens beside the chat, unless they are in the middle of a form (the card is there to tap).
+      const c = e.item.role === 'card' ? e.item.card : null;
+      const formOpen = itemsRef.current.some((x) => x.role === 'card' && x.card.kind === 'form' && x.state === 'open');
+      if (c && c.kind === 'artifact' && c.open && !formOpen) open.current.artifact(c.artifactId);
+      if (c && c.kind === 'printout' && c.open && !formOpen) open.current.printout(c);
       setItems((cur) => [...cur, e.item]);
     } else if (e.type === 'chips') setChips(e.chips);
   }, [adopt]);
@@ -83,7 +102,7 @@ export function ChatView(p: ChatViewProps) {
     const ac = new AbortController();
     abort.current = ac;
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: ac.signal, body: JSON.stringify({ conversationId: convRef.current, message: msg, chip }) });
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: ac.signal, body: JSON.stringify({ conversationId: convRef.current, message: msg, chip, artifactId: artifactRef.current }) });
       if (!res.ok || !res.body) {
         const err = (await res.json().catch(() => null)) as { error?: string } | null;
         setItems((cur) => [...cur, NOTICE(res.status === 401 ? 'Please log in again.' : err?.error ?? "I can't answer right now. The buttons above still work.")]);
@@ -121,7 +140,18 @@ export function ChatView(p: ChatViewProps) {
     setItems((cur) => (r.created ? r.items : [...cur, ...r.items]));
   }, [adopt, p]);
 
-  useEffect(() => { p.registerOpenForm((tool) => { void openForm(tool); }); }, [p, openForm]);
+  useEffect(() => { p.registerOpenForm((tool, prefill) => { void openForm(tool, prefill); }); }, [p, openForm]);
+
+  // A row button inside an artifact: the tool's own form opens in the chat, filled in with what the row says (never a rate).
+  const openFromArtifact = useCallback(async (artifactId: string, tool: string, prefill: Record<string, unknown>) => {
+    const r = await openArtifactFormAction({ artifactId, tool, prefill, conversationId: convRef.current });
+    if (!r.ok) { setItems((cur) => [...cur, NOTICE(r.message)]); return; }
+    adopt(r.conversationId);
+    const form = r.items.at(-1);
+    if (form) setNewForm(form.id);
+    setItems((cur) => (r.created ? r.items : [...cur, ...r.items]));
+  }, [adopt]);
+  useEffect(() => { p.registerArtifactForm(openFromArtifact); }, [p, openFromArtifact]);
 
   const closeForm = (id: string, state: 'saved' | 'closed', extra: ChatItem[]) =>
     setItems((cur) => [...cur.map((x) => (x.id === id && x.role === 'card' ? { ...x, state } : x)), ...extra]);
@@ -141,6 +171,9 @@ export function ChatView(p: ChatViewProps) {
             if (c.kind === 'table') return <TableCard key={it.id} card={c} />;
             if (c.kind === 'notice') return <NoticeCard key={it.id} card={c} />;
             if (c.kind === 'saved') return <SavedCard key={it.id} card={c} />;
+            if (c.kind === 'artifact') return <ArtifactCard key={it.id} card={c} onOpen={p.onOpenArtifact} />;
+            if (c.kind === 'printout') return <PrintoutCard key={it.id} card={c} onOpen={p.onOpenPrintout} />;
+            if (c.kind === 'download') return <DownloadCard key={it.id} card={c} />;
             return (
               <FormCard key={it.id} pendingId={c.pendingId} tool={c.tool} form={c.form} values={c.values} assisted={c.assisted} info={c.info} state={it.state ?? 'closed'}
                 conversationId={conversationId} focusOnMount={newForm === it.id}

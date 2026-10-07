@@ -20,5 +20,5 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   // Everything except static build assets and image files.
-  matcher: [{ source: '/((?!_next/static|_next/image|favicon.ico|icon.svg).*)' }],
+  matcher: [{ source: '/((?!_next/static|_next/image|favicon.ico|icon.svg|icons/|sw.js).*)' }],
 };

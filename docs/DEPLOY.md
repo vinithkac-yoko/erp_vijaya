@@ -47,7 +47,7 @@ Good to know:
 - The `SEED_*` variables are read **only the first time**, when the database has no users. After that, changing them does nothing.
 - If you leave a password out, the app makes a strong one and prints it **once** in the deploy log
   (Deployments → the latest one → **Deploy Logs**, look for `FIRST PASSWORDS`). Copy it then.
-- Later milestones add `DEMO_MODE` and `UPLOAD_DIR`. Not needed yet.
+- `DEMO_MODE` is described near the end of this page. Leave it out for the real copy.
 
 **Email to the owner (milestone 6, optional).** The owner is always told inside the app. If you also want an email for approvals and alerts, add:
 
@@ -69,6 +69,14 @@ The address the email goes to is the **Owner notification email** the owner sets
 | `AGENT_DAILY_TOKENS` | optional, default `500000` | Most one person can use in a day. After that the assistant says so; the buttons keep working. |
 | `AGENT_MESSAGES_PER_MINUTE` | optional, default `20` | Most messages one person can send in a minute |
 | `ANTHROPIC_REFUSAL_FALLBACK` | optional, `off` to turn off the automatic fallback when the model declines | Leave it as it is unless Anthropic's support says otherwise |
+
+**Reports, downloads and printouts (milestone 9).** They need a browser (to draw PDFs and pictures) and a program called pandoc (for Word files).
+The repo's `nixpacks.toml` makes Railway install both, so you do nothing. If a download says "Couldn't make that file", open the service's
+Variables and add `CHROMIUM_PATH` with the value `chromium`, then redeploy.
+
+| Name | Value | Why |
+|---|---|---|
+| `CHROMIUM_PATH` | optional, `chromium` | Only if downloads cannot find the browser by themselves |
 
 ## 5. Get the web address
 
@@ -100,3 +108,17 @@ The address the email goes to is the **Owner notification email** the owner sets
 - **No volume.** Attachments arrive in a later milestone; we will add a volume at `/data` then.
 - **No custom domain.** Railway's address is fine for testing; a custom domain can be added in Settings → Networking.
 - Railway will redeploy on every push to the branch. If you want to pause that, Settings → Source → **Disconnect**.
+
+## Demo copy (milestone 10)
+
+To show the owner a finished month of made-up stock, jobs, purchase orders and counts, make a **second** Railway service (or a second project) from the same repo and add:
+
+| Name | Value |
+|---|---|
+| `DEMO_MODE` | `true` |
+
+On its first start it fills itself with a realistic month (twelve jobs, receipts with one rejection and one rate jump, scrap, a count with differences nobody could explain). The owner can say "start the demo again" in the chat to wipe it and fill it in again. **Never set `DEMO_MODE` on the real copy**: with it off, the reset refuses to run and no demo data is ever made.
+
+## Putting the app on a phone
+
+The owner opens the web address in Chrome on his phone and chooses **Add to Home screen**. It then opens like an app. Nothing about the stock is kept on the phone: with no connection it says so, and nothing is lost.

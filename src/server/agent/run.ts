@@ -8,6 +8,8 @@ import type { ChatEvent } from './events';
 import { toApiMessages, wrapData } from './history';
 import { redactSecrets } from './redact';
 import { agentTools, stripHidden } from './schemas';
+import { APP_TOOLS, appToolDefs, runAppTool } from '../artifacts/app-tools';
+import type { BuilderModel } from '../artifacts/builder';
 import type { conversationStore } from '../tools/conversations';
 import type { createPendingService } from '../tools/pending';
 import type { Registry } from '../tools/registry';
@@ -25,6 +27,8 @@ export interface AgentDeps {
   client: Anthropic;
   config: AgentConfig;
   now?: () => Date;
+  /** The model the artifact builder uses (a separate call that never sees row data). Null: no artifacts. */
+  builder?: BuilderModel | null;
   /** Contextual chips for the end of a turn (see chat/chips.ts). */
   chips?: (role: Role, usedTools: string[], lastAsk: string) => Chip[];
 }
@@ -35,6 +39,8 @@ export interface TurnInput {
   text: string;
   /** Which launcher chip sent this, if one did (counted for "top used first"). */
   chip?: string;
+  /** The artifact open beside the chat, if any: the default for "change it" and "download it". */
+  openArtifactId?: string;
   emit: (e: ChatEvent) => void;
   signal?: AbortSignal;
 }
@@ -42,7 +48,7 @@ export interface TurnInput {
 /** What the person sees while a tool runs. Never a bare spinner (INTERFACE §11). */
 const STATUS: Record<string, string> = {
   search_materials: 'Looking up materials…', get_material_balance: 'Checking stock…', search_parties: 'Looking up suppliers and customers…',
-  list_reorder_alerts: 'Checking what is low…', list_pending_approvals: 'Checking what is waiting…', list_settings: 'Looking at the settings…', list_users: 'Looking up the logins…',
+  list_reorder_alerts: 'Checking what is low…', make_artifact: 'Building it. This can take a little while…', edit_artifact: 'Making the change…', open_printout: 'Getting the printout ready…', list_artifacts: 'Looking at what you have made…', list_pending_approvals: 'Checking what is waiting…', list_settings: 'Looking at the settings…', list_users: 'Looking up the logins…',
 };
 
 const SAY_IT = 'Now write the one short sentence the user needs before they check the form: what is filled in and what to check, following the rules for what it says. Plain words. Do not say it is done or saved.';
@@ -89,7 +95,7 @@ export function createAgent(deps: AgentDeps) {
     const run = await store.startRun(session.userId, conversationId, config.model);
     const usage = { inputTokens: 0, outputTokens: 0 };
     const calls: { tool: string; ok: boolean; rows?: number }[] = [];
-    const tools = agentTools(registry, session.role);
+    const tools = [...agentTools(registry, session.role), ...appToolDefs(session.role)].sort((a, b) => a.name.localeCompare(b.name));
 
     const timeout = new AbortController();
     const timer = setTimeout(() => timeout.abort(new Error('turn timed out')), config.turnTimeoutMs);
@@ -158,6 +164,16 @@ export function createAgent(deps: AgentDeps) {
             continue;
           }
           toolCalls++;
+          if (APP_TOOLS[use.name]) {
+            emit({ type: 'status', text: STATUS[use.name] ?? 'Working on it…' });
+            const texts = (await store.rows(conversationId)).flatMap((r) => { const c = r.content as { kind?: string; text?: string }; return c.kind === 'text' && c.text ? [c.text] : []; }).slice(-3);
+            const out = await runAppTool(use.name, { session, conversationId, runId: run.id, userTexts: texts, openArtifactId: input.openArtifactId, builder: deps.builder ?? null, runTool, now: now() }, use.input);
+            if (out.usage) { usage.inputTokens += out.usage.input; usage.outputTokens += out.usage.output; }
+            for (const c of out.cards ?? []) await show(conversationId, c, emit, run.id);
+            calls.push({ tool: use.name, ok: !out.isError });
+            results.push({ type: 'tool_result', tool_use_id: use.id, content: out.text, ...(out.isError ? { is_error: true } : {}) });
+            continue;
+          }
           const tool = registry.get(use.name);
           if (!tool || !tool.agentVisible || !tool.roles.includes(session.role)) {
             // the model asked for something it was not offered (or made a name up): refused like any unknown tool

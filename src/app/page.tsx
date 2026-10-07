@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { headers } from 'next/headers';
 import { requireUser } from '@/server/auth/session';
 import { launcherState } from '@/server/chat/launcher';
 import { openingFor } from '@/server/chat/opening';
@@ -12,6 +13,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
   const user = await requireUser();
   const session = { userId: user.id, name: user.name, role: user.role };
   const { c } = await searchParams;
+  const nonce = (await headers()).get('x-nonce') ?? '';
 
   const { on } = await assistantRuntime();
   const [state, opening, chats] = await Promise.all([launcherState(session, on), openingFor(session), conversations.recent(user.id)]);
@@ -28,6 +30,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
       currentChatId={existing ? (c ?? null) : null}
       allForms={state.allForms}
       viewKey={existing && c ? c : `new-${randomUUID()}`}
+      nonce={nonce}
       chat={{
         initialItems: items, conversationId: existing ? (c ?? null) : null, launcher: state.launcher, formEnabled: state.formEnabled, chipEnabled: state.chipEnabled,
         badges: opening.badges, assistantOn: on, offMessage: ASSISTANT_OFF,

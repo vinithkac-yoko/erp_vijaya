@@ -19,6 +19,7 @@ export async function loginAction(_prev: LoginState, form: FormData): Promise<Lo
 
   const session = await getSession();
   session.userId = result.user.id;
+  session.epoch = result.user.epoch ?? 0;
   await session.save();
   redirect('/');
 }

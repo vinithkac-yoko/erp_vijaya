@@ -5,6 +5,7 @@ import { ensureConversation } from '@/server/chat/conversation';
 import { allowMessage } from '@/server/chat/rate-limit';
 import { assistantRuntime } from '@/server/chat/runtime';
 import type { ChatEvent } from '@/server/agent/events';
+import { openFor } from '@/server/artifacts/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,8 @@ const body = z.object({
   conversationId: z.string().uuid().optional().nullable(),
   message: z.string().trim().min(1, 'Type a message.').max(2000, 'That message is too long.'),
   chip: z.string().max(40).optional(),
+  /** The artifact open beside the chat: "change it" and "download it" mean this one. Checked against what this person may open. */
+  artifactId: z.string().uuid().optional().nullable(),
 });
 
 const json = (status: number, message: string) => Response.json({ error: message }, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -33,6 +36,9 @@ export async function POST(req: Request) {
   const { agent, config } = await assistantRuntime();
   if (!allowMessage(user.id, config.messagesPerMinute)) return json(429, 'You are sending messages very fast. Please wait a moment.');
 
+  let openArtifactId: string | undefined;
+  if (parsed.data.artifactId) { try { openArtifactId = (await openFor(session, parsed.data.artifactId)).artifactId; } catch { openArtifactId = undefined; } }
+
   const conv = await ensureConversation(session, conversationId);
   if (!conv) return json(404, "Couldn't find that chat.");
 
@@ -46,7 +52,7 @@ export async function POST(req: Request) {
       const send = (e: ChatEvent) => { try { controller.enqueue(encoder.encode(JSON.stringify(e) + '\n')); } catch { /* the browser went away */ } };
       send({ type: 'conversation', id: conv.id });
       try {
-        await agent.runTurn({ session, conversationId: conv.id, text: message, chip, emit: send, signal: req.signal });
+        await agent.runTurn({ session, conversationId: conv.id, text: message, chip, openArtifactId, emit: send, signal: req.signal });
       } finally {
         try { controller.close(); } catch { /* already closed */ }
       }

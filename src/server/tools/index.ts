@@ -14,6 +14,9 @@ import { createPendingService } from './pending';
 import { assistantSettingOn, listSettings, updateSetting } from './settings';
 import { createUser, deactivateUser, listUsers, resetUserPassword } from './users';
 import { getStockValue } from './stock';
+import { getPrintData } from './printdata';
+import { shareArtifact, unshareArtifact } from './artifactshare';
+import { resetDemoData } from './demo';
 import { estimateJobCost, getActivity, getCountHistory, getJobCostReport, getLeakReport } from './reports';
 import { Registry } from './registry';
 import { createRunTool } from './run-tool';
@@ -32,7 +35,7 @@ export const registry = new Registry([
   listCustomerPos, listJobs, getJob, checkJobShortage, getJobBomVariance, createCustomerPo, createJob, setJobBom, cancelJob,
   listPurchaseOrders, getPurchaseOrder, getPurchasePriceHistory, createPurchaseOrder, cancelPurchaseOrder, approvePurchaseOrder, rejectPurchaseOrder, listGoodsReceipts, recordGoodsReceipt,
   issueMaterial, returnMaterial, closeJob, recordScrapIn, recordScrapSale, getScrapSummary, getMovementHistory, reverseMovement,
-  getLeakReport, getCountHistory, getJobCostReport, estimateJobCost, getActivity,
+  getPrintData, resetDemoData, shareArtifact, unshareArtifact, getLeakReport, getCountHistory, getJobCostReport, estimateJobCost, getActivity,
   listCounts, listCountLines, startStockCount, submitCountLine, saveCountSheet, submitStockCount, approveStockCount, rejectStockCount,
 ]);
 

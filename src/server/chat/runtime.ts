@@ -19,6 +19,7 @@ export async function assistantRuntime(overrides: Partial<AgentConfig> = {}) {
   const agent = createAgent({
     registry, runTool, pending: pendingActions, store: conversations, config,
     client: client ?? new Anthropic({ apiKey: 'not-set' }),
+    builder: on && client ? { client, model: config.model, effort: config.effort } : null,
     chips: (role, used, lastAsk) => contextualChips(role, used, lastAsk, (t) => registry.get(t) !== undefined),
   });
   return { agent, config, on };

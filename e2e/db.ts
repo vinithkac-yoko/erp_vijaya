@@ -17,9 +17,9 @@ export async function resetData() {
 
 let n = 0;
 /** Materials put straight into the table, as the owner would have added them before go-live. */
-export async function addMaterials(list: { name: string; uom?: 'KG' | 'NOS' | 'MTR' | 'LTR'; isScrap?: boolean }[]) {
+export async function addMaterials(list: { name: string; uom?: 'KG' | 'NOS' | 'MTR' | 'LTR'; isScrap?: boolean; min?: number }[]) {
   for (const m of list) {
-    await prisma.material.create({ data: { code: `MAT-E${String(++n).padStart(4, '0')}`, name: m.name, nameKey: materialNameKey(m.name), uom: m.uom ?? 'NOS', stockType: 'PER_JOB', isScrap: m.isScrap ?? false } });
+    await prisma.material.create({ data: { code: `MAT-E${String(++n).padStart(4, '0')}`, name: m.name, nameKey: materialNameKey(m.name), uom: m.uom ?? 'NOS', stockType: m.min ? 'STANDING' : 'PER_JOB', minimumLevel: m.min, isScrap: m.isScrap ?? false } });
   }
 }
 
@@ -64,4 +64,34 @@ export async function addApprovedCount(date: string, lines: { material: string; 
   await prisma.stockCount.update({ where: { id: count.id }, data: { status: 'PENDING_APPROVAL' } });
   await prisma.stockCount.update({ where: { id: count.id }, data: { status: 'APPROVED' } });
   return count;
+}
+
+/** A purchase order for a supplier, put straight into the table, with its lines (rate per unit, GST per cent). */
+export async function addPo(supplier: string, lines: { material: string; quantity: number; rate: number; gstRate?: number; hsn?: string }[], opts: { status?: 'APPROVED' | 'PENDING_APPROVAL'; number?: string } = {}) {
+  const sup = await prisma.party.findFirstOrThrow({ where: { name: supplier } });
+  let sub = 0, gst = 0;
+  const rows = [];
+  for (const l of lines) {
+    const m = await prisma.material.findFirstOrThrow({ where: { name: l.material } });
+    const amount = Math.round(l.quantity * l.rate * 100) / 100;
+    sub += amount; gst += Math.round(amount * (l.gstRate ?? 0)) / 100;
+    rows.push({ materialId: m.id, quantity: l.quantity, rate: l.rate, amount, hsnCode: l.hsn, gstRate: l.gstRate });
+  }
+  const count = await prisma.purchaseOrder.count();
+  return prisma.purchaseOrder.create({ data: { number: opts.number ?? `PO-2627-${String(count + 1).padStart(4, '0')}`, supplierId: sup.id, poDate: new Date(), status: opts.status ?? 'APPROVED', subTotal: sub, gstAmount: gst, totalValue: sub + gst, approvedAt: (opts.status ?? 'APPROVED') === 'APPROVED' ? new Date() : null, lines: { create: rows } } });
+}
+
+/** A goods receipt (with the stock movement it makes) for a supplier. */
+export async function addGrn(supplier: string, lines: { material: string; received: number; rejected?: number; rate: number }[], opts: { invoiceNo?: string } = {}) {
+  const sup = await prisma.party.findFirstOrThrow({ where: { name: supplier } });
+  const count = await prisma.goodsReceipt.count({ where: { number: { startsWith: 'GRN-2627-' } } });
+  const grn = await prisma.goodsReceipt.create({ data: { number: `GRN-2627-${String(count + 1).padStart(4, '0')}`, supplierId: sup.id, receiptDate: new Date(), supplierInvoiceNo: opts.invoiceNo } });
+  for (const l of lines) {
+    const m = await prisma.material.findFirstOrThrow({ where: { name: l.material } });
+    const rejected = l.rejected ?? 0;
+    const line = await prisma.goodsReceiptLine.create({ data: { goodsReceiptId: grn.id, materialId: m.id, receivedQty: l.received, acceptedQty: l.received - rejected, rejectedQty: rejected, rejectionReason: rejected ? 'Damaged' : null, rate: l.rate, amount: (l.received - rejected) * l.rate } });
+    await prisma.stockMovement.create({ data: { materialId: m.id, type: 'RECEIPT', direction: 'IN', quantity: l.received, rate: l.rate, grnLineId: line.id, movementDate: new Date() } });
+    if (rejected) await prisma.stockMovement.create({ data: { materialId: m.id, type: 'REJECT_RETURN', direction: 'OUT', quantity: rejected, rate: l.rate, grnLineId: line.id, movementDate: new Date() } });
+  }
+  return grn;
 }

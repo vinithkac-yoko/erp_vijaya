@@ -36,7 +36,12 @@ export interface AuditDraft {
   after?: unknown;
 }
 
-export interface WriteResult<O> { data: O; audit: AuditDraft }
+export interface WriteResult<O> {
+  data: O;
+  audit: AuditDraft;
+  /** Runs once, after the save is committed (the demo reset fills the demo data in through the tools). Its failure is reported, not hidden. */
+  afterCommit?: () => Promise<void>;
+}
 
 interface Base<I extends z.ZodTypeAny> {
   name: string;

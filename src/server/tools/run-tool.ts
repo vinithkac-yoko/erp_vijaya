@@ -100,11 +100,17 @@ export function createRunTool(registry: Registry, client: PrismaClient = db) {
             afterJson: scrub(a.after) as Prisma.InputJsonValue | undefined,
           },
         });
-        return { ok: true as const, data: result.data, auditId: event.id };
+        return { ok: true as const, data: result.data, auditId: event.id, afterCommit: result.afterCommit };
       }, { timeout: 20_000, maxWait: 10_000 });
       // After the save is safe: tell the owner by email, if email is set up. Never part of the save, never a reason for it to fail.
       void sendOwnerEmails().catch(() => undefined);
-      return out;
+      if (out.afterCommit) {
+        try { await out.afterCommit(); } catch (e) {
+          console.error(`[runTool] ${name} afterCommit failed:`, e instanceof Error ? `${e.name}: ${e.message.slice(0, 300)}` : 'unknown error');
+          return fail('FOLLOW_UP_FAILED', 'That was saved, but the next step failed. Please try again.');
+        }
+      }
+      return { ok: true as const, data: out.data, auditId: out.auditId };
     } catch (err) {
       const mapped = mapError(err);
       if (mapped === UNKNOWN_CONSTRAINT || mapped.code === 'INTERNAL') {

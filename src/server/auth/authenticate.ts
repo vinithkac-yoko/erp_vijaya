@@ -8,7 +8,7 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Type your password.').max(200),
 });
 
-export interface SessionUser { id: string; name: string; role: 'OWNER' | 'STOREKEEPER'; theme: string | null }
+export interface SessionUser { id: string; name: string; role: 'OWNER' | 'STOREKEEPER'; theme: string | null; /** Only set by a login: what goes into the cookie. */ epoch?: number }
 
 export type AuthResult =
   | { ok: true; user: SessionUser }
@@ -32,5 +32,6 @@ export async function authenticate(input: unknown, ip = 'unknown'): Promise<Auth
     return { ok: false, message: WRONG };
   }
   recordSuccess(ip, email);
-  return { ok: true, user: { id: user.id, name: user.name, role: user.role, theme: user.theme } };
+  await db.user.update({ where: { id: user.id }, data: { lastActiveAt: new Date() } });
+  return { ok: true, user: { id: user.id, name: user.name, role: user.role, theme: user.theme, epoch: user.sessionEpoch } };
 }

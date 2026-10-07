@@ -25,59 +25,84 @@ const KEY = process.env.LIVE_ANTHROPIC_API_KEY;
 const RUNS = Number(process.env.EVAL_RUNS ?? 5);
 const ONLY = (process.env.EVAL_ONLY ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const SEED_ONLY = process.env.EVAL_SEED_ONLY === '1';
-const INCLUDE_DEFERRED = process.env.EVAL_DEFERRED === '1';
 
 const cases = JSON.parse(readFileSync(join(__dirname, 'cases.json'), 'utf8')) as Case[];
 
-/** Cases that need what milestone 9 builds: artifacts, documents, printouts, downloads, sharing. They run again then. */
-const WANTS_APP_TOOLS = /\b(print|excel|word|pdf|download|export|email)\b/i;
-function deferredWhy(c: Case): string | null {
-  if (!SEEDS[c.state]) return `starting state "${c.state}" arrives with milestone 9`;
-  const wants = c.checks.some((k) => k.artifact || k.opensArtifact || k.prints || k.downloads || k.shares);
-  if (wants) return 'expects an artifact, printout, download or share (milestone 9)';
-  if (c.turns.some((t) => ARTIFACT_ASKED.test(t) || WANTS_APP_TOOLS.test(t))) return 'asks for an artifact, printout or download (milestone 9)';
-  return null;
-}
+/** A case whose starting state has no seed here cannot run; there are none left since milestone 9. */
+const deferredWhy = (c: Case): string | null => (SEEDS[c.state] ? null : `starting state "${c.state}" has no seed`);
 const chosen = cases.filter((c) => (ONLY.length ? ONLY.some((p) => c.id === p || c.id.startsWith(p)) : true));
-const runnable = chosen.filter((c) => INCLUDE_DEFERRED || !deferredWhy(c));
+const runnable = chosen.filter((c) => !deferredWhy(c));
 const deferred = chosen.filter((c) => !runnable.includes(c));
 
 interface RunResult { pass: boolean; failures: string[]; turns: TurnRecord[]; input: number; output: number; error?: string }
 interface CaseResult { id: string; passes: number; runs: number; first?: string; tokensIn: number; tokensOut: number; sample?: TurnRecord[] }
 
 const config = { ...agentConfig({ NODE_ENV: 'test' }), apiKey: KEY ?? 'unset' };
-const agent = createAgent({ registry, runTool, pending: pendingActions, store: conversations, client: new Anthropic({ apiKey: KEY ?? 'unset', maxRetries: 2 }), config });
+const client = new Anthropic({ apiKey: KEY ?? 'unset', maxRetries: 2 });
+// the builder is the same separate call the app makes: it never sees row data
+const agent = createAgent({ registry, runTool, pending: pendingActions, store: conversations, client, config, builder: { client, model: config.model, effort: config.effort } });
 
-type ApiRow = { content: { kind: string; blocks?: { type: string; name?: string; input?: Record<string, unknown>; text?: string }[] } };
+type Block = { type: string; id?: string; tool_use_id?: string; is_error?: boolean; name?: string; input?: Record<string, unknown>; text?: string };
+type ApiRow = { content: { kind: string; blocks?: Block[]; card?: { kind: string; artifactId?: string; title?: string } } };
+const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
 
 async function playOnce(c: Case): Promise<RunResult> {
   await freshDatabase();
   const sk = await storekeeper(); const ow = await owner();
   const who = c.role === 'OWNER' ? ow : sk;
   const conv = await conversations.create(who.userId);
-  await SEEDS[c.state]!({ sk, ow, conversationId: conv.id, role: c.role });
+  const seeded: { sk: typeof sk; ow: typeof ow; conversationId: string; role: Case['role']; openArtifactId?: string } = { sk, ow, conversationId: conv.id, role: c.role };
+  await SEEDS[c.state]!(seeded);
+  let openArtifactId = seeded.openArtifactId;
   // the seeding is not part of what the agent did; the turns start from here
   const turns: TurnRecord[] = [];
   let input = 0; let output = 0;
   for (const text of c.turns) {
     const startedAt = new Date();
     const before = (await conversations.rows(conv.id)).length;
-    await agent.runTurn({ session: who, conversationId: conv.id, text, emit: () => undefined });
+    await agent.runTurn({ session: who, conversationId: conv.id, text, emit: () => undefined, openArtifactId });
     const rows = (await conversations.rows(conv.id)).slice(before) as unknown as ApiRow[];
     const blocks = rows.filter((r) => r.content.kind === 'api').flatMap((r) => r.content.blocks ?? []);
     const uses = blocks.filter((b) => b.type === 'tool_use');
+    const failedUse = new Set(rows.filter((r) => r.content.kind === 'tool_results').flatMap((r) => r.content.blocks ?? []).filter((b) => b.is_error).map((b) => b.tool_use_id));
+    const succeeded = (name: string) => uses.filter((u) => u.name === name && !failedUse.has(u.id));
+    const cards = rows.flatMap((r) => (r.content.kind === 'card' && r.content.card ? [r.content.card] : []));
     const readCalls = uses.filter((u) => registry.get(u.name ?? '')?.kind === 'read').map((u) => ({ tool: u.name!, input: u.input ?? {} }));
-    const opened = await prisma.pendingAction.findMany({ where: { conversationId: conv.id, createdAt: { gte: startedAt } }, orderBy: { createdAt: 'asc' } });
+    const forms = await prisma.pendingAction.findMany({ where: { conversationId: conv.id, createdAt: { gte: startedAt } }, orderBy: { createdAt: 'asc' } });
     const audits = await prisma.auditEvent.findMany({ where: { createdAt: { gte: startedAt } } });
+    const versions = await prisma.artifactVersion.findMany({ where: { createdAt: { gte: startedAt }, madeBy: 'AGENT' }, include: { artifact: true }, orderBy: { createdAt: 'asc' } });
+    const artifacts: TurnRecord['artifacts'] = versions.map((v) => ({ op: v.n === 1 ? 'make' as const : 'edit' as const, artifactId: v.artifactId, kind: v.artifact.kind === 'DOCUMENT' ? 'document' as const : 'page' as const, source: v.source, role: c.role }));
+    const opened: TurnRecord['opened'] = succeeded('open_artifact').map((u) => ({ artifactId: str(u.input?.artifactId) ?? '', title: cards.find((k) => k.kind === 'artifact' && k.artifactId === u.input?.artifactId)?.title ?? '' }));
+    const prints: TurnRecord['prints'] = succeeded('open_printout').map((u) => ({ template: str(u.input?.template) ?? '', with: (u.input?.with ?? {}) as Record<string, unknown> }));
+    const downloads: TurnRecord['downloads'] = [];
+    for (const u of succeeded('download_data')) {
+      const format = u.input?.format as TurnRecord['downloads'][number]['format'];
+      const src = u.input?.source as { tool: string; input?: Record<string, unknown> } | undefined;
+      if (src) { downloads.push({ format, source: { tool: src.tool, input: src.input } }); continue; }
+      const artifactId = str(u.input?.artifactId) || openArtifactId || '';
+      const row = artifactId ? await prisma.artifact.findUnique({ where: { id: artifactId }, select: { kind: true } }) : null;
+      downloads.push({ format, source: { artifactId }, ...(row ? { artifactKind: row.kind === 'DOCUMENT' ? 'document' as const : 'page' as const } : {}) });
+    }
+    const shares: TurnRecord['shares'] = [];
+    for (const f of forms.filter((x) => x.toolName === 'share_artifact' || x.toolName === 'unshare_artifact')) {
+      const input = (f.proposedInput ?? {}) as { artifactId?: string; version?: number };
+      const artifactId = input.artifactId ?? '';
+      const art = artifactId ? await prisma.artifact.findUnique({ where: { id: artifactId }, include: { versions: true, currentVersion: true } }) : null;
+      const v = art?.versions.find((x) => x.n === input.version) ?? art?.currentVersion;
+      shares.push({ tool: f.toolName as 'share_artifact' | 'unshare_artifact', artifactId, ...(v && art ? { source: v.source, kind: art.kind === 'DOCUMENT' ? 'document' as const : 'page' as const } : {}) });
+    }
     turns.push({
       user: text,
       text: blocks.filter((b) => b.type === 'text').map((b) => b.text ?? '').join('\n').trim(),
       readCalls,
-      pendingActions: opened.map((p) => ({ tool: p.toolName, input: (p.proposedInput ?? {}) as Record<string, unknown> })),
+      pendingActions: forms.map((p) => ({ tool: p.toolName, input: (p.proposedInput ?? {}) as Record<string, unknown> })),
       writesExecuted: audits.map((a) => ({ tool: a.toolName ?? a.action })),
-      artifacts: [], opened: [], prints: [], downloads: [], shares: [],
+      artifacts, opened, prints, downloads, shares,
       toolCallCount: uses.length,
     });
+    // the page opens what was just made or opened, so the next turn starts from it (a form row-button or "add a column" refers to it)
+    const lastOpened = [...cards].reverse().find((k) => k.kind === 'artifact' && k.artifactId);
+    if (lastOpened?.artifactId) openArtifactId = lastOpened.artifactId;
   }
   const runs = await prisma.agentRun.findMany({ where: { conversationId: conv.id } });
   for (const r of runs) { input += r.inputTokens ?? 0; output += r.outputTokens ?? 0; }
@@ -93,7 +118,7 @@ afterAll(async () => {
   const tin = results.reduce((s, r) => s + r.tokensIn, 0); const tout = results.reduce((s, r) => s + r.tokensOut, 0);
   const lines = [
     `# Agent evals · ${date}`, '',
-    `${runnable.length} cases run ${RUNS}× each against \`${config.model}\`; ${deferred.length} deferred to milestone 9 (artifacts, printouts, downloads).`,
+    `${runnable.length} cases run ${RUNS}× each against \`${config.model}\`; ${deferred.length} without a starting state.`,
     'Mechanical checks only (evals/assert.ts: the case checks and the global rules). The `judge` rubrics are not graded by a model here.', '',
     `Tokens: ${tin.toLocaleString('en-IN')} in (cache reads counted at a tenth), ${tout.toLocaleString('en-IN')} out.`, '',
     '| Case | Passes | First failure |', '|---|---|---|',

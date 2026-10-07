@@ -44,6 +44,10 @@ model User {
   isActive     Boolean  @default(true)
   /// "light" | "dark" | null (follow the device)
   theme        String?
+  /// Last time this person did anything (read at most every 5 minutes). Drives the idle log-out.
+  lastActiveAt DateTime?
+  /// Goes up when the owner resets this person's password: every session made before that stops working.
+  sessionEpoch Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -375,6 +379,8 @@ model StockMovement {
   @@index([createdAt])
   @@index([agentRunId])
   @@map("stock_movements")
+  @@index([scrapSaleId])
+  @@index([actorId])
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -427,6 +433,9 @@ model PurchaseOrder {
   @@index([supplierId, poDate])
   @@index([status])
   @@map("purchase_orders")
+  @@index([triggeredByJobId])
+  @@index([createdById])
+  @@index([approvedById])
 }
 
 model PurchaseOrderLine {
@@ -447,6 +456,7 @@ model PurchaseOrderLine {
 
   @@index([purchaseOrderId])
   @@map("purchase_order_lines")
+  @@index([materialId])
 }
 
 /// Material arrives with supplier invoice / DC. Storekeeper records it
@@ -473,6 +483,7 @@ model GoodsReceipt {
 
   @@index([supplierId, receiptDate])
   @@map("goods_receipts")
+  @@index([purchaseOrderId])
 }
 
 model GoodsReceiptLine {
@@ -498,6 +509,8 @@ model GoodsReceiptLine {
 
   @@index([goodsReceiptId])
   @@map("goods_receipt_lines")
+  @@index([purchaseOrderLineId])
+  @@index([materialId])
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -584,6 +597,8 @@ model Job {
   @@index([customerId, jobDate])
   @@index([status])
   @@map("jobs")
+  @@index([parentJobId])
+  @@index([customerPoId])
 }
 
 /// THIS REPLACES THE EXCEL SHEET handed to the storekeeper.
@@ -608,6 +623,7 @@ model JobBomLine {
 
   @@unique([jobId, materialId])
   @@map("job_bom_lines")
+  @@index([materialId])
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -653,6 +669,8 @@ model StockCount {
   @@index([countDate])
   @@index([status])
   @@map("stock_counts")
+  @@index([countedById])
+  @@index([approvedById])
 }
 
 model StockCountLine {
@@ -690,6 +708,7 @@ model StockCountLine {
 
   @@unique([stockCountId, materialId])
   @@map("stock_count_lines")
+  @@index([materialId])
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -717,6 +736,8 @@ model ScrapSale {
 
   @@index([saleDate])
   @@map("scrap_sales")
+  @@index([materialId])
+  @@index([buyerId])
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -831,6 +852,7 @@ model AgentRun {
 
   @@index([userId, startedAt])
   @@map("agent_runs")
+  @@index([conversationId])
 }
 
 enum ArtifactKind {
@@ -868,6 +890,7 @@ model Artifact {
 
   @@index([ownerId, status])
   @@map("artifacts")
+  @@index([conversationId])
 }
 
 /// Immutable (trigger): a version is never edited, only superseded.
@@ -907,4 +930,7 @@ model ArtifactShare {
 
   @@index([toUserId, revokedAt])
   @@map("artifact_shares")
+  @@index([versionId])
+  @@index([sharedById])
+  @@index([artifactId])
 }

@@ -413,6 +413,15 @@ form, a button or an artifact. Filter by person, kind of action, date or one job
 Use it for "everything the agent did today" (from @today) and "all changes to job 31".""",
      {"userId": "One person. " + IDS, "from": "From. " + DATE_REL, "to": "To. " + DATE_REL, "tool": "One kind of action, e.g. issue_material.", "jobId": "Only changes to this job. " + IDS})
 
+tool("reset_demo_data", "write", OW, """
+OWNER ONLY, demo copy only. Opens the form to wipe the demo stock, jobs, orders and history and fill in a fresh demo month. Logins and settings
+stay. Use it only when the owner asks to start the demo again; say it cannot be undone. On a real copy it refuses. """ + FORM,
+     {"confirm": "Leave empty: the owner ticks the box on the form."})
+
+tool("get_print_data", "read", SK_OW, """
+Used by the app to fill the five printouts. Never called by the assistant.""",
+     {"template": "Which printout.", "purchaseOrderId": "The purchase order.", "receiptId": "The goods receipt.", "jobId": "The job.", "countId": "The count."}, agent=False)
+
 # ─────────────────────────────── 11. Settings and users ───────────────────────────────
 tool("list_settings", "read", SK_OW, """
 Settings. The owner sees all of them; the storekeeper sees only the purchase approval limit.""")

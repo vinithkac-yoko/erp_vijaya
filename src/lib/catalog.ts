@@ -23,6 +23,8 @@ export interface ToolMeta {
   outputs?: string[];
   /** Fields of the returned row that may be bound ($row) but never displayed. */
   bindOnly?: string[];
+  /** Used by the app itself (the printouts). Never offered to the assistant, an artifact or the builder. */
+  internal?: boolean;
 }
 
 const t = (m: ToolMeta) => m;
@@ -121,6 +123,8 @@ export const TOOLS: Record<string, ToolMeta> = Object.fromEntries(
         outputs: ['job', 'customer', 'customerPo', 'product', 'quantity', 'statusText', 'materialCost', 'costPerPiece', 'closedAt'], bindOnly: ['jobId'] }),
     t({ name: 'get_activity', kind: 'read', roles: OWNER, inputs: { userId: {}, from: {}, to: {}, tool: {}, jobId: {} },
         outputs: ['when', 'who', 'what', 'document', 'source', 'reason'], bindOnly: ['id'] }),
+    t({ name: 'get_print_data', kind: 'read', roles: BOTH, internal: true, inputs: { template: { required: true }, purchaseOrderId: {}, receiptId: {}, jobId: {}, countId: {} } }),
+    t({ name: 'reset_demo_data', kind: 'write', roles: OWNER, inputs: { confirm: { required: true } } }),
     t({ name: 'share_artifact', kind: 'write', roles: OWNER, inputs: { artifactId: { required: true }, version: {} } }),
     t({ name: 'unshare_artifact', kind: 'write', roles: OWNER, inputs: { artifactId: { required: true } } }),
     t({ name: 'deactivate_party', kind: 'write', roles: BOTH, inputs: { partyId: { required: true }, reason: {} } }),
@@ -163,6 +167,6 @@ export const ARTIFACT_OPENABLE_FORMS = new Set([
 /** Never displayed anywhere, whatever a tool returns. */
 export const FORBIDDEN_DISPLAY = /^(id|code|passwordHash|.*Id)$/;
 
-export const readToolsFor = (role: Role) => Object.values(TOOLS).filter((t) => t.kind === 'read' && t.roles.includes(role)).map((t) => t.name);
+export const readToolsFor = (role: Role) => Object.values(TOOLS).filter((t) => t.kind === 'read' && !t.internal && t.roles.includes(role)).map((t) => t.name);
 export const artifactFormsFor = (role: Role) => writeToolsFor(role).filter((n) => ARTIFACT_OPENABLE_FORMS.has(n));
 export const writeToolsFor = (role: Role) => Object.values(TOOLS).filter((t) => t.kind === 'write' && t.roles.includes(role)).map((t) => t.name);

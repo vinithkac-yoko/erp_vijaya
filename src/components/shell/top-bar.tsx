@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useTransition } from 'react';
-import { Bookmark, Check, ChevronDown, CircleHelp, History, LogOut, Monitor, Moon, Plus, Settings, Sun } from 'lucide-react';
+import { useState, useTransition } from 'react';
+import { Bookmark, Check, FileText, LayoutDashboard, ChevronDown, CircleHelp, History, LogOut, Monitor, Moon, Plus, Settings, Sun } from 'lucide-react';
 import { logoutAction, setThemeAction } from '@/server/auth/actions';
 import { CoilLine, BrandMark } from '@/components/brand';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/cn';
+import { listArtifactsAction } from '@/server/artifacts/actions';
+import type { ArtifactRow } from '@/server/artifacts/store';
 
 export interface ShellUser { name: string; role: 'OWNER' | 'STOREKEEPER'; theme: string | null }
 export interface ChatLink { id: string; title: string }
@@ -21,8 +23,10 @@ function applyTheme(value: 'light' | 'dark' | 'system') {
   if (value === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', value);
 }
 
-export function TopBar({ user, chats, currentChatId, onHelp, onSettings }: { user: ShellUser; chats: ChatLink[]; currentChatId: string | null; onHelp: () => void; /** Owner only: opens the form for changing a setting. It needs no assistant, so it also works when the assistant is off. */ onSettings?: () => void }) {
+export function TopBar({ user, chats, currentChatId, onHelp, onSettings, onOpenArtifact }: { user: ShellUser; chats: ChatLink[]; currentChatId: string | null; onHelp: () => void; onOpenArtifact: (id: string, title: string) => void; /** Owner only: opens the form for changing a setting. It needs no assistant, so it also works when the assistant is off. */ onSettings?: () => void }) {
   const [, startTransition] = useTransition();
+  const [saved, setSaved] = useState<{ mine: ArtifactRow[]; shared: ArtifactRow[] } | null>(null);
+  const loadSaved = (open: boolean) => { if (open) void listArtifactsAction().then((r) => { if (r.ok) setSaved({ mine: r.mine, shared: r.shared }); }); };
   const current = user.theme === 'light' || user.theme === 'dark' ? user.theme : 'system';
   const choose = (v: 'light' | 'dark' | 'system') => { applyTheme(v); startTransition(() => { void setThemeAction(v); }); };
   const themeItems = [
@@ -37,13 +41,19 @@ export function TopBar({ user, chats, currentChatId, onHelp, onSettings }: { use
       <div className="relative flex items-center gap-1 px-3 py-2 sm:gap-2 sm:px-5">
         <BrandMark className="mr-2 sm:mr-6" />
 
-        {/* Saved and Chats are filled in by later milestones; they are real menus now so the bar never changes shape. */}
-        <DropdownMenu>
+        <DropdownMenu onOpenChange={loadSaved}>
           <DropdownMenuTrigger className={barButton}>
             <Bookmark aria-hidden className="size-5 sm:size-4" /><span className="sr-only sm:not-sr-only">Saved</span><ChevronDown aria-hidden className="hidden size-4 sm:block" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuLabel>Nothing saved yet.</DropdownMenuLabel>
+          <DropdownMenuContent align="start" className="w-80">
+            {!saved && <DropdownMenuLabel>Looking…</DropdownMenuLabel>}
+            {saved && saved.mine.length === 0 && saved.shared.length === 0 && <DropdownMenuLabel>Nothing yet. Ask for a report, chart or document and it appears here.</DropdownMenuLabel>}
+            {saved && saved.mine.filter((a) => a.saved).length > 0 && <DropdownMenuLabel>Saved</DropdownMenuLabel>}
+            {saved?.mine.filter((a) => a.saved).map((a) => <ArtifactItem key={a.artifactId} a={a} onOpen={onOpenArtifact} />)}
+            {saved && saved.mine.filter((a) => !a.saved).length > 0 && <DropdownMenuLabel>Recent</DropdownMenuLabel>}
+            {saved?.mine.filter((a) => !a.saved).slice(0, 8).map((a) => <ArtifactItem key={a.artifactId} a={a} onOpen={onOpenArtifact} />)}
+            {saved && saved.shared.length > 0 && <DropdownMenuLabel>Shared with me</DropdownMenuLabel>}
+            {saved?.shared.map((a) => <ArtifactItem key={a.artifactId} a={a} onOpen={onOpenArtifact} />)}
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -111,5 +121,15 @@ export function TopBar({ user, chats, currentChatId, onHelp, onSettings }: { use
         </div>
       </div>
     </header>
+  );
+}
+
+function ArtifactItem({ a, onOpen }: { a: ArtifactRow; onOpen: (id: string, title: string) => void }) {
+  const Icon = a.kind === 'page' ? LayoutDashboard : FileText;
+  return (
+    <DropdownMenuItem onSelect={() => onOpen(a.artifactId, a.title)}>
+      <Icon aria-hidden className="size-4 shrink-0" />
+      <span className="min-w-0 flex-1"><span className="block truncate">{a.title}</span>{a.sharedBy && <span className="block text-sm text-ink-soft">Shared by {a.sharedBy} · version {a.version}</span>}</span>
+    </DropdownMenuItem>
   );
 }

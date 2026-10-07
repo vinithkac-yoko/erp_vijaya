@@ -71,7 +71,8 @@ export const resetUserPassword = defineTool({
   handler: async (ctx, input) => {
     const u = await ctx.db.user.findUnique({ where: { id: input.userId }, select: { id: true, name: true } });
     if (!u) throw new ToolError('NOT_FOUND', "Couldn't find that person.", undefined, 'userId');
-    await ctx.db.user.update({ where: { id: u.id }, data: { passwordHash: await hashPassword(input.password) } });
+    // the new password also ends every session the person already has (a lost phone, a shared PC)
+    await ctx.db.user.update({ where: { id: u.id }, data: { passwordHash: await hashPassword(input.password), sessionEpoch: { increment: 1 } } });
     // the audit says THAT it changed, never to what
     return { data: { name: u.name }, audit: { entityType: 'User', entityId: u.id, action: 'UPDATE', after: { name: u.name, credentialChanged: true } } };
   },
