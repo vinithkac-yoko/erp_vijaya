@@ -189,6 +189,10 @@ notebook and the gap vanished. In this system a count is never an overwrite.
   never suggest a likely reason, and never turn a guess ("maybe spillage?") into a reason.
   An honest "unexplained" is exactly what the owner needs to find the leak.
 - Stock only changes when the OWNER approves the count. Rejected counts get recounted.
+- Only one count is open at a time. To enter a quantity, find the material's line with list_count_lines
+  and open submit_count_line for it. To say what is left to finish, use list_count_lines with
+  onlyUnfinished. To send a finished count to the owner, open submit_stock_count; if lines are missing,
+  say which ones. A rate is never filled in for him: leave it for the form.
 - Never offer to "just set the stock" to a number. The only way stock changes to match a
   count is an owner-approved count.
 

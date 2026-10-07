@@ -7,7 +7,8 @@ import { cn } from '@/lib/cn';
 type Of<K extends Card['kind']> = Extract<Card, { kind: K }>;
 
 /** The first card in a new chat. Drawn by the server from read tools; a line with a question has a button that asks it. */
-export function OpeningCard({ card, onAsk, assistantOn }: { card: Of<'opening'>; onAsk: (ask: string, label: string) => void; assistantOn: boolean }) {
+export function OpeningCard({ card, onAsk, onSheet, onForm, assistantOn }: { card: Of<'opening'>; onAsk: (ask: string, label: string) => void; onSheet: () => void; onForm: (tool: string) => void; assistantOn: boolean }) {
+  const pill = 'inline-flex min-h-11 md:min-h-9 items-center rounded-full border border-line bg-copper-wash px-4 text-base font-medium text-copper-deep enabled:hover:border-copper disabled:cursor-not-allowed disabled:text-ink-faint';
   return (
     <section aria-label="Welcome" className="rounded-md border border-line border-l-4 border-l-copper bg-surface p-4">
       <h1 className="font-display text-xl font-bold">{card.title}</h1>
@@ -15,12 +16,10 @@ export function OpeningCard({ card, onAsk, assistantOn }: { card: Of<'opening'>;
         {card.lines.map((l) => (
           <li key={l.text} className="flex flex-wrap items-center gap-3">
             <span className="text-lg">{l.text}</span>
-            {l.ask && l.button && (
-              <button type="button" disabled={!assistantOn} onClick={() => onAsk(l.ask as string, l.button as string)}
-                className="inline-flex min-h-11 md:min-h-9 items-center rounded-full border border-line bg-copper-wash px-4 text-base font-medium text-copper-deep enabled:hover:border-copper disabled:cursor-not-allowed disabled:text-ink-faint">
-                {l.button}
-              </button>
-            )}
+            {/* the buttons that only open something (the sheet, a form) work with the assistant off; the ones that ask it do not */}
+            {l.sheet && l.button && <button type="button" onClick={onSheet} className={pill}>{l.button}</button>}
+            {l.form && l.button && <button type="button" onClick={() => onForm(l.form as string)} className={pill}>{l.button}</button>}
+            {l.ask && l.button && <button type="button" disabled={!assistantOn} onClick={() => onAsk(l.ask as string, l.button as string)} className={pill}>{l.button}</button>}
           </li>
         ))}
       </ul>

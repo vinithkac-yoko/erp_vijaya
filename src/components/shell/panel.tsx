@@ -10,7 +10,7 @@ import { cn } from '@/lib/cn';
  *  < 768 px (the owner's phone): a full-screen sheet with a clear "Back to chat".
  * It never opens by itself — only something the person asked for opens it.
  */
-export function Panel({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: React.ReactNode }) {
+export function Panel({ open, title, onClose, children, fill, wide }: { open: boolean; title: string; onClose: () => void; children: React.ReactNode; /** The content scrolls by itself (the count sheet). */ fill?: boolean; /** A big form takes more room; the chat narrows to a slim column beside it. */ wide?: boolean }) {
   const back = useRef<HTMLButtonElement>(null);
   const opener = useRef<Element | null>(null);
 
@@ -29,7 +29,7 @@ export function Panel({ open, title, onClose, children }: { open: boolean; title
         // tablet: overlay from the right
         'md:absolute md:inset-y-0 md:left-auto md:right-0 md:w-[min(560px,92%)] md:border-l md:border-line md:shadow-lg',
         // desktop: beside the chat
-        'xl:static xl:w-[45%] xl:shrink-0 xl:shadow-none',
+        wide ? 'xl:static xl:w-[68%] xl:shrink-0 xl:shadow-none' : 'xl:static xl:w-[45%] xl:shrink-0 xl:shadow-none',
       )}>
       <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2">
         <button ref={back} type="button" onClick={onClose}
@@ -42,7 +42,7 @@ export function Panel({ open, title, onClose, children }: { open: boolean; title
           <X aria-hidden className="size-5" />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
+      <div className={fill ? 'min-h-0 flex-1' : 'min-h-0 flex-1 overflow-y-auto p-4'}>{children}</div>
     </aside>
   );
 }

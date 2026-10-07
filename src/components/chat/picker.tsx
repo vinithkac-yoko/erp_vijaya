@@ -13,7 +13,7 @@ const inputClass = 'block w-full min-h-12 rounded-md border border-line bg-surfa
  * second line, and keeps an id inside. A business is never free text (INTERFACE §6): you pick one that exists.
  */
 export function Picker({ kind, value, onChange, partyRole, invalid, describedBy, id, autoFocus }: {
-  kind: 'material' | 'party' | 'user'; value: string; onChange: (id: string) => void; partyRole?: 'SUPPLIER' | 'CUSTOMER';
+  kind: 'material' | 'party' | 'user' | 'countLine'; value: string; onChange: (id: string) => void; partyRole?: 'SUPPLIER' | 'CUSTOMER';
   invalid?: boolean; describedBy?: string; id: string; autoFocus?: boolean;
 }) {
   const listId = useId();
@@ -58,7 +58,7 @@ export function Picker({ kind, value, onChange, partyRole, invalid, describedBy,
     <div className="relative">
       <input id={id} role="combobox" aria-expanded={open} aria-controls={listId} aria-autocomplete="list" aria-invalid={invalid || undefined} aria-describedby={describedBy}
         aria-activedescendant={open && options[active] ? `${listId}-${active}` : undefined} autoComplete="off" autoFocus={autoFocus}
-        placeholder={kind === 'material' ? 'Start typing the material…' : kind === 'party' ? 'Start typing the name…' : 'Start typing the name…'}
+        placeholder={kind === 'material' || kind === 'countLine' ? 'Start typing the material…' : 'Start typing the name…'}
         value={query} className={inputClass}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}

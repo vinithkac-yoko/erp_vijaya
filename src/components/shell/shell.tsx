@@ -6,8 +6,9 @@ import { ChatView, type ChatViewProps } from '@/components/chat/chat-view';
 import { TopBar, type ChatLink, type ShellUser } from './top-bar';
 import { Panel } from './panel';
 import { Shortcuts } from './shortcuts';
+import { CountSheet } from './count-sheet';
 
-type PanelView = 'shortcuts' | null;
+type PanelView = 'shortcuts' | 'sheet' | null;
 
 function typingInField(t: EventTarget | null) {
   return t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName));
@@ -18,7 +19,7 @@ export interface ShellProps {
   chats: ChatLink[];
   currentChatId: string | null;
   allForms: FormButton[];
-  chat: Omit<ChatViewProps, 'inputRef' | 'registerOpenForm'>;
+  chat: Omit<ChatViewProps, 'inputRef' | 'registerOpenForm' | 'onOpenSheet'>;
   /** Changes when another chat is opened (or a new one begun), so the chat view starts from what the server drew. */
   viewKey: string;
 }
@@ -55,10 +56,13 @@ export function Shell({ user, chats, currentChatId, allForms, chat, viewKey }: S
       <TopBar user={user} chats={chats} currentChatId={currentChatId} onHelp={() => setPanel('shortcuts')} />
       <div className="relative flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col xl:min-w-[420px]">
-          <ChatView key={viewKey} {...chat} inputRef={chatInput} registerOpenForm={register} />
+          <ChatView key={viewKey} {...chat} inputRef={chatInput} registerOpenForm={register} onOpenSheet={() => setPanel('sheet')} />
         </main>
         <Panel open={panel === 'shortcuts'} title="Keyboard shortcuts" onClose={close}>
           <Shortcuts forms={allForms} />
+        </Panel>
+        <Panel open={panel === 'sheet'} title="Count sheet" onClose={close} fill wide>
+          <CountSheet onSend={() => { close(); openForm.current('submit_stock_count'); }} />
         </Panel>
       </div>
     </div>

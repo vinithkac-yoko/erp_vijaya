@@ -10,7 +10,7 @@ bottom of each milestone's section.
 - ✅ = Kasi already agreed. The owner should still hear it once.
 - ❓ = nobody has agreed yet. **These are the important ones.**
 
-Last updated: after milestone 3 (section F).
+Last updated: after milestone 4 (section G).
 
 ---
 
@@ -87,3 +87,25 @@ Last updated: after milestone 3 (section F).
 | F14 | ✅ | **Suggestion buttons after an answer.** | Chosen by fixed rules (for example after adding a supplier, "Add its first purchase order" once that exists). They are never written by the assistant. | ☐ OK ☐ Change: |
 | F15 | ✅ | **Chat history.** | Each person sees only their own chats, titled by their first words. The owner cannot read the storekeeper's chats. Chats are kept for now (we can set a clean-up period). | ☐ OK ☐ Owner may read all: ☐ Delete after ___ days |
 | F16 | ❓ | **Whose key and bill for the assistant.** | The Anthropic key is set on Railway. Cost depends on use; the daily allowance (F3) is the brake. See E3 for who pays. | Who pays: ____________ |
+
+---
+
+## G. Added in milestone 4 — the opening count and stock counts
+
+| # | Status | The question | What we did | Owner says |
+|---|---|---|---|---|
+| G1 | ✅ | **The opening count: quantity and rate.** | Every material gets a counted quantity; every material **with stock** also gets a rate from its **last purchase invoice**. The invoice number is optional. A rate of ₹0 is refused. Nobody (and not the assistant) estimates a rate. Material counted at zero needs no rate. | ☐ OK ☐ Change: |
+| G2 | ✅ | **The sheet shows the System column.** | On a normal count the storekeeper sees what the system expects next to what he counts, and the difference, signed. (The owner dropped blind counting.) The opening count has no System column: everything starts at zero. | ☐ OK ☐ Change: |
+| G3 | ❓ | **One count open at a time.** | While a count is in progress, sent back, or waiting for the owner, no second count can start. "Count stock" takes the storekeeper back to the same sheet. | Why: two counts at once would post the same difference twice. ☐ OK ☐ Change: |
+| G4 | ❓ | **No normal count before go-live.** | A normal count is refused until the opening count is approved. | ☐ OK ☐ Change: |
+| G5 | ❓ | **A new material while the opening count is still being filled.** | It is added to the count automatically (with nothing counted), so it cannot be forgotten. | ☐ OK ☐ Ask each time: |
+| G6 | ❓ | **Pieces, rolls and sets must be whole numbers.** | "2999.5 pieces" is refused. Kilograms, metres and litres take decimals (to 4 places). | ☐ OK ☐ Change: |
+| G7 | ✅ | **A difference with no reason.** | Saved as "Don't know" (UNEXPLAINED) straight away and never asked again. The reason box starts on "Don't know" and the storekeeper can pick another. Nobody suggests a reason. | ☐ OK ☐ Change: |
+| G8 | ❓ | **How a normal count's value is shown to the owner.** | "3 materials differ: ₹4,230 short, ₹180 over". Each difference is valued at the material's **current average rate**. The three biggest differences show on the approval card. | ☐ OK ☐ Change: |
+| G9 | ❓ | **Send back.** | The owner sends a count back with a note. One tap on a quick pick ("Please recount all of it", "Something looks too low/high", "A rate looks wrong") fills it, or he types. The storekeeper sees the note on the sheet and fixes the **same** count. | ☐ OK ☐ Other quick picks: |
+| G10 | ✅ | **While a count is with the owner.** | The storekeeper can look at the sheet but not change it. The owner can send it back if it needs a fix. | ☐ OK ☐ Change: |
+| G11 | ❓ | **Who is told what.** | Owner: "count waiting" when it is sent. Storekeeper: "recount needed" (with the owner's note) or "approved". It shows once, at the top of the next new chat, and is then marked read. Email to the owner comes with purchasing (milestone 6). | ☐ OK ☐ Change: |
+| G12 | ❓ | **If any stock is recorded after the opening count started.** | Approving it is refused ("it would count that stock twice"); the owner sends it back. Starting an opening count when stock already exists is refused too. | ☐ OK ☐ Change: |
+| G13 | ❓ | **Count date.** | May be today or earlier, never in the future. | ☐ OK ☐ Change: |
+| G14 | ❓ | **Who may count.** | Storekeeper and owner both (the owner as back-up). Only the owner approves or sends back. | ☐ OK ☐ Change: |
+| G15 | ❓ | **Stock value.** | "What is my total stock value?" is owner only (see A9). It uses each material's running average. | ☐ OK ☐ Storekeeper may see: |

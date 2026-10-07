@@ -24,6 +24,8 @@ export interface ChatViewProps {
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   /** The shell calls this with a function that opens a form (for Alt+R and friends). */
   registerOpenForm: (fn: (tool: string) => void) => void;
+  /** Opens the count sheet in the panel. */
+  onOpenSheet: () => void;
 }
 
 const NOTICE = (text: string): ChatItem => ({ id: `n-${Date.now()}-${Math.random()}`, role: 'card', card: { kind: 'notice', tone: 'info', text } });
@@ -45,7 +47,9 @@ export function ChatView(p: ChatViewProps) {
 
   const adopt = useCallback((id: string) => {
     setConversationId(id);
-    if (typeof window !== 'undefined' && new URL(window.location.href).searchParams.get('c') !== id) window.history.replaceState(null, '', `/?c=${id}`);
+    // Only the address bar changes (so a reload or a bookmark finds this chat). Next's own replaceState would also ask the
+    // server to draw the page again, and a page drawn again starts this view over: a half-typed form would be lost.
+    if (typeof window !== 'undefined' && new URL(window.location.href).searchParams.get('c') !== id) History.prototype.replaceState.call(window.history, window.history.state, '', `/?c=${id}`);
   }, []);
 
   const handle = useCallback((e: ChatEvent) => {
@@ -110,11 +114,12 @@ export function ChatView(p: ChatViewProps) {
     setChips([]);
     const r = await openFormAction({ tool, conversationId: convRef.current });
     if (!r.ok) { setItems((cur) => [...cur, NOTICE(r.message)]); return; }
+    if (r.sheet) { p.onOpenSheet(); return; }
     adopt(r.conversationId);
     const form = r.items.at(-1);
     if (form) setNewForm(form.id);
     setItems((cur) => (r.created ? r.items : [...cur, ...r.items]));
-  }, [adopt]);
+  }, [adopt, p]);
 
   useEffect(() => { p.registerOpenForm((tool) => { void openForm(tool); }); }, [p, openForm]);
 
@@ -132,22 +137,23 @@ export function ChatView(p: ChatViewProps) {
             if (it.role === 'user') return <div key={it.id} className="flex justify-end"><p className="max-w-[85%] whitespace-pre-wrap rounded-md bg-plate px-4 py-2.5 text-plate-ink">{it.text}</p></div>;
             if (it.role === 'assistant') return <p key={it.id} className="whitespace-pre-wrap rounded-md border border-line border-l-4 border-l-copper bg-surface px-4 py-3">{it.text}</p>;
             const c = it.card;
-            if (c.kind === 'opening') return <OpeningCard key={it.id} card={c} assistantOn={p.assistantOn} onAsk={(ask, label) => void send(ask, label)} />;
+            if (c.kind === 'opening') return <OpeningCard key={it.id} card={c} assistantOn={p.assistantOn} onAsk={(ask, label) => void send(ask, label)} onSheet={p.onOpenSheet} onForm={(tool) => void openForm(tool)} />;
             if (c.kind === 'table') return <TableCard key={it.id} card={c} />;
             if (c.kind === 'notice') return <NoticeCard key={it.id} card={c} />;
             if (c.kind === 'saved') return <SavedCard key={it.id} card={c} />;
             return (
-              <FormCard key={it.id} pendingId={c.pendingId} tool={c.tool} form={c.form} values={c.values} assisted={c.assisted} state={it.state ?? 'closed'}
+              <FormCard key={it.id} pendingId={c.pendingId} tool={c.tool} form={c.form} values={c.values} assisted={c.assisted} info={c.info} state={it.state ?? 'closed'}
                 conversationId={conversationId} focusOnMount={newForm === it.id}
                 onSaved={(extra, nextChips) => { closeForm(it.id, 'saved', extra); setChips(nextChips); }}
-                onClosed={(extra) => closeForm(it.id, 'closed', extra)} />
+                onClosed={(extra) => closeForm(it.id, 'closed', extra)}
+                onSwitched={(extra) => { const f = extra.find((x) => x.role === 'card' && x.card.kind === 'form'); if (f) setNewForm(f.id); closeForm(it.id, 'closed', extra); }} />
             );
           })}
           {status && <p className="flex items-center gap-2 text-ink-soft" role="status"><span aria-hidden className="size-2 animate-pulse rounded-full bg-copper" />{status}</p>}
           {chips.length > 0 && !busy && (
             <div className="flex flex-wrap gap-2" aria-label="Suggestions">
               {chips.map((c) => (
-                <button key={c.label} type="button" onClick={() => ('ask' in c ? void send(c.ask) : void openForm(c.form))}
+                <button key={c.label} type="button" onClick={() => ('ask' in c ? void send(c.ask) : 'sheet' in c ? p.onOpenSheet() : void openForm(c.form))}
                   className="inline-flex min-h-11 md:min-h-9 items-center rounded-full border border-line bg-copper-wash px-4 text-base hover:border-copper">{c.label}</button>
               ))}
             </div>

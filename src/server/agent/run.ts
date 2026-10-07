@@ -191,7 +191,7 @@ export function createAgent(deps: AgentDeps) {
           }
           if (tool.kind !== 'write') continue;
           formOpened = true;
-          await show(conversationId, { kind: 'form', pendingId: opened.data.id, tool: use.name, form: tool.form, values: opened.data.input, assisted: opened.data.assisted }, emit, run.id);
+          await show(conversationId, await pending.formCard(session, opened.data), emit, run.id);
           results.push({ type: 'tool_result', tool_use_id: use.id, content: FORM_OPENED });
         }
 

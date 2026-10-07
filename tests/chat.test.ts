@@ -44,7 +44,11 @@ describe('the opening card is drawn by read tools', () => {
     const count = await prisma.stockCount.create({ data: { number: 'CNT-2627-0001', countDate: new Date(), isOpening: true } });
     await prisma.stockCount.update({ where: { id: count.id }, data: { status: 'PENDING_APPROVAL' } }).catch(() => null); // no lines yet: allowed
     const { card } = await openingFor(o);
-    expect(card).toMatchObject({ lines: [{ text: '1 waiting for you', ask: 'What is waiting for my approval?' }, { text: 'Nothing is below its minimum.' }] });
+    expect(card).toMatchObject({ lines: [
+      { text: '1 waiting for you', ask: 'What is waiting for my approval?' },
+      { text: expect.stringContaining('Opening count CNT-2627-0001'), form: 'approve_stock_count', button: 'Review it' }, // one tap opens the approval
+      { text: 'Nothing is below its minimum.' },
+    ] });
   });
 });
 
@@ -78,14 +82,14 @@ describe('starting a chat', () => {
 });
 
 describe('the buttons above the input', () => {
-  it('storekeeper: his own buttons, no owner chips; forms stay off until their tools exist (21.3)', async () => {
+  it('storekeeper: his own buttons, no owner chips; forms stay off until their tools exist, Count stock is on (21.3)', async () => {
     const s = await storekeeper();
     const st = await launcherState(s, true);
     expect(st.launcher.forms.map((f) => f.label)).toEqual(['Receive stock', 'Issue to a job', 'Return', 'Count stock']);
     expect(st.launcher.moreForms.map((f) => f.label)).toEqual(['New PO', 'New job']);
     const chips = [...st.launcher.chips, ...st.launcher.moreChips].map((c) => c.label);
     expect(chips).toEqual(['Low stock', 'Open jobs', 'Stock today']);
-    expect(Object.values(st.formEnabled).every((v) => v === false)).toBe(true);
+    expect(st.formEnabled).toEqual({ record_goods_receipt: false, issue_material: false, return_material: false, start_stock_count: true, create_purchase_order: false, create_job: false });
     expect(st.chipEnabled).toEqual({ 'Low stock': true, 'Open jobs': false, 'Stock today': true });
   });
 

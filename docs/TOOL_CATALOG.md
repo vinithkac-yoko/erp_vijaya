@@ -182,6 +182,21 @@ Rules (full detail in BUSINESS_FLOW §11):
   Status flips to APPROVED **before** movements are inserted, in the same transaction (the guard
   trigger checks it).
 
+**As built (milestone 4):**
+- **One count is open at a time** (in progress, sent back, or with the owner). A normal count is refused until the opening count is approved
+  (`OPENING_NOT_DONE`) and while another count is open (`COUNT_IN_PROGRESS`).
+- `stockCountId` is optional on `list_count_lines`, `submit_stock_count`, `approve_stock_count` and `reject_stock_count`: it defaults to the one open
+  count (the one waiting, for approve and reject), so the assistant does not need an extra lookup. The forms carry it as a hidden value.
+- `save_count_sheet` is the count sheet saving a row as it is typed. It goes through the gateway like every write (a PendingAction opened and
+  submitted in one go by the sheet), and the assistant is never offered it.
+- Counted quantity of pieces, rolls and sets must be whole numbers. A reason sent for the opening count is ignored. A count line can be edited only
+  while the count is with the storekeeper (in progress or sent back).
+- A material added while the opening count is still with the storekeeper joins that count.
+- Approval writes status APPROVED first, then one OPENING movement per material with stock (the rate is the line's), or one COUNT_ADJUSTMENT per difference
+  (at the current average rate). The owner and the person who counted are told (in-app notices on the opening card).
+- `list_pending_approvals` returns each count's id, a one-line summary and (opening) its total value.
+- `get_stock_value` (owner) is built here: total and per material, from the running balances.
+
 *Follow-ups:*
 - `start_stock_count` → offer "Open the count sheet". Opening: explain quantity + rate from the
   last invoice, invoice number optional, can take several days.

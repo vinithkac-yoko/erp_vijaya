@@ -147,6 +147,9 @@ export const createMaterial = defineTool({
         hsnCode: input.hsnCode, gstRate: input.gstRate, isScrap: input.isScrap ?? false,
       },
     });
+    // A material added while the opening count is still with the storekeeper joins that count (nothing counted yet), so it is not missed.
+    const opening = await ctx.db.stockCount.findFirst({ where: { isOpening: true, status: { in: ['DRAFT', 'REJECTED'] } }, select: { id: true } });
+    if (opening) await ctx.db.stockCountLine.create({ data: { stockCountId: opening.id, materialId: m.id, systemQty: 0 } });
     return {
       data: { id: m.id, name: m.name, unit: m.uom },
       audit: { entityType: 'Material', entityId: m.id, action: 'CREATE', after: { name: m.name, uom: m.uom, stockType: m.stockType, minimumLevel: num(m.minimumLevel), hsnCode: m.hsnCode, gstRate: num(m.gstRate), isScrap: m.isScrap } },

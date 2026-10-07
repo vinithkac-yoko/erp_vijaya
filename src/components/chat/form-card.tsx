@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CircleAlert, Sparkles } from 'lucide-react';
 import type { ChatItem, Chip } from '@/lib/cards';
 import type { FieldDef, FormDef } from '@/lib/forms';
-import { cancelFormAction, submitFormAction } from '@/server/chat/actions';
+import { cancelFormAction, submitFormAction, switchFormAction } from '@/server/chat/actions';
 import { Button } from '@/components/ui/button';
 import { Picker } from './picker';
 
@@ -29,9 +29,9 @@ export function payload(form: FormDef, v: Values, notDuplicate: boolean): Values
   return out;
 }
 
-export function FormCard({ pendingId, tool, form, values, assisted, state, conversationId, focusOnMount, onSaved, onClosed }: {
-  pendingId: string; tool: string; form: FormDef; values: Values; assisted: boolean; state: 'open' | 'saved' | 'closed'; conversationId: string | null;
-  focusOnMount?: boolean; onSaved: (items: ChatItem[], chips: Chip[]) => void; onClosed: (items: ChatItem[]) => void;
+export function FormCard({ pendingId, tool, form, values, assisted, info, state, conversationId, focusOnMount, onSaved, onClosed, onSwitched }: {
+  pendingId: string; tool: string; form: FormDef; values: Values; assisted: boolean; info?: string[]; state: 'open' | 'saved' | 'closed'; conversationId: string | null;
+  focusOnMount?: boolean; onSaved: (items: ChatItem[], chips: Chip[]) => void; onClosed: (items: ChatItem[]) => void; onSwitched?: (items: ChatItem[]) => void;
 }) {
   const [v, setV] = useState<Values>(() => ({ ...values }));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -66,6 +66,16 @@ export function FormCard({ pendingId, tool, form, values, assisted, state, conve
     } else setGeneral(r.message);
   }
 
+  /** "Send back" on an approval: this form closes and the other tool's form opens for the same thing. */
+  async function switchTo() {
+    if (busy) return;
+    setBusy(true);
+    const r = await switchFormAction({ pendingId, conversationId });
+    setBusy(false);
+    if (!r.ok) { setGeneral(r.message); return; }
+    if (!r.sheet) onSwitched?.(r.items);
+  }
+
   async function notNow() {
     const r = await cancelFormAction({ pendingId, conversationId });
     onClosed(r.items);
@@ -92,7 +102,12 @@ export function FormCard({ pendingId, tool, form, values, assisted, state, conve
       {form.intro && <p className="mt-1 text-ink-soft">{form.intro}</p>}
 
       <div className="mt-4 space-y-4">
-        {form.fields.filter((f) => visible(f, v)).map((f) => {
+        {info && info.length > 0 && (
+          <div className="rounded-md border border-line bg-paper p-3 text-base" data-testid="form-info">
+            {info.map((line, i) => <p key={i} className={i === 0 ? 'font-medium' : 'text-ink-soft'}>{line}</p>)}
+          </div>
+        )}
+        {form.fields.filter((f) => f.type !== 'hidden' && visible(f, v)).map((f) => {
           const id = `f-${pendingId}-${f.name}`;
           const err = errors[f.name];
           const hint = f.hint && !err ? `${id}-hint` : undefined;
@@ -114,7 +129,7 @@ export function FormCard({ pendingId, tool, form, values, assisted, state, conve
                         {!f.options?.some((o) => o.value === '') && <option value="">Choose…</option>}
                         {f.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
-                    ) : f.type === 'material' || f.type === 'party' || f.type === 'user' ? (
+                    ) : f.type === 'material' || f.type === 'party' || f.type === 'user' || f.type === 'countLine' ? (
                       <Picker kind={f.type} id={id} value={String(v[f.name] ?? '')} onChange={(x) => set(f.name, x)} partyRole={f.partyRole} invalid={!!err} describedBy={described} />
                     ) : f.type === 'textarea' ? (
                       <textarea {...common} rows={3} value={String(v[f.name] ?? '')} onChange={(e) => set(f.name, e.target.value)} className={box + ' py-3'} />
@@ -128,6 +143,13 @@ export function FormCard({ pendingId, tool, form, values, assisted, state, conve
                     )}
                   </div>
                 </>
+              )}
+              {f.suggestions && (
+                <div className="mt-2 flex flex-wrap gap-2" aria-label="Quick picks">
+                  {f.suggestions.map((q) => (
+                    <button key={q} type="button" onClick={() => set(f.name, q)} className="inline-flex min-h-11 md:min-h-9 items-center rounded-full border border-line bg-copper-wash px-3 text-base hover:border-copper">{q}</button>
+                  ))}
+                </div>
               )}
               {err && <p id={`${id}-err`} role="alert" className="mt-1 flex items-start gap-1.5 text-alert"><CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />{err}</p>}
               {hint && <p id={hint} className="mt-1 text-sm text-ink-soft">{f.hint}</p>}
@@ -151,6 +173,7 @@ export function FormCard({ pendingId, tool, form, values, assisted, state, conve
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={busy || (!!similar && !notDuplicate)}>{busy ? 'Saving…' : form.verb}</Button>
+        {form.alt && <Button type="button" variant="secondary" onClick={() => void switchTo()} disabled={busy}>{form.alt.label}</Button>}
         <Button type="button" variant="ghost" onClick={() => void notNow()} disabled={busy}>Not now</Button>
         <span className="text-sm text-ink-faint">Ctrl+Enter saves</span>
       </div>

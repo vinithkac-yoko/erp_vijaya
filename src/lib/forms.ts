@@ -2,7 +2,7 @@
  * A form is data. Each write tool owns its definition, so the same task always looks the same, wherever the form opens
  * from and whoever asked for it (INTERFACE §1: "it comes from the tool's form definition, not from the model").
  */
-export type FieldType = 'text' | 'textarea' | 'number' | 'select' | 'checkbox' | 'password' | 'email' | 'material' | 'party' | 'user';
+export type FieldType = 'text' | 'textarea' | 'number' | 'select' | 'checkbox' | 'password' | 'email' | 'date' | 'hidden' | 'material' | 'party' | 'user' | 'countLine';
 
 export interface FieldDef {
   name: string;
@@ -20,6 +20,8 @@ export interface FieldDef {
   /** Pickers: only parties of this kind. */
   partyRole?: 'SUPPLIER' | 'CUSTOMER';
   autoComplete?: string;
+  /** Quick picks under a text box ("Recount the bobbins"): one tap fills the box. */
+  suggestions?: string[];
 }
 
 export interface FormDef {
@@ -28,6 +30,8 @@ export interface FormDef {
   verb: string;
   intro?: string;
   fields: FieldDef[];
+  /** A second way out of an approval card: opens another tool's form for the same thing ("Send back"). */
+  alt?: { tool: string; label: string };
 }
 
 /** What a picker offers: a name to read and a small second line. The id is the value, never shown. */

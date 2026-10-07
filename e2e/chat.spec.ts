@@ -38,7 +38,7 @@ test.describe('the first card and the buttons', () => {
   test('buttons switch on only when they can work: forms not built yet stay off, chips follow the tools', async ({ page }) => {
     await login(page, STOREKEEPER);
     const nav = page.getByRole('navigation', { name: 'Quick buttons' });
-    for (const l of ['Receive stock', 'Issue to a job', 'Return', 'Count stock']) await expect(nav.getByRole('button', { name: new RegExp(l) })).toBeDisabled();
+    for (const l of ['Receive stock', 'Issue to a job', 'Return']) await expect(nav.getByRole('button', { name: new RegExp(l) })).toBeDisabled();
     await expect(nav.getByRole('button', { name: 'Low stock' })).toBeEnabled();
     await expect(nav.getByRole('button', { name: 'Stock today' })).toBeEnabled();
     await expect(nav.getByRole('button', { name: 'Open jobs' })).toBeDisabled(); // no jobs yet

@@ -4,10 +4,11 @@ import { z } from 'zod';
 import type { ChatItem } from '@/lib/cards';
 import type { PickerOption } from '@/lib/forms';
 import { currentUser } from '../auth/session';
-import { conversations, pendingActions, registry } from '../tools';
+import { conversations, currentCount, pendingActions, registry } from '../tools';
 import type { ToolSession } from '../tools/types';
 import { ensureConversation } from './conversation';
-import { pickerLabel, pickerOptions } from './pickers';
+import { pickerLabel, pickerOptions, type PickerKind } from './pickers';
+import { loadSheet, saveSheetRows, type SheetData, type SheetEdit } from './sheet';
 import { assistantRuntime } from './runtime';
 import { submitAndFollow, type SubmitResult } from './submit';
 
@@ -20,7 +21,8 @@ async function who(): Promise<ToolSession | null> {
 }
 
 export type OpenFormResult =
-  | { ok: true; conversationId: string; created: boolean; items: ChatItem[] }
+  | { ok: true; sheet?: false; conversationId: string; created: boolean; items: ChatItem[] }
+  | { ok: true; sheet: true }
   | { ok: false; code: string; message: string };
 
 /** A launcher button: opens the tool's form with nothing filled in. No model is involved, so it works with the assistant off. */
@@ -29,13 +31,13 @@ export async function openFormAction(input: { tool: string; conversationId?: str
   if (!session) return LOGGED_OUT;
   const p = z.object({ tool: z.string().min(1).max(60), conversationId: uuid.nullish() }).safeParse(input);
   if (!p.success) return { ok: false, code: 'INVALID_INPUT', message: 'Something went wrong. Please try again.' };
+  // "Count stock" while a count is open means "carry on counting" (or, once it is with the owner, look at it): the sheet, not a second count.
+  if (p.data.tool === 'start_stock_count' && (await currentCount())) return { ok: true, sheet: true };
   const conv = await ensureConversation(session, p.data.conversationId);
   if (!conv) return { ok: false, code: 'NOT_FOUND', message: "Couldn't find that chat." };
   const opened = await pendingActions.create(session, { tool: p.data.tool, origin: 'LAUNCHER', conversationId: conv.id });
   if (!opened.ok) return opened;
-  const tool = registry.get(p.data.tool);
-  if (!tool || tool.kind !== 'write') return { ok: false, code: 'NOT_A_FORM', message: "That isn't a form." };
-  const card = { kind: 'form' as const, pendingId: opened.data.id, tool: p.data.tool, form: tool.form, values: opened.data.input, assisted: false };
+  const card = await pendingActions.formCard(session, opened.data);
   const row = await conversations.append(conv.id, 'CARD', { kind: 'card', card });
   const items: ChatItem[] = [];
   if (conv.created) for (const r of (await conversations.items(session.userId, conv.id)) ?? []) if (r.id !== row.id) items.push(r);
@@ -67,9 +69,9 @@ export async function cancelFormAction(input: { pendingId: string; conversationI
 }
 
 /** Type-ahead for the pickers in a form. */
-export async function pickerAction(input: { kind: 'material' | 'party' | 'user'; query: string; role?: 'SUPPLIER' | 'CUSTOMER' }): Promise<PickerOption[]> {
+export async function pickerAction(input: { kind: PickerKind; query: string; role?: 'SUPPLIER' | 'CUSTOMER' }): Promise<PickerOption[]> {
   const session = await who();
-  const p = z.object({ kind: z.enum(['material', 'party', 'user']), query: z.string().max(100), role: z.enum(['SUPPLIER', 'CUSTOMER']).optional() }).safeParse(input);
+  const p = z.object({ kind: z.enum(['material', 'party', 'user', 'countLine']), query: z.string().max(100), role: z.enum(['SUPPLIER', 'CUSTOMER']).optional() }).safeParse(input);
   if (!session || !p.success) return [];
   return pickerOptions(session, p.data.kind, p.data.query, p.data.role);
 }
@@ -83,9 +85,57 @@ export async function loadChatAction(id: string): Promise<{ ok: boolean; items: 
 }
 
 /** The name behind an id the assistant filled into a picker. */
-export async function pickerLabelAction(input: { kind: 'material' | 'party' | 'user'; id: string }): Promise<PickerOption | null> {
+export async function pickerLabelAction(input: { kind: PickerKind; id: string }): Promise<PickerOption | null> {
   const session = await who();
-  const p = z.object({ kind: z.enum(['material', 'party', 'user']), id: z.string().min(1).max(64) }).safeParse(input);
+  const p = z.object({ kind: z.enum(['material', 'party', 'user', 'countLine']), id: z.string().min(1).max(64) }).safeParse(input);
   if (!session || !p.success) return null;
   return pickerLabel(session, p.data.kind, p.data.id);
+}
+
+/** The count sheet in the panel: the count in progress, with its rows. */
+export async function loadSheetAction(): Promise<{ ok: true; data: SheetData } | { ok: false; message: string }> {
+  const session = await who();
+  if (!session) return { ok: false, message: LOGGED_OUT.message };
+  const r = await loadSheet(session);
+  return r.ok ? { ok: true, data: r.data } : { ok: false, message: r.message };
+}
+
+const editSchema = z.object({
+  stockCountLineId: z.string().min(1).max(64),
+  countedQty: z.number().finite().min(0).max(1e9).nullish(),
+  reasonCode: z.string().max(20).nullish(),
+  unitRate: z.number().finite().min(0).max(1e9).nullish(),
+  sourceInvoiceNo: z.string().max(60).nullish(),
+  sourceInvoiceDate: z.string().max(10).nullish(),
+});
+
+/** A row (or a few) typed on the count sheet. Saved through the gateway as the person's own form. */
+export async function saveSheetAction(input: { stockCountId: string; edits: SheetEdit[] }) {
+  const session = await who();
+  if (!session) return LOGGED_OUT;
+  const p = z.object({ stockCountId: z.string().min(1).max(64), edits: z.array(editSchema).min(1).max(50) }).safeParse(input);
+  if (!p.success) return { ok: false as const, code: 'INVALID_INPUT', message: 'Something went wrong. Please try again.' };
+  return saveSheetRows(session, p.data.stockCountId, p.data.edits);
+}
+
+/**
+ * "Send back" on an approval card: the Approve form is closed and the Send-back form (with its note box) opens in its
+ * place, for the same thing. Each is its own form for its own tool, so the same rules apply to each.
+ */
+export async function switchFormAction(input: { pendingId: string; conversationId?: string | null }): Promise<OpenFormResult> {
+  const session = await who();
+  if (!session) return LOGGED_OUT;
+  const p = z.object({ pendingId: uuid, conversationId: uuid.nullish() }).safeParse(input);
+  if (!p.success) return { ok: false, code: 'INVALID_INPUT', message: 'Something went wrong. Please try again.' };
+  const from = await pendingActions.get(session, p.data.pendingId);
+  const tool = from ? registry.get(from.tool) : undefined;
+  if (!from || !tool || tool.kind !== 'write' || !tool.form.alt) return { ok: false, code: 'NOT_FOUND', message: "That form isn't open any more." };
+  const conv = await ensureConversation(session, from.conversationId ?? p.data.conversationId);
+  if (!conv) return { ok: false, code: 'NOT_FOUND', message: "Couldn't find that chat." };
+  const opened = await pendingActions.create(session, { tool: tool.form.alt.tool, origin: 'LAUNCHER', conversationId: conv.id });
+  if (!opened.ok) return opened;
+  await pendingActions.cancel(session, from.id);
+  const card = await pendingActions.formCard(session, opened.data);
+  const row = await conversations.append(conv.id, 'CARD', { kind: 'card', card });
+  return { ok: true, conversationId: conv.id, created: false, items: [{ id: row.id, role: 'card', card, state: 'open' }] };
 }

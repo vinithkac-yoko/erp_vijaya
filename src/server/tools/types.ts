@@ -66,7 +66,10 @@ export interface WriteTool<I extends z.ZodTypeAny = z.ZodTypeAny, O = unknown> e
   describe: (after: Record<string, unknown>) => string[];
   /** After a successful save: facts from read-only checks (a shortage, a rate change) and chips for what to do next. */
   followUps?: (ctx: FollowUpContext, input: Record<string, unknown>, result: unknown) => Promise<FollowUpResult>;
+  /** When the form opens: read-only facts to show on it, and values it should carry that the person never types (which count). */
+  preview?: (ctx: { db: Db; session: ToolSession }, input: Record<string, unknown>) => Promise<FormPreview>;
 }
+export interface FormPreview { info: string[]; values?: Record<string, unknown> }
 /** Follow-ups only READ, and only through the gateway, as the person who just saved. */
 export interface FollowUpContext { session: ToolSession; read: (tool: string, input?: unknown) => Promise<ToolOutcome> }
 export interface FollowUpResult { facts: string[]; chips: Chip[] }

@@ -295,10 +295,9 @@ Stock counts with number, date, type (opening or normal), status and progress (c
      {"status": "DRAFT, PENDING_APPROVAL (with the owner), APPROVED or REJECTED (sent back to recount)."})
 
 tool("list_count_lines", "read", SK_OW, """
-A count's lines by material: counted quantity, reason, and for the opening count the rate and invoice.
-BLIND for the storekeeper: the system quantity and difference come back only for lines he has already
-counted (null before) — never tell him what to expect for a line he hasn't counted. The owner sees
-everything. Defaults to the count in progress.""",
+A count's lines by material: system quantity (frozen when the count started), counted quantity, difference,
+reason, and for the opening count the rate and invoice. Both roles see the system quantity; the owner
+dropped blind counting, so say it plainly when asked. Defaults to the count in progress.""",
      {"stockCountId": "The count. Default: the one in progress. " + IDS, "onlyUnfinished": "true for lines still to count or missing a rate."})
 
 tool("start_stock_count", "write", SK_OW, """

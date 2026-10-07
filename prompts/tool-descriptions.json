@@ -525,7 +525,7 @@
     "OWNER"
    ],
    "agent": true,
-   "description": "A count's lines by material: counted quantity, reason, and for the opening count the rate and invoice. BLIND for the storekeeper: the system quantity and difference come back only for lines he has already counted (null before) — never tell him what to expect for a line he hasn't counted. The owner sees everything. Defaults to the count in progress.",
+   "description": "A count's lines by material: system quantity (frozen when the count started), counted quantity, difference, reason, and for the opening count the rate and invoice. Both roles see the system quantity; the owner dropped blind counting, so say it plainly when asked. Defaults to the count in progress.",
    "inputs": {
     "stockCountId": "The count. Default: the one in progress. Ids come from earlier read-tool results; never show them to the user.",
     "onlyUnfinished": "true for lines still to count or missing a rate."

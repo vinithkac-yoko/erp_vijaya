@@ -4,7 +4,7 @@ import { launcherState } from '@/server/chat/launcher';
 import { openingFor } from '@/server/chat/opening';
 import { assistantRuntime } from '@/server/chat/runtime';
 import { ASSISTANT_OFF } from '@/server/agent/config';
-import { conversations } from '@/server/tools';
+import { conversations, notifications } from '@/server/tools';
 import type { ChatItem } from '@/lib/cards';
 import { Shell } from '@/components/shell/shell';
 
@@ -19,6 +19,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
   // An existing chat (?c=…) shows its own history; a new chat starts with the opening card, drawn by the server.
   const existing = c ? await conversations.items(user.id, c) : null;
   const items: ChatItem[] = existing ?? [{ id: 'opening', role: 'card', card: opening.card }];
+  if (!existing) await notifications.markRead(user.id, opening.noticeIds); // told once, on the card
 
   return (
     <Shell

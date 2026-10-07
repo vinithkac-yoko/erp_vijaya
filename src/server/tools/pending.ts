@@ -4,7 +4,8 @@ import { sanitizePrefill, type Origin } from '@/lib/prefill';
 import { db } from '../db';
 import { mapError } from '../errors';
 import type { Registry } from './registry';
-import type { ToolOutcome, ToolSession } from './types';
+import type { Card } from '@/lib/cards';
+import type { FormPreview, ToolOutcome, ToolSession } from './types';
 
 /** A form stays open for 15 minutes (VIJAYA prompt §3.3). */
 export const PENDING_TTL_MS = 15 * 60 * 1000;
@@ -81,6 +82,21 @@ export function createPendingService(registry: Registry, client: PrismaClient = 
         const m = mapError(err);
         return fail(m.code, m.message);
       }
+    },
+
+    /**
+     * The card for an open form: the form, the values it starts with (what was asked for, over what the tool itself knows
+     * such as today's date or which count), and the read-only facts the tool works out when it opens.
+     */
+    async formCard(session: ToolSession, view: PendingView): Promise<Extract<Card, { kind: 'form' }>> {
+      const tool = registry.get(view.tool);
+      if (!tool || tool.kind !== 'write') throw new Error(`"${view.tool}" is not a form`);
+      let preview: FormPreview | undefined;
+      try { preview = tool.preview ? await tool.preview({ db: client, session }, view.input) : undefined; } catch { preview = undefined; } // a form still opens if the extra facts can't be worked out
+      return {
+        kind: 'form', pendingId: view.id, tool: view.tool, form: tool.form, values: { ...(preview?.values ?? {}), ...view.input }, assisted: view.assisted,
+        ...(preview?.info.length ? { info: preview.info } : {}),
+      };
     },
 
     /** The person's own open, unexpired form — or null. */
