@@ -453,7 +453,8 @@ OWNER ONLY. Opens the form to stop a person logging in. The last active owner ca
 tool("list_artifacts", "app", SK_OW, """
 The user's saved and recent artifacts and, for the storekeeper, the ones the owner shared with him.
 ALWAYS call this before make_artifact when someone asks for a report, chart or dashboard: if one
-already does the job, open it with open_artifact and say so instead of building a duplicate.""",
+already does the job, open it with open_artifact and say so instead of building a duplicate.
+For the owner, each one says whether it can be shared with the storekeeper; if it says it cannot, do not open the share form.""",
      {"query": "Words from the title or what it shows, e.g. \"copper\" or \"below minimum\"."})
 
 tool("open_artifact", "app", SK_OW, """

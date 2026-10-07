@@ -2,7 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { PRINT_TEMPLATES, readToolsFor, TOOLS, type Role } from '@/lib/catalog';
-import { checkPrintRequest } from '@/lib/artifacts/check';
+import { canShare, canShareDoc, checkPrintRequest } from '@/lib/artifacts/check';
 import { ARTIFACT_ASKED } from '@/lib/artifacts/asked';
 import VDoc from '@/lib/artifacts/host/vdoc.cjs';
 import type { Card } from '@/lib/cards';
@@ -48,7 +48,15 @@ const listArtifacts: AppTool = {
   roles: ['STOREKEEPER', 'OWNER'], input: z.object({ query: z.string().max(100).optional() }),
   run: async (ctx, input: { query?: string }) => {
     const r = await listFor(db, ctx.session, input.query);
-    return ok({ mine: r.mine.slice(0, 15).map(({ artifactId, title, kind, version, saved, updatedAt }) => ({ artifactId, title, kind, version, saved, updatedAt })), sharedWithMe: r.shared.slice(0, 15).map(({ artifactId, title, kind, version, sharedBy }) => ({ artifactId, title, kind, version, sharedBy })) });
+    // The owner is told up front which ones cannot be shared (and why), so the assistant never opens a share form that is bound to be refused.
+    const sources = ctx.session.role === 'OWNER' ? new Map((await db.artifact.findMany({ where: { id: { in: r.mine.slice(0, 15).map((a) => a.artifactId) } }, select: { id: true, currentVersion: { select: { source: true } } } })).map((a) => [a.id, a.currentVersion?.source ?? ''])) : new Map<string, string>();
+    const sharing = (a: { artifactId: string; kind: Kind }) => {
+      if (ctx.session.role !== 'OWNER') return undefined;
+      const src = sources.get(a.artifactId) ?? '';
+      const c = a.kind === 'document' ? canShareDoc(src) : canShare(src);
+      return c.ok ? 'can be shared' : `cannot be shared: ${c.reason}`;
+    };
+    return ok({ mine: r.mine.slice(0, 15).map((a) => ({ artifactId: a.artifactId, title: a.title, kind: a.kind, version: a.version, saved: a.saved, updatedAt: a.updatedAt, sharing: sharing(a) })), sharedWithMe: r.shared.slice(0, 15).map(({ artifactId, title, kind, version, sharedBy }) => ({ artifactId, title, kind, version, sharedBy })) });
   },
 };
 

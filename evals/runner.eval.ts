@@ -96,7 +96,8 @@ async function playOnce(c: Case): Promise<RunResult> {
       text: blocks.filter((b) => b.type === 'text').map((b) => b.text ?? '').join('\n').trim(),
       readCalls,
       pendingActions: forms.map((p) => ({ tool: p.toolName, input: (p.proposedInput ?? {}) as Record<string, unknown> })),
-      writesExecuted: audits.map((a) => ({ tool: a.toolName ?? a.action })),
+      // making, opening, printing and downloading an artifact leave an audit row, but they change no business data: only a form's button writes
+      writesExecuted: audits.filter((a) => a.entityType !== 'Artifact' && !['PRINT', 'DOWNLOAD'].includes(a.action)).map((a) => ({ tool: a.toolName ?? a.action })),
       artifacts, opened, prints, downloads, shares,
       toolCallCount: uses.length,
     });

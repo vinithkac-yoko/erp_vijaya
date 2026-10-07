@@ -859,7 +859,7 @@
     "OWNER"
    ],
    "agent": true,
-   "description": "The user's saved and recent artifacts and, for the storekeeper, the ones the owner shared with him. ALWAYS call this before make_artifact when someone asks for a report, chart or dashboard: if one already does the job, open it with open_artifact and say so instead of building a duplicate.",
+   "description": "The user's saved and recent artifacts and, for the storekeeper, the ones the owner shared with him. ALWAYS call this before make_artifact when someone asks for a report, chart or dashboard: if one already does the job, open it with open_artifact and say so instead of building a duplicate. For the owner, each one says whether it can be shared with the storekeeper; if it says it cannot, do not open the share form.",
    "inputs": {
     "query": "Words from the title or what it shows, e.g. \"copper\" or \"below minimum\"."
    }
