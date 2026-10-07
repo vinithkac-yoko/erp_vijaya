@@ -2,6 +2,35 @@
 
 Read this at the start of every session (CLAUDE.md). Newest on top.
 
+## Milestones 9 and 10 — Reports, printouts, downloads, sharing, the demo copy, hardening — **built; waiting for Kasi's test**
+
+Kasi's instruction after milestone 8: "start milestone 9 and 10 and finish it before testing". Everything below is built and tested together.
+
+Milestone 9 — what you can do now
+- **Ask for a report, memo, SOP, diagram, chart, dashboard or what-if** and it opens beside the chat (a full-screen sheet on a phone) with today's numbers, "As of hh:mm" and the tools it read at the bottom. A fact is still a sentence and a short list a table; nothing is made unless asked.
+- **Change it by asking** ("add a supplier column"): each change is a new version; **Version ▾** lists them and **Restore** makes an old one current as another new version; earlier versions are never edited or deleted (the database refuses). **Save** keeps it under **Saved ▾**; the top bar menu has Saved, Recent and, for the storekeeper, "Shared with me".
+- **Row buttons** in a report (for example "Make PO") open the real form with the shortfall filled in and **no rate**; nothing is saved until the person presses the form's button.
+- **Download** as PDF, Word, Excel, CSV, Markdown or a picture (a page: PDF, picture, Excel, CSV). Made on the server at that moment, with the **downloader's** permissions (a storekeeper gets 404 for an owner report); every download is in the activity log. Tables in the chat can be downloaded as Excel or CSV.
+- **Five printouts**, fixed layouts that the assistant never writes: purchase order (CGST+SGST or IGST by state, "NOT APPROVED" mark until the owner approves), goods receipt note, issue slip, count sheet (with the System column), and the owner-only job cost sheet. On screen, **Print** (PDF in its own tab) and **Download PDF**.
+- **Owner sharing:** "Share" opens a form; the storekeeper gets a **frozen copy of one version** that reads with *his* permissions; later edits change nothing for him; "Stop sharing" removes it at once. A report that reads owner-only data cannot be shared, and the form says which part.
+- Limits: 20 reports made or changed per person per hour, 100 versions per report, pictures up to 16,000 px tall.
+- The sandbox is unchanged and checked: the frame allows scripts only through the page's nonce, the page header says `frame-src about:`, a report cannot reach the network, a export that tries is refused and returns nothing.
+
+Milestone 10 — hardening
+- **Demo copy (`DEMO_MODE=true`)**: a month of believable stock, 12 jobs (one sample, three under one customer PO), a PO waiting above the limit, one rejected receipt, an approved count with unexplained differences, built through the real tools. The owner says "start the demo again"; a form with a tick wipes the business data and rebuilds it (it cannot run on the real copy).
+- **Phone**: installable (manifest, icons), an offline page with no data on it.
+- **Logins**: storekeeper idle limit 12 hours, owner 30 days; a password reset ends every session that person has.
+- **Logs**: passwords, tokens and keys are removed from anything printed.
+- **Production audit** (`tests/audit.production.test.ts`): every tool has a role list and the roles are right; every page route and server action checks the session; no key in any tracked file or in the history, and browser code never reads a secret; **22 foreign keys had no index and now do** (new migration); no list is unbounded; no internal id or code reaches a user.
+- Railway: `nixpacks.toml` installs Chromium and pandoc (needed for PDF, Word and pictures); `docs/DEPLOY.md` has the notes.
+
+Proof (run in this session)
+- `pnpm e2e` for the new specs: artifacts, printouts, sharing, hardening, desktop and phone, all passing (the two-person sharing test runs on desktop only: it needs room for two people at once).
+- New unit tests: store, builder, app tools, printouts (with a real browser), demo, production audit, session limits, log redaction.
+- Agent evals: all 30 starting states build (the 9 artifact and document states were added). Real-model results are in the section below once run.
+
+Decisions to confirm with Kasi: section L of `docs/CLIENT_CONFIRMATIONS.md` (letterhead details, "NOT APPROVED" printing, which printouts exist, who prints what, limits, login lengths, demo copy, Chromium and pandoc on Railway).
+
 ## Milestone 8 — Monthly counts and reports, agent evals — **built; waiting for Kasi's test and go-ahead for milestone 9**
 
 Kasi's answers after milestone 7: reopening a closed job stays refused ✓, 5% over BOM ✓, reversal limits ✓, go ahead with milestone 8 ✓.

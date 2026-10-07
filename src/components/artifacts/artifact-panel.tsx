@@ -113,7 +113,7 @@ export function ArtifactPanel({ id, nonce, role, onOpenForm, onShare, onClosed, 
         {!data.owned && <p className="mb-2 text-sm text-ink-soft">Shared by {data.sharedBy} · version {data.version}{data.sharedAt ? ` · ${dateText(new Date(data.sharedAt))}` : ''}</p>}
         {data.owned && data.sharedWithStorekeeper && <p className="mb-2 text-sm text-ink-soft">The storekeeper has a copy of an earlier version.</p>}
         <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Artifact tools">
-          <button type="button" className={bar} onClick={() => { setNote(null); setRun((n) => n + 1); }}><RefreshCw aria-hidden className="size-4" />Refresh</button>
+          <button type="button" className={cn(bar, 'px-2')} aria-label="Refresh" title="Refresh" onClick={() => { setNote(null); setRun((n) => n + 1); }}><RefreshCw aria-hidden className="size-4" /></button>
 
           {data.owned ? (
             <DropdownMenu>
@@ -151,7 +151,7 @@ export function ArtifactPanel({ id, nonce, role, onOpenForm, onShare, onClosed, 
           {data.owned && role === 'OWNER' && data.sharedWithStorekeeper && <button type="button" className={bar} onClick={() => onShare(data.id, data.version, true)}>Stop sharing</button>}
           {data.owned && (
             <DropdownMenu>
-              <DropdownMenuTrigger className={cn(bar, 'px-2')} aria-label="More"><ChevronDown aria-hidden className="size-4" /></DropdownMenuTrigger>
+              <DropdownMenuTrigger className={cn(bar, 'px-2 sm:ml-auto')} aria-label="More"><ChevronDown aria-hidden className="size-4" /></DropdownMenuTrigger>
               <DropdownMenuContent align="end"><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => void remove()}><Trash2 aria-hidden className="size-4" />Delete</DropdownMenuItem></DropdownMenuContent>
             </DropdownMenu>
           )}

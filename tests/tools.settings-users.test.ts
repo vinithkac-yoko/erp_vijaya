@@ -14,11 +14,15 @@ const settings = async (s: Awaited<ReturnType<typeof owner>>) => (await ok<{ row
 describe('settings', () => {
   it('start at ₹50,000 and the assistant on', async () => {
     const o = await owner();
-    expect(await settings(o)).toEqual([
+    const rows = await settings(o);
+    expect(rows.slice(0, 3)).toEqual([
       expect.objectContaining({ key: 'po.approval_limit', value: '₹50,000' }),
       expect.objectContaining({ key: 'agent.enabled', value: 'On' }),
       expect.objectContaining({ key: 'notify.owner_email', value: 'None' }),
     ]);
+    // the letterhead printouts use (milestone 9): the name is there from day one, the rest is for the owner to fill in
+    expect(rows.slice(3).map((r) => r.key)).toEqual(['company.name', 'company.address', 'company.gstin', 'company.state', 'company.phone']);
+    expect(rows.find((r) => r.key === 'company.name')?.value).toBe('Vijaya Electronics');
   });
 
   it('the storekeeper can read the approval limit and nothing else (1.27)', async () => {
