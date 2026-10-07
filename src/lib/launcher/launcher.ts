@@ -1,4 +1,4 @@
-import { TOOLS, type Role } from './catalog';
+import { TOOLS, type Role } from '../catalog';
 
 /**
  * The button row above the chat input. Two kinds:

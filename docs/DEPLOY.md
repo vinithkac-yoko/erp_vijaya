@@ -60,7 +60,8 @@ Good to know:
 1. Service → **Deployments**. If a build is not running, click **Deploy** (or the three dots → **Redeploy**).
 2. Wait for **Active** (green). The first build takes a few minutes.
 3. Open `your-address/api/health` in the browser. You should see:
-   `{"ok":true,"config":"ok","database":"ok","guards":{"expected":0,"missing":[]}}`
+   `{"ok":true,"config":"ok","database":"ok","guards":{"expected":33,"missing":[]}}`
+   (the number is how many database protections the app checked; `"missing":[]` must be empty)
 4. Open `your-address`. You should land on **Log in**. Log in as the owner, then (in another browser or a
    private window) as the storekeeper.
 
@@ -70,6 +71,7 @@ Good to know:
 |---|---|---|
 | Deployment says **Failed** at health check | The app started but `/api/health` is not ok | Open `/api/health` or the Deploy Logs. `"config":{"missing":[…]}` names the variable to fix |
 | `"database":"down"` | `DATABASE_URL` is wrong | Check it is exactly `${{Postgres.DATABASE_URL}}` and the Postgres box is green |
+| The deploy log says `Refusing to start: the database is missing these guards` | The database protections are not all there | Redeploy (the start command re-applies them). If it still says so, someone changed the database by hand; tell us which guard it names |
 | Log in says "email or password is not right" | Wrong details, or the seed ran with other emails | Check the `SEED_*` values you set **before the first deploy**. Once users exist, ask us to add a way to reset |
 | "Too many tries" | 5 wrong logins from one place | Wait 15 minutes |
 

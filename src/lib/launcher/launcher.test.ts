@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { launcherFor, shortcutTool } from './launcher';
-import { TOOLS } from './catalog';
+import { TOOLS } from '../catalog';
 
 // Ported from reference/artifacts/artifacts.test.ts (the kit keeps its own copy).
 const flat = (l: ReturnType<typeof launcherFor>) => [...l.forms, ...l.moreForms, ...l.chips, ...l.moreChips];

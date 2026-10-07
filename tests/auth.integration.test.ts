@@ -1,13 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, it, expect } from 'vitest';
-import { PrismaClient } from '@prisma/client';
 import { authenticate, LOCKED, WRONG } from '@/server/auth/authenticate';
 import { hashPassword } from '@/server/auth/password';
 import { resetRateLimits } from '@/server/auth/rate-limit';
-
-const prisma = new PrismaClient();
+import { prisma, resetDb } from './helpers/db';
 
 beforeAll(async () => {
-  await prisma.user.deleteMany();
+  await resetDb();
   await prisma.user.createMany({
     data: [
       { name: 'Test Owner', email: 'owner@test.local', role: 'OWNER', passwordHash: await hashPassword('owner-password-1') },

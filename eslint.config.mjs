@@ -10,7 +10,7 @@ const noDb = {
   paths: [{ name: '@prisma/client', message: 'Go through the Tool Gateway (src/server/tools).' }],
   patterns: [{ group: ['@/server/db', '**/server/db'], message: 'Go through the Tool Gateway (src/server/tools).' }],
 };
-const allowed = ['src/server/db.ts', 'src/server/tools/**', 'src/server/auth/**', 'src/server/health.ts', 'src/server/guards.ts',
+const allowed = ['src/server/db.ts', 'src/server/tools/**', 'src/server/auth/**', 'src/server/health.ts', 'src/server/guards.ts', 'src/server/errors.ts',
   'prisma/**', 'tests/**', 'e2e/**', 'src/**/*.test.ts'];
 
 export default [

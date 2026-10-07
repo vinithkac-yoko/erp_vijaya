@@ -1,5 +1,5 @@
-import { existsSync } from 'node:fs';
+import { loadTestEnv } from './helpers/env';
 
-// Tests run against a real Postgres. Use .env.test when it exists, otherwise whatever DATABASE_URL is set.
-if (existsSync('.env.test')) process.loadEnvFile('.env.test');
+// Tests run against a real Postgres: the _test database from .env.test, never the dev one.
+loadTestEnv();
 process.env.SESSION_SECRET ??= 'test-secret-test-secret-test-secret-123456';

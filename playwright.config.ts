@@ -1,8 +1,8 @@
-import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
+import { loadTestEnv } from './tests/helpers/env';
 
 // The browser tests use the test database, never the dev one.
-if (existsSync('.env.test')) process.loadEnvFile('.env.test');
+loadTestEnv();
 
 const PORT = 3100;
 const chromium = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';

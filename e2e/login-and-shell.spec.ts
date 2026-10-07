@@ -189,6 +189,8 @@ test.describe('health', () => {
   test('/api/health is open and says ok', async ({ request }) => {
     const r = await request.get('/api/health');
     expect(r.status()).toBe(200);
-    expect(await r.json()).toEqual({ ok: true, config: 'ok', database: 'ok', guards: { expected: 0, missing: [] } });
+    const body = await r.json();
+    expect(body).toMatchObject({ ok: true, config: 'ok', database: 'ok', guards: { missing: [] } });
+    expect(body.guards.expected).toBeGreaterThan(20);
   });
 });

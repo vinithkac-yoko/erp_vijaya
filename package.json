@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run -c vitest.app.config.ts",
     "test:kit": "npm --prefix reference/artifacts ci && cd reference/artifacts && npx vitest run --root ../.. reference/ evals/ prompts/",
-    "e2e": "playwright test",
+    "e2e": "tsx tests/rebuild-test-db.ts && playwright test",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
