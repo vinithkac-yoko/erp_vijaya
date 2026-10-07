@@ -53,3 +53,15 @@ export async function addJob(customer: string, quantity: number, bom: { material
   }
   return job;
 }
+
+/** A monthly count that was approved some time ago, with its lines (system, counted, reason), put straight into the table. */
+export async function addApprovedCount(date: string, lines: { material: string; system: number; counted: number; reason?: string }[]) {
+  const count = await prisma.stockCount.create({ data: { number: `CNT-E-${++n}`, countDate: new Date(`${date}T00:00:00+05:30`) } });
+  for (const l of lines) {
+    const m = await prisma.material.findFirstOrThrow({ where: { name: l.material } });
+    await prisma.stockCountLine.create({ data: { stockCountId: count.id, materialId: m.id, systemQty: l.system, countedQty: l.counted, differenceQty: l.counted - l.system, reasonCode: l.reason } });
+  }
+  await prisma.stockCount.update({ where: { id: count.id }, data: { status: 'PENDING_APPROVAL' } });
+  await prisma.stockCount.update({ where: { id: count.id }, data: { status: 'APPROVED' } });
+  return count;
+}

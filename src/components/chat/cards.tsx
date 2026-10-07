@@ -33,7 +33,7 @@ export function TableCard({ card }: { card: Of<'table'> }) {
     <div className="rounded-md border border-line bg-surface">
       {card.title && <p className="border-b border-line px-3 py-2 font-medium">{card.title}</p>}
       {card.rows.length > 0 && (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-[-2px]" role="region" aria-label={card.title ?? 'Table'} tabIndex={0}>
           <table className="w-full border-collapse text-[15px]">
             <thead>
               <tr>{card.columns.map((c) => <th key={c.key} scope="col" className={cn('bg-sunk px-3 py-2 font-semibold', c.align === 'right' ? 'text-right' : 'text-left')}>{c.label}</th>)}</tr>

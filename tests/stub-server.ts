@@ -25,6 +25,11 @@ function script(r: StubRequest): StubReply {
   if (t.includes('record a customer po')) return call('create_customer_po', { customerName: 'Ashok Transformers', number: 'AT/2627/118' }, 'Check the PO number.');
   if (t.includes('open jobs')) return answered ? say('Here are the open jobs.') : call('list_jobs', { status: 'OPEN' });
   if (t.includes('close the job')) return call('close_job', {}, 'Check the job and say if anything came back.');
+  if (t.includes('stock leaking')) return owner ? (answered ? say('Here is where the counts differed.') : call('get_leak_report', {})) : say('The leak report is the owner\'s. I can show you the count for a material.');
+  if (t.includes('bobbin history')) return answered ? say('Every count of the bobbins, newest first.') : call('get_count_history', { materialNames: ['Bobbin Type-B'] });
+  if (t.includes('job costs')) return owner ? (answered ? say('Here are the jobs and what they cost.') : call('get_job_cost_report', { includeOpen: true })) : say('Job costs are the owner\'s.');
+  if (t.includes('copper goes up')) return owner ? (answered ? say('Here is what that does to the open jobs.') : call('estimate_job_cost', { materialNames: ['22 SWG Copper Wire'], newRate: 900 })) : say('That is for the owner.');
+  if (t.includes('done today')) return owner ? (answered ? say('Here is what was done today.') : call('get_activity', { from: '@today' })) : say('Only the owner sees that.');
   if (t.includes('collected scrap')) return call('record_scrap_in', {}, 'Check the scrap and the quantity.');
   if (t.includes('sold scrap')) return call('record_scrap_sale', {}, 'Check the buyer, the quantity and the rate.');
   if (t.includes('reverse an entry')) return owner ? call('reverse_movement', {}, 'Choose the entry and say why.') : say('Only the owner can reverse an entry.');

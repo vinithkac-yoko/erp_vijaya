@@ -287,6 +287,63 @@ describe('a normal count', () => {
     expect((await lineOf(ow, 'Copper Wire')).countedQty).toBe(100);
   });
 
+  it('the monthly story: sent to the owner, sent back with a note, no stock moved, recounted in the same count, sent again, approved (11.10–11.16)', async () => {
+    const { sk, ow } = await live();
+    const mat = await prisma.material.findFirstOrThrow({ where: { name: 'Copper Wire' } });
+    await ok(save(sk, 'start_stock_count', { countDate: today() }));
+    await ok(sheet(sk, [{ name: 'Copper Wire', countedQty: 92, reasonCode: 'MISSING' }, { name: 'Ferrite Core', countedQty: 50 }]));
+    const started = await prisma.stockCount.findFirstOrThrow({ where: { isOpening: false } });
+    await ok(save(sk, 'submit_stock_count', {}));
+    await ok(save(ow, 'reject_stock_count', { rejectionNote: 'Please recount the copper' }));
+    expect(await prisma.stockCount.findUniqueOrThrow({ where: { id: started.id } })).toMatchObject({ status: 'REJECTED', rejectionNote: 'Please recount the copper' });
+    expect(await prisma.stockMovement.count({ where: { type: 'COUNT_ADJUSTMENT' } })).toBe(0);
+    expect(await balance(mat.id)).toMatchObject({ qty: 100 });
+    expect(await prisma.notification.findFirstOrThrow({ where: { userId: sk.userId, type: 'RECOUNT_REQUIRED' } })).toMatchObject({ body: expect.stringContaining('recount the copper') });
+    // the same count is recounted, not a new one
+    await ok(enter(sk, 'Copper Wire', { countedQty: 95 }));
+    expect(await lineOf(sk, 'Copper Wire')).toMatchObject({ systemQty: 100, countedQty: 95, difference: -5, reason: 'MISSING' });
+    expect(await prisma.stockCount.count({ where: { isOpening: false } })).toBe(1);
+    await ok(save(sk, 'submit_stock_count', {}));
+    expect(await prisma.notification.count({ where: { userId: ow.userId, type: 'COUNT_PENDING_APPROVAL', title: 'Stock count sent again' } })).toBe(1);
+    await ok(save(ow, 'approve_stock_count', {}));
+    expect(await balance(mat.id)).toMatchObject({ qty: 95, rate: 800 });
+    expect(await prisma.notification.findFirstOrThrow({ where: { userId: sk.userId, type: 'COUNT_APPROVED' } })).toBeTruthy();
+  });
+
+  it('a count that matches asks for no reason and records none (11.7)', async () => {
+    const { sk } = await live();
+    await ok(save(sk, 'start_stock_count', { countDate: today() }));
+    await ok(enter(sk, 'Ferrite Core', { countedQty: 50 }));
+    expect(await lineOf(sk, 'Ferrite Core')).toMatchObject({ difference: 0, reason: null });
+    await ok(enter(sk, 'Copper Wire', { countedQty: 100 }));
+    await ok(save(sk, 'submit_stock_count', {}));
+    expect(await prisma.stockCountLine.count({ where: { reasonCode: { not: null } } })).toBe(0);
+  });
+
+  it('the System column stays what it was when the count started, even if stock moves meanwhile (11.1, 11.8)', async () => {
+    const { sk } = await live();
+    const mat = await prisma.material.findFirstOrThrow({ where: { name: 'Copper Wire' } });
+    await ok(save(sk, 'start_stock_count', { countDate: today() }));
+    await receive(mat.id, 10, 800);
+    expect(await balance(mat.id)).toMatchObject({ qty: 110 });
+    expect(await lineOf(sk, 'Copper Wire')).toMatchObject({ systemQty: 100 });
+    // there is no way to type a System quantity: a value sent for it is ignored, the frozen one stays
+    await ok(enter(sk, 'Copper Wire', { countedQty: 100, systemQty: 110 }));
+    expect(await lineOf(sk, 'Copper Wire')).toMatchObject({ systemQty: 100, countedQty: 100, difference: 0 });
+  });
+
+  it('an approved count cannot be changed by anyone; stock is only ever corrected by the next count (11.17)', async () => {
+    const { sk, ow } = await live();
+    await ok(save(sk, 'start_stock_count', { countDate: today() }));
+    await ok(sheet(sk, [{ name: 'Copper Wire', countedQty: 97, reasonCode: 'SPILLAGE' }, { name: 'Ferrite Core', countedQty: 50 }]));
+    const line = await lineOf(sk, 'Copper Wire');
+    await ok(save(sk, 'submit_stock_count', {}));
+    expect((await fails(enter(sk, 'Copper Wire', { countedQty: 100 }))).code).toBe('COUNT_LOCKED');
+    await ok(save(ow, 'approve_stock_count', {}));
+    for (const who of [sk, ow]) expect((await fails(save(who, 'submit_count_line', { stockCountLineId: line.id, countedQty: 100 }))).code).toBe('COUNT_LOCKED');
+    expect((await fails(save(ow, 'save_count_sheet', { stockCountId: line.stockCountId ?? (await prisma.stockCount.findFirstOrThrow({ where: { isOpening: false } })).id, lines: [{ stockCountLineId: line.id, countedQty: 100 }] }))).code).toBe('COUNT_LOCKED');
+  });
+
   it('a date in the future, or one that is not a date, is refused', async () => {
     const { sk } = await live();
     expect((await fails(save(sk, 'start_stock_count', { countDate: '2099-01-01' }))).code).toBe('INVALID_DATE');
