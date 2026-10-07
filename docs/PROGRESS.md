@@ -2,7 +2,30 @@
 
 Read this at the start of every session (CLAUDE.md). Newest on top.
 
-## Milestone 6 — Purchasing — **built; waiting for Kasi's test and go-ahead for milestone 7**
+## Milestone 7 — Issue, return, close, scrap, reversal — **built; waiting for Kasi's test and go-ahead for milestone 8**
+
+Kasi's answers after milestone 6: rejected-goods ledger shape (b) is OK ✓, keep the 5% receipt-rate-move threshold ✓, go ahead with milestone 7 ✓.
+
+Done
+- **Issue to a job** (`issue_material`): no lines = everything still outstanding on the BOM, all at once. Quantities over the BOM, materials not on the BOM, duplicates, closed/cancelled jobs are refused in plain words. A line ticked "Extra, for rework" is a **top-up** (`TOP_UP` on the movement) and shows in the job's BOM-vs-actual. Negative stock is allowed: the owner is warned; below-minimum notices go out. After an issue the storekeeper is offered "Raise a PO for X" for anything now short.
+- **Return from a job** (`return_material`): only what was issued, at the current average; "all come back" works; a closed job refuses.
+- **Close a job** (`close_job`): asks what came back first (answer "nothing came back" is explicit); cost = value out − value back, stored on the job and **shown only to the owner** (with per piece). More than 5% over BOM → the owner is told.
+- **Scrap** (`record_scrap_in`, `record_scrap_sale`, `get_scrap_summary`): scrap in against a job, sale at the ₹ amount typed, selling more than collected is flagged; the owner's summary ignores reversed entries.
+- **Reversals** (`get_movement_history`, `reverse_movement`): owner only, needs a reason, once per entry, both rows stay and the balance comes back; the person who made the entry is told. Opening, count adjustments, reversals and sent-back-goods rows cannot be reversed. A job that is closed cannot have entries reversed (see J6).
+- Forms: give-out, take-back, scrap, reversal with live info under the job/entry picked; every launcher button now works.
+
+Proof (all run in this session)
+- `pnpm test`: 379 passed (16 live skipped) — `tests/tools.stock.test.ts` (32 tests) follows ACCEPTANCE §7, §8, §10, §14 incl. 100@800 + 100@900 → 850, issue 50, return 10, close 40@1000 → ₹880.
+- `pnpm e2e`: 139 passed (5 skipped on purpose), desktop and phone. `pnpm test:kit`: 200/200. Lint, typecheck, build clean.
+- Live, real model (5 checks): issue for a job opens the form with no lines; "5 kg wire" with no job asks which; extra wire for rework → marked top-up; closing a job asks what came back before any form; the storekeeper asking to reverse is told the owner does it; scrap sale form has no rate filled.
+
+Things to know
+- Questions for the owner are in `docs/CLIENT_CONFIRMATIONS.md` section J (J1–J15): mainly J6 (reopen a closed job to reverse an entry?), the 5% over-BOM threshold, receipt-reversal limits.
+- The "Issue material to JOB-…" button from milestone 6 now works.
+
+Next: milestone 8 — monthly counts and reports (leak report, job cost, BOM vs actual, scrap reconciliation, reorder alerts); run the agent evals. Needs Kasi's go-ahead.
+
+## Milestone 6 — Purchasing — built (milestone 7 followed)
 
 Kasi's answers after milestone 5: the shortage check comparing one job with stock is fine ✓, go ahead with milestone 6 ✓. (All client confirmations stay for the end-of-project demo.)
 
