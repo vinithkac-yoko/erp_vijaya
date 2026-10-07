@@ -27,7 +27,8 @@ Milestone 10 — hardening
 Proof (run in this session)
 - `pnpm e2e` for the new specs: artifacts, printouts, sharing, hardening, desktop and phone, all passing (the two-person sharing test runs on desktop only: it needs room for two people at once).
 - New unit tests: store, builder, app tools, printouts (with a real browser), demo, production audit, session limits, log redaction.
-- Agent evals: all 30 starting states build (the 9 artifact and document states were added). Real-model results are in the section below once run.
+- Agent evals: all 30 starting states build (the 9 artifact and document states were added). **Real-model runs are not finished: the API key ran out of credit part-way** (see `evals/reports/2026-10-07.md`). What the valid passes showed: the first pass found that every artifact build failed (this model refuses a forced tool choice) — fixed, and checked against the real model; with builds working 56 of 80 cases passed every run, section 32 (safety, hostile text, sharing limits) 22 of 22; most of the rest were the runner's own bookkeeping (fixed). Still failing for assistant-behaviour reasons: it sometimes answers in the chat instead of making a report (31.9, 31.10, 31.12, 31.32) and opened a share form for an owner-only report (16.88, fixed afterwards, not re-run live).
+- Everything else, final: `pnpm test` 509 passed (22 skipped: live), `pnpm test:kit` 200/200, `pnpm e2e` 192 passed (6 skipped on purpose), lint, typecheck and build clean.
 
 Decisions to confirm with Kasi: section L of `docs/CLIENT_CONFIRMATIONS.md` (letterhead details, "NOT APPROVED" printing, which printouts exist, who prints what, limits, login lengths, demo copy, Chromium and pandoc on Railway).
 
