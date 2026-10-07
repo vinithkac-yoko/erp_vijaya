@@ -60,17 +60,21 @@ export interface WriteTool<I extends z.ZodTypeAny = z.ZodTypeAny, O = unknown> e
   form: FormDef;
   /** The rubber stamp on the "Saved" card, e.g. "MATERIAL ADDED". Drawn by the server from the audit row. */
   stamp: string;
+  /** If the save turned out to be a change to something that already existed (create_party adding a role), this stamp is used instead. */
+  stampUpdate?: string;
   /** The lines under the stamp, from the audit row's `after` (names and numbers people use, never ids). */
   describe: (after: Record<string, unknown>) => string[];
   /** After a successful save: facts from read-only checks (a shortage, a rate change) and chips for what to do next. */
-  followUps?: (ctx: ToolContext, input: Record<string, unknown>, result: unknown) => Promise<FollowUpResult>;
+  followUps?: (ctx: FollowUpContext, input: Record<string, unknown>, result: unknown) => Promise<FollowUpResult>;
 }
+/** Follow-ups only READ, and only through the gateway, as the person who just saved. */
+export interface FollowUpContext { session: ToolSession; read: (tool: string, input?: unknown) => Promise<ToolOutcome> }
 export interface FollowUpResult { facts: string[]; chips: Chip[] }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyTool = ReadTool<any, any> | WriteTool<any, any>;
 
 /** A tool as registered: the definition plus the model-facing text loaded from prompts/tool-descriptions.json. */
-export type RegisteredTool = AnyTool & { description: string; inputDescriptions: Record<string, string> };
+export type RegisteredTool = AnyTool & { description: string; inputDescriptions: Record<string, string>; /** False for tools the model is never offered (UI-only actions). */ agentVisible: boolean };
 
 export type ToolOutcome<T = unknown> =
   | { ok: true; data: T; auditId?: string }

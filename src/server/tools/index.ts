@@ -4,7 +4,7 @@ import { listReorderAlerts } from './alerts';
 import { createMaterial, deactivateMaterial, getMaterialBalance, searchMaterials, updateMaterial } from './materials';
 import { createParty, deactivateParty, searchParties, updateParty } from './parties';
 import { createPendingService } from './pending';
-import { listSettings, updateSetting } from './settings';
+import { assistantSettingOn, listSettings, updateSetting } from './settings';
 import { createUser, deactivateUser, listUsers, resetUserPassword } from './users';
 import { Registry } from './registry';
 import { createRunTool } from './run-tool';
@@ -25,9 +25,12 @@ export const registry = new Registry([
 export const runTool = createRunTool(registry, db);
 export const pendingActions = createPendingService(registry, db);
 
-/** What a form's button does: load the person's own open form, then run its tool with that form as the confirmation. */
+/**
+ * What a form's button does: find the person's own form, then run its tool with that form as the confirmation. If the form
+ * is no longer open (already saved, closed, timed out) the gateway says which, in plain words, instead of a vague "gone".
+ */
 export async function submitForm(session: ToolSession, pendingId: string, input: unknown): Promise<ToolOutcome> {
-  const form = await pendingActions.get(session, pendingId);
+  const form = (await pendingActions.get(session, pendingId)) ?? (await pendingActions.peek(session, pendingId));
   if (!form) return { ok: false, code: 'CONFIRMATION_INVALID', message: "That form isn't open any more. Please open it again." };
   const opts: RunOptions = { confirmation: pendingId };
   return runTool(session, form.tool, input, opts);
@@ -35,5 +38,10 @@ export async function submitForm(session: ToolSession, pendingId: string, input:
 
 export { ToolError } from '../errors';
 export { defineTool } from './define';
+export { conversations, conversationStore, startOfIndiaDay } from './conversations';
+export type { Stored } from './conversations';
+export { readSetting } from './settings';
+/** The owner's switch for the assistant (the environment variable is the hard stop; this is the one in Settings). */
+export const assistantOn = () => assistantSettingOn(db);
 export { nextNumber, nextCode } from './numbers';
 export type { ToolSession, ToolOutcome } from './types';

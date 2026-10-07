@@ -3,7 +3,7 @@ import { TOOLS } from '@/lib/catalog';
 import descriptions from '../../../prompts/tool-descriptions.json';
 import type { AnyTool, ReadTool, RegisteredTool, WriteTool } from './types';
 
-interface Described { description: string; inputs: Record<string, string> }
+interface Described { description: string; inputs: Record<string, string>; agent?: boolean }
 const TEXT = (descriptions as { tools: Record<string, Described> }).tools;
 
 /** The exact words the model sees for a tool. Generated from prompts/build_tool_descriptions.py — never edited here. */
@@ -28,5 +28,5 @@ export function defineTool(def: AnyTool): RegisteredTool {
     throw new Error(`Tool "${def.name}" has roles ${def.roles.join('+')} here but ${meta.roles.join('+')} in the catalog.`);
   }
   const text = toolText(def.name);
-  return { ...def, description: text.description, inputDescriptions: text.inputs } as RegisteredTool;
+  return { ...def, description: text.description, inputDescriptions: text.inputs, agentVisible: text.agent !== false } as RegisteredTool;
 }

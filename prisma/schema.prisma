@@ -789,6 +789,8 @@ enum MessageRole {
 
 model Message {
   id             String      @id @default(uuid())
+  /// Order inside the whole table; the chat is read back in this order (createdAt can tie within a millisecond).
+  seq            Int         @default(autoincrement())
   conversationId String
   role           MessageRole
   /// Text, tool calls and results, card data. Never a password.
@@ -798,7 +800,7 @@ model Message {
 
   conversation Conversation @relation(fields: [conversationId], references: [id])
 
-  @@index([conversationId, createdAt])
+  @@index([conversationId, seq])
   @@map("messages")
 }
 

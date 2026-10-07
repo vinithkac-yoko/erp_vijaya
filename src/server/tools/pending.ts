@@ -23,6 +23,7 @@ export interface CreatePendingArgs {
 export interface PendingView {
   id: string;
   tool: string;
+  conversationId: string | null;
   input: Record<string, unknown>;
   /** True when the form has suggested values: show "assistant filled this in — check it". */
   assisted: boolean;
@@ -75,7 +76,7 @@ export function createPendingService(registry: Registry, client: PrismaClient = 
             },
           });
         });
-        return { ok: true, data: { id: created.id, tool: a.tool, input: clean.input, assisted: clean.assisted, dropped: clean.dropped, expiresAt: created.expiresAt } };
+        return { ok: true, data: { id: created.id, tool: a.tool, conversationId: created.conversationId, input: clean.input, assisted: clean.assisted, dropped: clean.dropped, expiresAt: created.expiresAt } };
       } catch (err) {
         const m = mapError(err);
         return fail(m.code, m.message);
@@ -86,7 +87,13 @@ export function createPendingService(registry: Registry, client: PrismaClient = 
     async get(session: ToolSession, id: string, now = new Date()): Promise<PendingView | null> {
       const p = await client.pendingAction.findFirst({ where: { id, userId: session.userId, status: 'OPEN', expiresAt: { gt: now } } });
       if (!p) return null;
-      return { id: p.id, tool: p.toolName, input: (p.proposedInput ?? {}) as Record<string, unknown>, assisted: Object.keys((p.proposedInput ?? {}) as object).length > 0 && p.origin !== 'LAUNCHER', dropped: [], expiresAt: p.expiresAt };
+      return { id: p.id, tool: p.toolName, conversationId: p.conversationId, input: (p.proposedInput ?? {}) as Record<string, unknown>, assisted: Object.keys((p.proposedInput ?? {}) as object).length > 0 && p.origin !== 'LAUNCHER', dropped: [], expiresAt: p.expiresAt };
+    },
+
+    /** The person's own form in ANY state (open, saved, closed): so a second press can be told "already saved", not just "gone". */
+    async peek(session: ToolSession, id: string): Promise<{ tool: string } | null> {
+      const p = await client.pendingAction.findFirst({ where: { id, userId: session.userId }, select: { toolName: true } });
+      return p ? { tool: p.toolName } : null;
     },
 
     /** "Not now": closes the person's own open form. */

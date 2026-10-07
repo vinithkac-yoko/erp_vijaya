@@ -71,6 +71,7 @@ export const createParty = defineTool({
     ],
   },
   stamp: 'ADDED TO THE LIST',
+  stampUpdate: 'ROLE ADDED',
   describe: (a) => [String(a.name), String(a.type), ...(a.city ? [`City: ${a.city}`] : []), ...(a.gstin ? [`GSTIN: ${a.gstin}`] : [])],
   handler: async (ctx, input): Promise<WriteResult<PartyResult>> => {
     const name = tidy(input.name), key = partyNameKey(name);
