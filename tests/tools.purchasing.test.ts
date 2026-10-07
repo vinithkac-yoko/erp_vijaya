@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { pendingActions, registry, runTool } from '@/server/tools';
 import { balance, prisma, resetDb } from './helpers/db';
+import { sendOwnerEmails, sentMail } from '@/server/tools/email';
 import { fails, material, ok, owner, save, seedSettings, storekeeper } from './helpers/tools';
 
 beforeEach(async () => { await resetDb(); await seedSettings(); });
@@ -274,5 +275,22 @@ describe('goods receipt with inspection (ACCEPTANCE §6)', () => {
     expect(card.info?.[0]).toContain('Sundaram Ferrites · ₹63,830');
     expect(card.info).toContain('Ferrite Core E-30: 982 pcs at ₹65/pcs = ₹63,830');
     expect(card.form.alt).toEqual({ tool: 'reject_purchase_order', label: 'Reject' });
+  });
+});
+
+describe('email to the owner', () => {
+  it('a PO waiting for him is emailed once (to the address in Settings), a failure never blocks a save, and with no email set up nothing is sent', async () => {
+    const s = await storekeeper(); const o = await owner(); const x = await setup(s);
+    expect(await sendOwnerEmails({ ...process.env, SMTP_URL: '' })).toBe(0); // not configured: the app is the only place he is told
+    await prisma.setting.update({ where: { key: 'notify.owner_email' }, data: { value: 'owner@vijaya.example' } });
+    const env = { ...process.env, SMTP_URL: 'json:', APP_URL: 'https://stores.example' };
+    sentMail.length = 0;
+    await ok(po(s, x.sundaram, [{ materialId: x.core, quantity: 982, rate: 65 }]));
+    expect(await sendOwnerEmails(env)).toBe(1);
+    expect(sentMail).toMatchObject([{ to: 'owner@vijaya.example', subject: 'Purchase order waiting', text: expect.stringContaining('₹63,830') }]);
+    expect(sentMail[0]?.text).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/); // names and rupees, never ids
+    expect(await sendOwnerEmails(env)).toBe(0); // once
+    expect((await prisma.notification.findFirstOrThrow({ where: { userId: o.userId } })).emailSentAt).not.toBeNull();
+    expect(await prisma.notification.count({ where: { userId: s.userId, emailSentAt: { not: null } } })).toBe(0); // only the owner is emailed
   });
 });

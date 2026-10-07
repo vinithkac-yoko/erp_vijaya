@@ -1,5 +1,6 @@
 import { Prisma, type PendingAction, type PrismaClient } from '@prisma/client';
 import { db } from '../db';
+import { sendOwnerEmails } from './email';
 import { fieldOf, mapError, ToolError, UNKNOWN_CONSTRAINT } from '../errors';
 import type { Registry } from './registry';
 import type { Actor, RunOptions, Tx, ToolOutcome, ToolSession } from './types';
@@ -62,7 +63,7 @@ export function createRunTool(registry: Registry, client: PrismaClient = db) {
       const confirmation = opts.confirmation;
       if (!confirmation) return fail('CONFIRMATION_REQUIRED', 'Please check the form and press its button. Nothing is saved until you do.');
 
-      return await client.$transaction(async (tx) => {
+      const out = await client.$transaction(async (tx) => {
         // Claim the form. Atomic: a double click or a second tab loses this race and changes nothing.
         const claimed = await tx.pendingAction.updateMany({
           where: { id: confirmation, userId: session.userId, toolName: name, status: 'OPEN', expiresAt: { gt: now } },
@@ -101,6 +102,9 @@ export function createRunTool(registry: Registry, client: PrismaClient = db) {
         });
         return { ok: true as const, data: result.data, auditId: event.id };
       }, { timeout: 20_000, maxWait: 10_000 });
+      // After the save is safe: tell the owner by email, if email is set up. Never part of the save, never a reason for it to fail.
+      void sendOwnerEmails().catch(() => undefined);
+      return out;
     } catch (err) {
       const mapped = mapError(err);
       if (mapped === UNKNOWN_CONSTRAINT || mapped.code === 'INTERNAL') {

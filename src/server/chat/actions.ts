@@ -153,3 +153,11 @@ export async function lastRateAction(input: { materialId: string }): Promise<{ r
   if (!top) return null;
   return { rate: top.rate, text: `Last paid ${rateText(top.rate, top.unit)} · ${top.supplier} · ${dateText(new Date(top.date))}` };
 }
+
+/** A choice in an open form that fills in the rest of it (a purchase order picked on the receipt form): the facts and values for that choice. */
+export async function previewFormAction(input: { tool: string; input: Record<string, unknown> }): Promise<{ info: string[]; values: Record<string, unknown> } | null> {
+  const session = await who();
+  const p = z.object({ tool: z.string().min(1).max(60), input: z.record(z.unknown()) }).safeParse(input);
+  if (!session || !p.success) return null;
+  return pendingActions.previewFor(session, p.data.tool, p.data.input);
+}

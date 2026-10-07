@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CircleAlert, Sparkles } from 'lucide-react';
 import type { ChatItem, Chip } from '@/lib/cards';
 import type { FieldDef, FormDef } from '@/lib/forms';
-import { cancelFormAction, submitFormAction, switchFormAction } from '@/server/chat/actions';
+import { cancelFormAction, previewFormAction, submitFormAction, switchFormAction } from '@/server/chat/actions';
 import { Button } from '@/components/ui/button';
 import { Picker } from './picker';
 import { LinesEditor, type BomLineValue } from './lines-editor';
@@ -48,6 +48,9 @@ export function FormCard({ pendingId, tool, form, values, assisted, info, state,
   /** The pieces in the job, for the live totals in a bill of materials. */
   const [jobQty, setJobQty] = useState<number | null>(typeof values.jobQuantity === 'number' ? values.jobQuantity : null);
   const [busy, setBusy] = useState(false);
+  /** Picking a purchase order on the receipt form fills in the supplier and what is still due: the lines start over from that. */
+  const [liveInfo, setLiveInfo] = useState<string[] | null>(null);
+  const [linesKey, setLinesKey] = useState(0);
   const root = useRef<HTMLFormElement>(null);
 
   useEffect(() => { if (focusOnMount) root.current?.querySelector<HTMLElement>('input, select, textarea')?.focus(); }, [focusOnMount]);
@@ -86,6 +89,16 @@ export function FormCard({ pendingId, tool, form, values, assisted, info, state,
     if (!r.sheet) onSwitched?.(r.items);
   }
 
+  async function poPicked(poId: string) {
+    set('purchaseOrderId', poId);
+    if (!poId) { setLiveInfo(null); return; }
+    const r = await previewFormAction({ tool, input: { purchaseOrderId: poId } });
+    if (!r) return;
+    setV((p) => ({ ...p, supplierId: r.values.supplierId ?? p.supplierId, ...(r.values.lines ? { lines: r.values.lines } : {}) }));
+    setLiveInfo(r.info);
+    setLinesKey((k) => k + 1);
+  }
+
   async function notNow() {
     const r = await cancelFormAction({ pendingId, conversationId });
     onClosed(r.items);
@@ -112,9 +125,9 @@ export function FormCard({ pendingId, tool, form, values, assisted, info, state,
       {form.intro && <p className="mt-1 text-ink-soft">{form.intro}</p>}
 
       <div className="mt-4 space-y-4">
-        {info && info.length > 0 && (
+        {(liveInfo ?? info) && (liveInfo ?? info ?? []).length > 0 && (
           <div className="rounded-md border border-line bg-paper p-3 text-base" data-testid="form-info">
-            {info.map((line, i) => <p key={i} className={i === 0 ? 'font-medium' : 'text-ink-soft'}>{line}</p>)}
+            {(liveInfo ?? info ?? []).map((line, i) => <p key={i} className={i === 0 ? 'font-medium' : 'text-ink-soft'}>{line}</p>)}
           </div>
         )}
         {form.fields.filter((f) => f.type !== 'hidden' && visible(f, v)).map((f) => {
@@ -146,9 +159,9 @@ export function FormCard({ pendingId, tool, form, values, assisted, info, state,
                     ) : f.type === 'poLines' ? (
                       <PoLinesEditor id={id} value={(Array.isArray(v[f.name]) ? v[f.name] : []) as PoLineValue[]} onChange={(x) => setV((p) => ({ ...p, [f.name]: x }))} limit={typeof v.approvalLimit === 'number' ? v.approvalLimit : null} />
                     ) : f.type === 'grnLines' ? (
-                      <GrnLinesEditor id={id} value={(Array.isArray(v[f.name]) ? v[f.name] : []) as GrnLineValue[]} onChange={(x) => setV((p) => ({ ...p, [f.name]: x }))} />
+                      <GrnLinesEditor key={linesKey} id={id} value={(Array.isArray(v[f.name]) ? v[f.name] : []) as GrnLineValue[]} onChange={(x) => setV((p) => ({ ...p, [f.name]: x }))} />
                     ) : f.type === 'material' || f.type === 'party' || f.type === 'user' || f.type === 'countLine' || f.type === 'customerPo' || f.type === 'job' || f.type === 'purchaseOrder' ? (
-                      <Picker kind={f.type} id={id} value={String(v[f.name] ?? '')} onChange={(x) => set(f.name, x)} partyRole={f.partyRole} invalid={!!err} describedBy={described}
+                      <Picker kind={f.type} id={id} value={String(v[f.name] ?? '')} onChange={(x) => (tool === 'record_goods_receipt' && f.name === 'purchaseOrderId' ? void poPicked(x) : set(f.name, x))} partyRole={f.partyRole} invalid={!!err} describedBy={described}
                         onOption={f.type === 'job' ? (o) => { if (o.quantity !== undefined) setJobQty(o.quantity); } : undefined}
                         forId={f.dependsOn ? String(v[f.dependsOn] ?? '') || undefined : undefined} filter={f.pickerFilter}
                         waitFor={f.dependsOn && !v[f.dependsOn] ? 'Pick the customer first' : undefined} />

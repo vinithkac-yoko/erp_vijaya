@@ -82,14 +82,14 @@ describe('starting a chat', () => {
 });
 
 describe('the buttons above the input', () => {
-  it('storekeeper: his own buttons, no owner chips; forms stay off until their tools exist; Count stock and New job are on (21.3)', async () => {
+  it('storekeeper: his own buttons, no owner chips; forms stay off until their tools exist; receiving, counting, purchase orders and jobs are on (21.3)', async () => {
     const s = await storekeeper();
     const st = await launcherState(s, true);
     expect(st.launcher.forms.map((f) => f.label)).toEqual(['Receive stock', 'Issue to a job', 'Return', 'Count stock']);
     expect(st.launcher.moreForms.map((f) => f.label)).toEqual(['New PO', 'New job']);
     const chips = [...st.launcher.chips, ...st.launcher.moreChips].map((c) => c.label);
     expect(chips).toEqual(['Low stock', 'Open jobs', 'Stock today']);
-    expect(st.formEnabled).toEqual({ record_goods_receipt: false, issue_material: false, return_material: false, start_stock_count: true, create_purchase_order: false, create_job: true });
+    expect(st.formEnabled).toEqual({ record_goods_receipt: true, issue_material: false, return_material: false, start_stock_count: true, create_purchase_order: true, create_job: true });
     expect(st.chipEnabled).toEqual({ 'Low stock': true, 'Open jobs': true, 'Stock today': true });
   });
 

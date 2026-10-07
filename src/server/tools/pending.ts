@@ -102,6 +102,16 @@ export function createPendingService(registry: Registry, client: PrismaClient = 
       };
     },
 
+    /** What a form knows about a choice made in it (picking a PO fills the receipt): the same facts the form opened with. */
+    async previewFor(session: ToolSession, toolName: string, input: Record<string, unknown>): Promise<{ info: string[]; values: Record<string, unknown> } | null> {
+      const tool = registry.get(toolName);
+      if (!tool || tool.kind !== 'write' || !tool.preview || !tool.roles.includes(session.role)) return null;
+      try {
+        const p = await tool.preview({ db: client, session }, input);
+        return { info: p.info, values: { ...(p.values ?? {}), ...input, ...(p.decorate ?? {}) } };
+      } catch { return null; }
+    },
+
     /** The person's own open, unexpired form — or null. */
     async get(session: ToolSession, id: string, now = new Date()): Promise<PendingView | null> {
       const p = await client.pendingAction.findFirst({ where: { id, userId: session.userId, status: 'OPEN', expiresAt: { gt: now } } });

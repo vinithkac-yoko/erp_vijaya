@@ -41,3 +41,15 @@ export async function addStock(materialName: string, quantity: number, rate: num
   const line = await prisma.goodsReceiptLine.create({ data: { goodsReceiptId: grn.id, materialId: m.id, receivedQty: quantity, acceptedQty: quantity, rejectedQty: 0, rate, amount: quantity * rate } });
   await prisma.stockMovement.create({ data: { materialId: m.id, type: 'RECEIPT', direction: 'IN', quantity, rate, grnLineId: line.id, movementDate: new Date() } });
 }
+
+/** A job with its bill of materials, put straight into the table (quantities per piece). */
+export async function addJob(customer: string, quantity: number, bom: { material: string; perPiece: number }[]) {
+  const c = await prisma.party.findFirstOrThrow({ where: { name: customer } });
+  const count = await prisma.job.count();
+  const job = await prisma.job.create({ data: { number: `JOB-2627-${String(count + 1).padStart(4, '0')}`, customerId: c.id, productDescription: 'SMPS transformer 12V 2A', quantity, jobDate: new Date() } });
+  for (const b of bom) {
+    const m = await prisma.material.findFirstOrThrow({ where: { name: b.material } });
+    await prisma.jobBomLine.create({ data: { jobId: job.id, materialId: m.id, qtyPerPiece: b.perPiece, requiredQty: Math.round(b.perPiece * quantity * 10_000) / 10_000 } });
+  }
+  return job;
+}
