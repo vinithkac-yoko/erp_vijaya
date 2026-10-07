@@ -74,6 +74,15 @@ until the user ticks "different business"; bad GSTIN → `INVALID_GSTIN`.
 | `set_job_bom` | W | SK OW | Lines: material + **qty per piece**. Replaces the BOM. Only while status OPEN |
 | `cancel_job` | W | SK OW | Only with nothing issued; reason required |
 
+**As built (milestone 5):**
+- `create_customer_po` takes the customer by `customerName` (as the assistant sends it) or `customerId` (as the form's picker sends it). The same customer and PO number, in any case or spacing, returns the existing PO and says so (an open PO releases item by item).
+- `get_job`, `check_job_shortage` and `get_job_bom_variance` accept the job's id, its full number, or just the end of it ("31").
+- A job's quantity is a whole number; over 1,00,000 pieces the form asks "is that right?" once. A BOM line under 0.0001 per piece asks once; under 0.000001 is refused (it cannot be kept) with "did you mean a different unit?". Pieces and sets are whole numbers per piece.
+- A BOM is edited by replacing it, only while the job is OPEN. Its form opens on the job with the BOM it already has. The saved card lists every line as *name — per piece → total* (wire in grams, liquids in millilitres, totals in kg and litres).
+- After a BOM is saved the **server** draws the shortage table and offers the purchase order for the shortfall (rate left out) or "Issue material now". `list_customer_pos` is new (read): the forms use it to offer only that customer's POs.
+- `cancel_job` only with nothing issued and no sample job still under it. Job cost fields stay owner-only.
+- `get_job_bom_variance` marks top-ups when issue and top-up arrive (milestone 7).
+
 **create_customer_po** — unknown customer → `PARTY_NOT_FOUND` with suggestions; supplier-only
 party → `PARTY_WRONG_ROLE`. *Follow-ups:* offer "Create a job for this PO".
 **create_job** — SAMPLE without parent → `PARENT_REQUIRED`. *Follow-ups:* offer "Add the BOM".

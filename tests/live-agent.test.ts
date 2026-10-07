@@ -102,4 +102,44 @@ live('the real assistant (needs LIVE_ANTHROPIC_API_KEY)', () => {
     expect(r.calls).toContain('list_pending_approvals');
     expect(r.said).toMatch(/12,920|count/i);
   }, 120_000);
+
+  it('jobs: opens the job form for the customer, the BOM per piece in kg with the totals, and asks when a number sounds like a total', async () => {
+    await resetDb(); await seedSettings();
+    const s = await storekeeper();
+    await ok(save(s, 'create_party', { name: 'Ashok Transformers', role: 'CUSTOMER', city: 'Chennai' }));
+    for (const [name, uom] of [['22 SWG Copper Wire', 'KG'], ['Ferrite Core E-30', 'NOS'], ['Varnish', 'LTR']] as const) await ok(save(s, 'create_material', material(name, { uom })));
+
+    const j = await say(s, 'New job for Ashok Transformers, 500 pieces, SMPS transformer 12V 2A');
+    expect(j.forms[0]?.tool).toBe('create_job');
+    expect(Number(j.forms[0]?.values.quantity)).toBe(500);
+    expect(typeof j.forms[0]?.values.customerId).toBe('string');
+    expect(await prisma.job.count()).toBe(0);
+
+    const job = await ok<{ id: string }>(save(s, 'create_job', { customerId: j.forms[0]?.values.customerId, productDescription: 'SMPS transformer 12V 2A', quantity: 500, jobDate: new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10) }));
+    const b = await say(s, 'Add the BOM for job 1: 22 SWG wire 18.4 grams each, ferrite core E-30 2 each, varnish 5 ml each');
+    expect(b.forms[0]?.tool).toBe('set_job_bom');
+    const lines = b.forms[0]?.values.lines as { materialId: string; qtyPerPiece: number }[];
+    expect(lines).toHaveLength(3);
+    const wire = await prisma.material.findFirstOrThrow({ where: { name: '22 SWG Copper Wire' } });
+    expect(lines.find((l) => l.materialId === wire.id)?.qtyPerPiece).toBeCloseTo(0.0184, 6); // grams turned into kg, per piece
+    expect(await prisma.jobBomLine.count()).toBe(0);
+    void job;
+
+    const t = await say(s, 'BOM for job 1: 9.2 kg of wire for this job');
+    expect(t.forms).toHaveLength(0); // it asks first: per piece, or for all 500?
+    expect(t.said.toLowerCase()).toMatch(/per piece|each|all 500|whole job/);
+  }, 240_000);
+
+  it('jobs: "same as last time" is a new job with no copied BOM', async () => {
+    await resetDb(); await seedSettings();
+    const s = await storekeeper();
+    const c = await ok<{ id: string }>(save(s, 'create_party', { name: 'Brightline LED', role: 'CUSTOMER', city: 'Chennai' }));
+    const m = await ok<{ id: string }>(save(s, 'create_material', material('Varnish', { uom: 'LTR' })));
+    const first = await ok<{ id: string }>(save(s, 'create_job', { customerId: c.id, productDescription: 'LED driver transformer', quantity: 1200, jobDate: new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10) }));
+    await ok(save(s, 'set_job_bom', { jobId: first.id, lines: [{ materialId: m.id, qtyPerPiece: 0.005 }] }));
+    const r = await say(s, 'New job for Brightline LED, 300 pieces, same as last time');
+    expect(r.calls).not.toContain('set_job_bom');
+    expect(r.forms.every((f) => f.tool !== 'set_job_bom')).toBe(true);
+    expect(await prisma.jobBomLine.count()).toBe(1); // nothing was copied
+  }, 180_000);
 });

@@ -10,7 +10,7 @@ bottom of each milestone's section.
 - ✅ = Kasi already agreed. The owner should still hear it once.
 - ❓ = nobody has agreed yet. **These are the important ones.**
 
-Last updated: after milestone 4 (section G).
+Last updated: after milestone 5 (section H).
 
 ---
 
@@ -109,3 +109,22 @@ Last updated: after milestone 4 (section G).
 | G13 | ❓ | **Count date.** | May be today or earlier, never in the future. | ☐ OK ☐ Change: |
 | G14 | ❓ | **Who may count.** | Storekeeper and owner both (the owner as back-up). Only the owner approves or sends back. | ☐ OK ☐ Change: |
 | G15 | ❓ | **Stock value.** | "What is my total stock value?" is owner only (see A9). It uses each material's running average. | ☐ OK ☐ Storekeeper may see: |
+
+---
+
+## H. Added in milestone 5 — customers' POs, jobs and the BOM
+
+| # | Status | The question | What we did | Owner says |
+|---|---|---|---|---|
+| H1 | ✅ | **A repeat order is a new job with a new BOM.** | Nothing is ever copied from an old job. "Same as last time" still asks for the BOM. | ☐ OK ☐ Change: |
+| H2 | ✅ | **BOM quantities are per piece.** | The total for the whole job is worked out and shown before saving. If a number sounds like a total ("9.2 kg for this job") the assistant asks first. | ☐ OK ☐ Change: |
+| H3 | ❓ | **Grams and millilitres on the BOM form.** | Wire and varnish lines start in grams and millilitres (how the shop says it); the system keeps kilograms and litres. 18.4 g is stored as 0.0184 kg and the total shows in kg. | ☐ OK ☐ Change: |
+| H4 | ❓ | **Pieces per piece.** | A BOM line for pieces (cores, bobbins) must be a whole number: "2.5 cores each" is refused and asks about the unit. | ☐ OK ☐ Change: |
+| H5 | ❓ | **"Unusual" numbers are asked once.** | More than **1,00,000 pieces** on a job, or less than **0.0001** (kg, L, m) per piece on a BOM line, shows "Is that right?" with a tick. | ☐ OK ☐ Limits: |
+| H6 | ❓ | **A customer PO.** | Unique per customer (any capital or spacing counts as the same). A second entry of the same number says "already recorded" and adds nothing. Each item released under an open PO is its own job. | ☐ OK ☐ Change: |
+| H7 | ❓ | **Job date.** | Today by default; any date may be typed. A due date cannot be before the job date. | ☐ OK ☐ Change: |
+| H8 | ✅ | **A sample is its own job** linked to the production job it comes before (a sample of a sample is refused). Its cost is the company's. | | ☐ OK ☐ Change: |
+| H9 | ❓ | **Changing the BOM.** | Allowed only while nothing has been issued to the job; it replaces the whole BOM. After that, extra material is a top-up issue. | ☐ OK ☐ Change: |
+| H10 | ❓ | **Cancelling a job.** | Only while nothing has been issued, with a reason, and not while a sample job still hangs under it. The job stays in the list as "Cancelled". | ☐ OK ☐ Change: |
+| H11 | ❓ | **The shortage check.** | After a BOM is saved the system compares what the job still needs with what is in stock (it does not count what other open jobs also need) and offers a purchase order for the shortfall. | ☐ OK ☐ Also count other jobs: |
+| H12 | ❓ | **Settings for the owner.** | The owner has "Settings" in the menu under his name. It is a form, so it works even when the assistant is off. | ☐ OK ☐ Change: |

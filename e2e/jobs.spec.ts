@@ -23,6 +23,9 @@ async function seed() {
 
 /** New job sits behind More: the four most used forms take the row. */
 async function openNewJob(page: Page) {
+  // the buttons you use most move up into the row (top used first), so after the first job it is no longer behind More
+  const direct = buttons(page).getByRole('button', { name: /New job/ });
+  if (await direct.count()) { await direct.click(); return; }
   await buttons(page).getByRole('button', { name: 'More' }).first().click();
   await page.getByRole('menuitem', { name: /New job/ }).click();
 }
