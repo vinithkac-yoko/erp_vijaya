@@ -193,6 +193,7 @@ allowed and flagged. *Follow-ups:* scrap left in stock; flag over-sale.
 | `approve_stock_count` | W | **OW** | Normal: COUNT_ADJUSTMENT per difference at current average. Opening: OPENING per material with stock at its rate |
 | `reject_stock_count` | W | **OW** | Send back with a note |
 | `get_leak_report` | R | OW | `v_material_leak` (opening excluded), filter by period/material, ranked by value |
+| `get_count_history` | R | SK OW | Every count of a material, newest first: system quantity then, counted, difference, reason, who counted, which count. Nothing overwritten |
 
 Rules (full detail in BUSINESS_FLOW §11):
 - **Counts show the system quantity** (the owner chose that): `list_count_lines` returns
@@ -258,6 +259,14 @@ corrected by a later count). *Follow-ups:* new balance; notify the storekeeper.
 | `estimate_job_cost` | R | OW | What-if: open jobs' material cost now vs. if one material's rate changed (`materialNames`, `newRate`). Same costing as the report; nothing is saved |
 | `get_job_cost_report` | R | OW | `v_job_material_cost` for a period: per job cost, per piece, issued vs returned |
 | `get_activity` | R | OW | Audit events: who, what, when, from chat (agent), a button or an artifact. Filter by user, tool, date |
+
+**As built (milestone 8):** all owner reports and `get_count_history` are built. Dates may also be `@today`, `@today-7d` (days back) and `@month` (the first of this month).
+- `get_leak_report`: approved monthly counts only (the opening count never counts, a count still with the owner does not yet), optional period (`from`, `to`) and `materialNames`. Per material: differed X of Y counts, total short, worth at today's average rate (same arithmetic as `v_material_leak`), differences nobody explained (no reason or "Don't know"), and the reasons given. Ranked by value. Names no person.
+- `get_count_history`: both roles. Counted-by is the person who entered that line (the sheet's save counts too); the opening count shows what was counted with no difference.
+- `get_job_cost_report`: closed jobs by the day they closed, using the cost stored at close; `includeOpen` adds open jobs (cost so far) and `customerPoId` limits to one customer PO, so each job under a PO is costed separately. Cancelled jobs are never in it. The "issued vs returned" split is not in the rows (cost is value out less value back).
+- `estimate_job_cost`: jobs not yet closed; each material priced at today's average rate on the BOM quantity (or more, if more has gone out), against the same with the named materials at `newRate`. Saves nothing. A material with no rate yet counts as nothing and is said.
+- `get_activity`: newest first, 50; `jobId` gives every change to one job. "How" is the chat assistant, a form, a button or a page.
+- `get_stock_value` takes `materialNames` for one material's value.
 
 ## 11. Settings and users
 

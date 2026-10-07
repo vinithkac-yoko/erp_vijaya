@@ -15,13 +15,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const round4 = (n: number) => Math.round(n * 10_000) / 10_000;
 const emptyToUndef = (v: unknown) => (v === '' || v === null ? undefined : v);
 const idOpt = z.preprocess(emptyToUndef, z.string().min(1).max(64).optional());
-const istDate = (ymd: string) => new Date(`${ymd}T00:00:00+05:30`);
+export const istDate = (ymd: string) => new Date(`${ymd}T00:00:00+05:30`);
 const todayYmd = () => new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
 const validYmd = (s: string) => { const d = new Date(`${s}T00:00:00Z`); return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s; };
 
-/** A date as typed (2026-10-07) or as the assistant may say it (@today, @today-7d). */
-const dateIn = z.preprocess((v) => {
+/** A date as typed (2026-10-07) or as the assistant may say it (@today, @today-7d, @month for the first of this month). */
+export const dateIn = z.preprocess((v) => {
   if (v === '' || v === null || v === undefined) return undefined;
+  if (String(v).trim() === '@month') return `${todayYmd().slice(0, 8)}01`;
   const m = /^@today(?:-(\d{1,3})d)?$/.exec(String(v).trim());
   if (!m) return v;
   return new Date(new Date(`${todayYmd()}T00:00:00Z`).getTime() - Number(m[1] ?? 0) * 86_400_000).toISOString().slice(0, 10);

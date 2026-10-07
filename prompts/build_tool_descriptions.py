@@ -20,6 +20,7 @@ RATE = "Never fill in a rate yourself. If the user gave one, pass it; otherwise 
 IDS = "Ids come from earlier read-tool results; never show them to the user."
 NAMES = "Material names as returned by search_materials, e.g. [\"22 SWG Copper Wire\"]."
 DATE = "Date as YYYY-MM-DD (Asia/Kolkata)."
+DATE_REL = "Date as YYYY-MM-DD (Asia/Kolkata), or @today, @today-7d (days back), or @month (the first of this month)."
 
 T = {}
 
@@ -347,10 +348,19 @@ bobbins"). No stock moves. """ + FORM,
      {"stockCountId": "The count. " + IDS, "rejectionNote": "What to recount or fix — the storekeeper will read this."})
 
 tool("get_leak_report", "read", OW, """
-OWNER ONLY. Per material across approved normal counts (never the opening count): times counted, times
-mismatched, net and total shortage with units, rupee value, number of unexplained differences, and when
-last counted; ranked by value. State facts and numbers only — never guess who is responsible.""",
-     {"from": "From date. " + DATE, "to": "To date. " + DATE, "materialNames": "Only these materials. " + NAMES})
+OWNER ONLY. Per material across approved monthly counts (never the opening count): how many times it
+differed out of how many counts, the total short, what that is worth at today's average rate, how many
+differences were not explained, and the reasons given; ranked by rupee value. Use it for "where is my stock
+leaking", "which materials keep going missing" (look at how often each differed) and "how many unexplained
+differences this month" (from @month). It only reads approved counts. State facts and numbers only: never
+guess who is responsible, and say plainly that the system cannot tell who, if asked.""",
+     {"from": "Counts from this date. " + DATE_REL, "to": "Counts up to this date. " + DATE_REL, "materialNames": "Only these materials. " + NAMES})
+
+tool("get_count_history", "read", SK_OW, """
+Every time one material was counted, newest first: the system quantity at the time, what was counted, the
+difference, the reason, who counted it and which count it was. Nothing is ever overwritten. Use it for
+"show the bobbin count history" and "who counted the bobbins". Both roles may see the system quantity.""",
+     {"materialNames": "The material. " + NAMES, "materialId": "The material. " + IDS})
 
 # ─────────────────────────────── 9. Corrections ───────────────────────────────
 tool("reverse_movement", "write", OW, """
@@ -378,24 +388,30 @@ STANDING materials below their minimum level: on hand, minimum and shortfall, wi
 purchase order for the shortfall (rate empty).""")
 
 tool("get_stock_value", "read", OW, """
-OWNER ONLY. Total stock value and value per material at average rates.""")
+OWNER ONLY. Total stock value and value per material at average rates (quantity times average rate). Name materials to get
+only those, e.g. "value of copper wire in stock".""",
+     {"materialNames": "Only these materials. " + NAMES})
 
 tool("estimate_job_cost", "read", OW, """
-OWNER ONLY. What-if: open jobs' material cost now versus if one material's rate changed — e.g. copper
-at ₹900/kg. Same costing as the job cost report. Nothing is saved and no price changes anywhere. Use it
-for "what if copper goes to…" questions and in what-if artifacts.""",
+OWNER ONLY. What-if: the material cost of the jobs not yet closed at today's average rates, against the same
+with one material's rate changed — e.g. copper at ₹900/kg. Same costing as the job cost report. Nothing is
+saved and no price changes anywhere. Use it for "what if copper goes to…" questions and in what-if artifacts.
+Never do the sums yourself.""",
      {"jobIds": "Only these jobs; leave out for all open jobs. " + IDS, "materialNames": "The material whose rate changes. " + NAMES,
       "newRate": "The rate to try, in ₹ per unit. This is a what-if input, not a price."})
 
 tool("get_job_cost_report", "read", OW, """
-OWNER ONLY. Closed jobs in a period: customer, product, pieces, value issued and returned, material
-cost and cost per piece.""",
-     {"from": "Closed from. " + DATE, "to": "Closed to. " + DATE, "customerId": "One customer. " + IDS})
+OWNER ONLY. Material cost per job: pieces, cost (value issued less value returned) and cost per piece. By
+default the jobs closed in the period; set includeOpen for open jobs too (their cost so far), which is also
+how to see every job under one customer PO, each costed separately.""",
+     {"from": "From (closed on or after; job date when includeOpen). " + DATE_REL, "to": "To. " + DATE_REL, "customerId": "One customer. " + IDS,
+      "customerPoId": "Only jobs under this customer PO, from list_customer_pos. " + IDS, "includeOpen": "true to include jobs that are not closed yet."})
 
 tool("get_activity", "read", OW, """
-OWNER ONLY. Who did what and when, and whether from chat, a button or an artifact. Filter by person, tool or
-date.""",
-     {"userId": "One person. " + IDS, "from": "From. " + DATE, "to": "To. " + DATE, "tool": "One kind of action, e.g. issue_material."})
+OWNER ONLY. Who did what and when, newest first, and whether it was done through the chat assistant, a
+form, a button or an artifact. Filter by person, kind of action, date or one job (every change to that job).
+Use it for "everything the agent did today" (from @today) and "all changes to job 31".""",
+     {"userId": "One person. " + IDS, "from": "From. " + DATE_REL, "to": "To. " + DATE_REL, "tool": "One kind of action, e.g. issue_material.", "jobId": "Only changes to this job. " + IDS})
 
 # ─────────────────────────────── 11. Settings and users ───────────────────────────────
 tool("list_settings", "read", SK_OW, """
