@@ -36,7 +36,7 @@ export const TOOLS: Record<string, ToolMeta> = Object.fromEntries(
         outputs: ['material', 'unit', 'quantity', 'averageRate', 'value', 'minimumLevel', 'stockType', 'isNegative', 'belowMinimum'], bindOnly: ['materialId'] }),
     t({ name: 'get_movement_history', kind: 'read', roles: BOTH, inputs: { materialId: {}, materialNames: {}, jobId: {}, from: {}, to: {} },
         outputs: ['date', 'type', 'material', 'unit', 'quantity', 'rate', 'value', 'document', 'job', 'by', 'source', 'balanceAfter'], bindOnly: ['id', 'materialId', 'jobId'] }),
-    t({ name: 'create_material', kind: 'write', roles: BOTH, inputs: { name: { required: true }, uom: { required: true }, stockType: { required: true }, minimumLevel: {}, hsnCode: {}, gstRate: {}, isScrap: {} } }),
+    t({ name: 'create_material', kind: 'write', roles: BOTH, inputs: { name: { required: true }, uom: { required: true }, stockType: { required: true }, minimumLevel: {}, hsnCode: {}, gstRate: {}, isScrap: {}, confirmNotDuplicate: {} } }),
     t({ name: 'update_material', kind: 'write', roles: BOTH, inputs: { materialId: { required: true }, name: {}, minimumLevel: {}, hsnCode: {}, gstRate: {} } }),
     t({ name: 'deactivate_material', kind: 'write', roles: BOTH, inputs: { materialId: { required: true }, reason: {} } }),
     // ── parties ──
@@ -125,6 +125,7 @@ export const TOOLS: Record<string, ToolMeta> = Object.fromEntries(
     t({ name: 'mark_notifications_read', kind: 'write', roles: BOTH, inputs: { notificationIds: { required: true } } }),
     t({ name: 'list_users', kind: 'read', roles: OWNER, inputs: {}, outputs: ['name', 'role', 'active'], bindOnly: ['id'] }),
     t({ name: 'create_user', kind: 'write', roles: OWNER, inputs: { name: { required: true }, login: { required: true }, role: { required: true } } }),
+    t({ name: 'reset_user_password', kind: 'write', roles: OWNER, inputs: { userId: { required: true } } }),
     t({ name: 'deactivate_user', kind: 'write', roles: OWNER, inputs: { userId: { required: true } } }),
     t({ name: 'list_settings', kind: 'read', roles: BOTH, inputs: {}, outputs: ['setting', 'value'] }),
     t({ name: 'update_setting', kind: 'write', roles: OWNER, inputs: { key: { required: true }, value: { required: true } } }),

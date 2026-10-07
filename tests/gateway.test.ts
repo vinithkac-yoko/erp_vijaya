@@ -7,7 +7,7 @@ import { Registry } from '@/server/tools/registry';
 import { registry as productionRegistry } from '@/server/tools';
 import { createRunTool } from '@/server/tools/run-tool';
 import { expectPlain, prisma, resetDb } from './helpers/db';
-import { openForm, registry, resetSeen, runTool, seen, session } from './helpers/gateway';
+import { openForm, registry, resetSeen, runTool, seen, session, W } from './helpers/gateway';
 
 beforeEach(async () => { await resetDb(); resetSeen(); });
 afterAll(() => prisma.$disconnect());
@@ -23,9 +23,9 @@ describe('defineTool — a tool that disagrees with the catalog never starts', (
       expect(() => defineTool({ name, kind: 'read', roles: ['OWNER'], input: z.object({}), handler: async () => ({}) })).toThrow(/not in the catalog/);
   });
   it('refuses missing roles, the wrong kind, and roles that differ from the catalog', () => {
-    expect(() => defineTool({ name: 'create_material', kind: 'write', roles: [], input: z.object({}), handler: noop })).toThrow(/must declare its roles/);
+    expect(() => defineTool({ name: 'create_material', kind: 'write', ...W, roles: [], input: z.object({}), handler: noop })).toThrow(/must declare its roles/);
     expect(() => defineTool({ name: 'create_material', kind: 'read', roles: ['OWNER', 'STOREKEEPER'], input: z.object({}), handler: async () => ({}) })).toThrow(/catalog/);
-    expect(() => defineTool({ name: 'create_user', kind: 'write', roles: ['OWNER', 'STOREKEEPER'], input: z.object({}), handler: noop })).toThrow(/roles/);
+    expect(() => defineTool({ name: 'create_user', kind: 'write', ...W, roles: ['OWNER', 'STOREKEEPER'], input: z.object({}), handler: noop })).toThrow(/roles/);
   });
   it('takes the model-facing text from prompts/tool-descriptions.json, never from the caller', () => {
     const t = registry.get('create_material');

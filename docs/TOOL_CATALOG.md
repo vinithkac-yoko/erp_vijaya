@@ -40,7 +40,7 @@ and role in its context).
 | `deactivate_material` | W | SK OW | Only with zero stock |
 
 **create_material** — errors: `SIMILAR_MATERIAL_EXISTS` (returns the matches; the form offers
-"this is a different material"), `MATERIAL_EXISTS`, `MINIMUM_REQUIRED`.
+"this is a different material", which sets `confirmNotDuplicate`), `MATERIAL_EXISTS`, `MINIMUM_REQUIRED`.
 **update_material** — `UNIT_LOCKED` explains why unit/stock type can't change.
 **deactivate_material** — `MATERIAL_HAS_STOCK`.
 
@@ -221,6 +221,7 @@ corrected by a later count). *Follow-ups:* new balance; notify the storekeeper.
 | `update_setting` | W | **OW** | Known keys only, validated by type |
 | `list_users` | R | OW | Name, role, active |
 | `create_user` | W | **OW** | Name, email or username, role, initial password |
+| `reset_user_password` | W | **OW** | A new password for someone who forgot theirs (min 10 characters). The owner types it in the form |
 | `deactivate_user` | W | **OW** | Never the last active owner |
 
 Tools that need a setting read it server-side; they never take it from the caller.

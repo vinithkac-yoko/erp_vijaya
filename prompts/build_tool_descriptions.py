@@ -72,7 +72,8 @@ STANDING materials need a minimum level. """ + FORM,
       "stockType": "STANDING (kept in stock, needs a minimum) or PER_JOB (bought only for a job).",
       "minimumLevel": "Reorder level in the material's unit. Required for STANDING; leave empty for PER_JOB.",
       "hsnCode": "HSN code, if the user has it.", "gstRate": "GST %, if the user has it (e.g. 18).",
-      "isScrap": "true only for scrap materials such as copper offcuts."})
+      "isScrap": "true only for scrap materials such as copper offcuts.",
+      "confirmNotDuplicate": "true only after the user has said a similar existing material is a different one."})
 
 tool("update_material", "write", SK_OW, """
 Opens the form to change a material's name, minimum level, HSN code or GST rate. It cannot change the
@@ -407,6 +408,11 @@ tool("create_user", "write", OW, """
 OWNER ONLY. Opens the form to add a login. The owner types the initial password in the form; never put
 a password in the chat or in this call. """ + FORM,
      {"name": "The person's full name.", "login": "Email or username.", "role": "STOREKEEPER or OWNER."})
+
+tool("reset_user_password", "write", OW, """
+OWNER ONLY. Opens the form to set a new password for someone who forgot theirs. The owner types the new
+password in the form; never put a password in the chat or in this call. """ + FORM,
+     {"userId": "The person. " + IDS})
 
 tool("deactivate_user", "write", OW, """
 OWNER ONLY. Opens the form to stop a person logging in. The last active owner can't be deactivated.

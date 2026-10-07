@@ -7,11 +7,11 @@
 import { Prisma } from '@prisma/client';
 import { ZodError } from 'zod';
 
-export interface MappedError { code: string; message: string }
+export interface MappedError { code: string; message: string; field?: string; details?: unknown }
 
-/** Thrown by tool handlers for business rules. The message is already plain words. */
+/** Thrown by tool handlers for business rules. The message is already plain words. `field` puts it next to a form field. */
 export class ToolError extends Error {
-  constructor(public readonly code: string, message: string, public readonly details?: unknown) {
+  constructor(public readonly code: string, message: string, public readonly details?: unknown, public readonly field?: string) {
     super(message);
     this.name = 'ToolError';
   }
@@ -137,9 +137,15 @@ function uniqueName(err: Prisma.PrismaClientKnownRequestError): string | undefin
   return `${table}_${target.join('_')}_key`;
 }
 
+/** The form field a validation message belongs to (the first path step of the first issue). */
+export function fieldOf(err: ZodError): string | undefined {
+  const first = err.issues[0]?.path[0];
+  return typeof first === 'string' ? first : undefined;
+}
+
 export function mapError(err: unknown): MappedError {
-  if (err instanceof ToolError) return { code: err.code, message: err.message };
-  if (err instanceof ZodError) return e('INVALID_INPUT', err.issues[0]?.message || 'Please check what you typed.');
+  if (err instanceof ToolError) return { code: err.code, message: err.message, field: err.field, details: err.details };
+  if (err instanceof ZodError) return { ...e('INVALID_INPUT', err.issues[0]?.message || 'Please check what you typed.'), field: fieldOf(err) };
 
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2002') return (uniqueName(err) && mapConstraint(uniqueName(err) as string)) || e('ALREADY_EXISTS', 'That already exists.');

@@ -1,10 +1,10 @@
 import { Prisma, type PendingAction, type PrismaClient } from '@prisma/client';
 import { db } from '../db';
-import { mapError, ToolError, UNKNOWN_CONSTRAINT } from '../errors';
+import { fieldOf, mapError, ToolError, UNKNOWN_CONSTRAINT } from '../errors';
 import type { Registry } from './registry';
 import type { Actor, RunOptions, Tx, ToolOutcome, ToolSession } from './types';
 
-const fail = (code: string, message: string): ToolOutcome<never> => ({ ok: false, code, message });
+const fail = (code: string, message: string, field?: string, details?: unknown): ToolOutcome<never> => ({ ok: false, code, message, ...(field ? { field } : {}), ...(details !== undefined ? { details } : {}) });
 
 /** Anything that looks like a secret never goes into the audit log, whatever a tool hands us (SAFETY T19). */
 const SECRET_KEY = /pass(word)?|hash|secret|token|api[_-]?key/i;
@@ -50,7 +50,7 @@ export function createRunTool(registry: Registry, client: PrismaClient = db) {
         return fail('FORBIDDEN_ROLE', tool.roles.length === 1 && tool.roles[0] === 'OWNER' ? 'Only the owner can do that.' : "You can't do that.");
       }
       const parsed = tool.input.safeParse(input ?? {});
-      if (!parsed.success) return fail('INVALID_INPUT', parsed.error.issues[0]?.message || 'Please check what you typed.');
+      if (!parsed.success) return fail('INVALID_INPUT', parsed.error.issues[0]?.message || 'Please check what you typed.', fieldOf(parsed.error));
 
       const now = new Date();
       if (tool.kind === 'read') {
@@ -107,7 +107,7 @@ export function createRunTool(registry: Registry, client: PrismaClient = db) {
         // For us, not for the screen. No input values, no stack.
         console.error(`[runTool] ${name} failed:`, err instanceof Error ? `${err.name}: ${err.message.slice(0, 500)}` : 'unknown error');
       }
-      return fail(mapped.code, mapped.message);
+      return fail(mapped.code, mapped.message, mapped.field, mapped.details);
     }
   };
 }

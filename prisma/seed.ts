@@ -8,6 +8,7 @@
 import { randomInt } from 'node:crypto';
 import { PrismaClient, type UserRole } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { SETTINGS } from '../src/lib/settings';
 
 const prisma = new PrismaClient();
 const ifEmpty = process.argv.includes('--if-empty');
@@ -32,7 +33,19 @@ function seedUser(role: UserRole, prefix: 'OWNER' | 'STOREKEEPER', defaults: { n
   };
 }
 
+/** The settings the system needs from day one. Written once; a value the owner changed is never overwritten. */
+async function ensureSettings() {
+  for (const def of SETTINGS) {
+    await prisma.setting.upsert({
+      where: { key: def.key },
+      create: { key: def.key, value: def.initial, valueType: def.type, description: def.help },
+      update: {},
+    });
+  }
+}
+
 async function main() {
+  await ensureSettings();
   if (ifEmpty && (await prisma.user.count()) > 0) {
     console.log('[seed] Users already exist. Nothing to do.');
     return;

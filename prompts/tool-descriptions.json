@@ -60,7 +60,8 @@
     "minimumLevel": "Reorder level in the material's unit. Required for STANDING; leave empty for PER_JOB.",
     "hsnCode": "HSN code, if the user has it.",
     "gstRate": "GST %, if the user has it (e.g. 18).",
-    "isScrap": "true only for scrap materials such as copper offcuts."
+    "isScrap": "true only for scrap materials such as copper offcuts.",
+    "confirmNotDuplicate": "true only after the user has said a similar existing material is a different one."
    }
   },
   "update_material": {
@@ -769,6 +770,17 @@
     "name": "The person's full name.",
     "login": "Email or username.",
     "role": "STOREKEEPER or OWNER."
+   }
+  },
+  "reset_user_password": {
+   "kind": "write",
+   "roles": [
+    "OWNER"
+   ],
+   "agent": true,
+   "description": "OWNER ONLY. Opens the form to set a new password for someone who forgot theirs. The owner types the new password in the form; never put a password in the chat or in this call. Calling this opens the form for the user to check and submit; nothing is saved until they submit it. Pass everything you can work out and leave the rest for the form.",
+   "inputs": {
+    "userId": "The person. Ids come from earlier read-tool results; never show them to the user."
    }
   },
   "deactivate_user": {

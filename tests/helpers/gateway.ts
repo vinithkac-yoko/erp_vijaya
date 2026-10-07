@@ -9,6 +9,9 @@ import { nextCode } from '@/server/tools/numbers';
 import type { ToolSession } from '@/server/tools/types';
 import { makeUser, prisma } from './db';
 
+/** The parts every write tool must now carry (a form, a stamp, a description for the saved card). */
+export const W = { form: { title: 'Test form', verb: 'Save', fields: [] }, stamp: 'TEST SAVED', describe: () => [] as string[] };
+
 /** What the test tools saw, so a test can prove a handler was (or was not) reached. */
 export const seen = { createMaterial: [] as unknown[], listJobs: 0, createUser: 0 };
 export const resetSeen = () => { seen.createMaterial.length = 0; seen.listJobs = 0; seen.createUser = 0; };
@@ -16,7 +19,7 @@ export const resetSeen = () => { seen.createMaterial.length = 0; seen.listJobs =
 // Real catalog names (the gateway refuses anything else), test handlers.
 const tools = [
   defineTool({
-    name: 'create_material', kind: 'write', roles: ['STOREKEEPER', 'OWNER'],
+    name: 'create_material', kind: 'write', ...W, roles: ['STOREKEEPER', 'OWNER'],
     input: z.object({ name: z.string().min(1, 'Type the name.'), uom: z.enum(['KG', 'NOS', 'MTR', 'LTR']) }),
     handler: async (ctx, input) => {
       seen.createMaterial.push(input);
@@ -27,7 +30,7 @@ const tools = [
     },
   }),
   defineTool({
-    name: 'create_user', kind: 'write', roles: ['OWNER'],
+    name: 'create_user', kind: 'write', ...W, roles: ['OWNER'],
     input: z.object({ name: z.string().min(1), login: z.string().min(3), role: z.enum(['OWNER', 'STOREKEEPER']), password: z.string().min(10).optional() }),
     handler: async (ctx, input) => {
       seen.createUser++;
@@ -43,7 +46,7 @@ const tools = [
   }),
   // a write that breaks half-way through
   defineTool({
-    name: 'cancel_job', kind: 'write', roles: ['STOREKEEPER', 'OWNER'],
+    name: 'cancel_job', kind: 'write', ...W, roles: ['STOREKEEPER', 'OWNER'],
     input: z.object({ jobId: z.string(), reason: z.string() }),
     handler: async (ctx) => {
       await ctx.db.material.create({ data: { code: await nextCode(ctx.db, 'MAT'), name: 'Half done', nameKey: 'halfdone', uom: 'KG', stockType: 'PER_JOB' } });
@@ -52,7 +55,7 @@ const tools = [
   }),
   // a write that the DATABASE refuses (a CHECK) after writing something
   defineTool({
-    name: 'issue_material', kind: 'write', roles: ['STOREKEEPER', 'OWNER'],
+    name: 'issue_material', kind: 'write', ...W, roles: ['STOREKEEPER', 'OWNER'],
     input: z.object({ materialId: z.string(), quantity: z.number() }),
     handler: async (ctx, input) => {
       await ctx.db.stockMovement.create({ data: { materialId: input.materialId, type: 'SCRAP_IN', direction: 'IN', quantity: input.quantity, rate: 0, movementDate: ctx.now } });
@@ -61,13 +64,13 @@ const tools = [
   }),
   // a write with a rate field, to prove a rate is never pre-filled
   defineTool({
-    name: 'record_scrap_sale', kind: 'write', roles: ['STOREKEEPER', 'OWNER'],
+    name: 'record_scrap_sale', kind: 'write', ...W, roles: ['STOREKEEPER', 'OWNER'],
     input: z.object({ quantity: z.number(), rate: z.number(), invoiceNo: z.string().optional() }),
     handler: async () => ({ data: {}, audit: { entityType: 'ScrapSale', entityId: 'x', action: 'CREATE' } }),
   }),
   // a write that forgets to say what it did
   defineTool({
-    name: 'deactivate_material', kind: 'write', roles: ['STOREKEEPER', 'OWNER'],
+    name: 'deactivate_material', kind: 'write', ...W, roles: ['STOREKEEPER', 'OWNER'],
     input: z.object({ materialId: z.string() }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     handler: (async (ctx: any, input: { materialId: string }) => {
