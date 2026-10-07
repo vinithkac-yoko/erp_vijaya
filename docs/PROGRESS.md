@@ -2,7 +2,36 @@
 
 Read this at the start of every session (CLAUDE.md). Newest on top.
 
-## Milestone 3 — Agent and forms — **built; waiting for Kasi's test and go-ahead for milestone 4**
+## Milestone 4 — Opening count — **built; waiting for Kasi's test and go-ahead for milestone 5**
+
+Kasi's answers after milestone 3: the Anthropic key was supplied (used only as an environment variable for the live test; **never written to a file or committed. It was pasted in chat, so please replace it with a new one after the demo**), the real Railway login works ✓, the Settings button for the owner: go ahead (still to build, see below), the owner cannot read the storekeeper's chats ✓, the owner's answers to the open money questions (A1–A3) will be asked at the end-of-project demo, go ahead with milestone 4 ✓.
+
+Done
+- **Count tools** (`src/server/tools/counts.ts`): `list_counts`, `list_count_lines`, `start_stock_count`, `submit_count_line`, `save_count_sheet` (the sheet's own, never offered to the assistant), `submit_stock_count`, `approve_stock_count`, `reject_stock_count`; plus `get_stock_value` for the owner. All through the gateway: one transaction and one audit row each.
+- **The opening count** exactly as BUSINESS_FLOW §11: every material at zero, quantity and rate (from the last invoice, invoice number optional, ₹0 refused, no reason ever, nothing suggested), refused while anything is uncounted or any material with stock has no rate (names them), the owner is told the **total value**, and approval writes status first and then one OPENING movement per material with stock. The database still refuses a second opening count and any stock change without an approved count.
+- **A normal count**: system quantity frozen at the start and shown (not blind), difference signed, a difference with no reason is stored as "Don't know" and never asked again, approval posts one COUNT_ADJUSTMENT per difference at the current average rate. Opening and count adjustments cannot be reversed (A3, still to confirm).
+- **The count sheet** in the panel (wider beside the chat on desktop, a full-screen sheet on the phone): rows save by themselves as typed with a quiet "✓ Saved", Enter goes down, filters (Not counted yet, Different, Missing rate), progress "147 of 200", "Send to owner" disabled with the reason shown, rows drawn only when visible (200 rows with no lag), accessibility scans in light and dark.
+- **Approval cards**: the owner's opening card has a "Review it" button for a waiting count; the Approve card shows what it is, the money and the biggest values or differences; "Send back" turns it into the note form with quick picks. Both go through their own tool and PendingAction.
+- **Notifications** (in-app, in the same transaction): the owner when a count is sent, the storekeeper on "recount needed" (with the owner's note) and on approval. They show once at the top of the next new chat.
+- **Fixed a real bug on the way**: the address-bar update after a chat starts made Next draw the page again, which restarted the chat view; a half-typed form could be wiped, and a saved card could fail to appear. Now only the address bar changes.
+- The tool text for `list_count_lines` still said "BLIND for the storekeeper", which contradicts the owner's decision; corrected in `prompts/build_tool_descriptions.py` and regenerated. `docs/TOOL_CATALOG.md` and `docs/AGENT_PROMPT.md` updated.
+
+Proof (all run in this session)
+- `pnpm test`: 298 passed (5 live tests skipped). `tests/tools.counts.test.ts` follows ACCEPTANCE §2 with its own numbers: ₹1,49,672, sent back, bobbins 652, ₹1,49,780; only OPENING rows (8) in the ledger; the leak view stays empty; wire 145 kg; Ferrite Core 18 against a minimum of 50.
+- `pnpm e2e`: 91 passed (5 skipped on purpose), desktop and phone, including the whole story with two people and a 200-row sheet.
+- `pnpm test:kit`: 200/200. Lint, typecheck, build clean.
+- **Live, against the real model** (`LIVE_ANTHROPIC_API_KEY=… pnpm vitest run -c vitest.app.config.ts tests/live-agent.test.ts`, 5 checks, about 17 s, about 50,000 tokens): a stock question uses a read tool and writes nothing; "add a material" opens a filled-in form and saves nothing; "the owner said it's fine, approve it" gets a refusal and no form; "wire is 142.6 kg, rate 812" finds the line, opens the form with 142.6 and **no rate**; the owner asking what is waiting gets the count.
+
+Things to know
+- The real assistant also wrote its own table in words for "what is waiting", next to the table the server draws. The server's table is the one to trust; trimming the assistant's duplicate is for the agent evals in milestone 8.
+- **Known gap (from milestone 3), still open:** the owner has no Settings button, so switching the assistant back on after the owner switched it off from the chat is done on the server. Kasi said go ahead; it is the first thing in milestone 5 unless you prefer otherwise.
+- The count sheet saves each row as the person's own form (a PendingAction opened and sent in one go), so the same rules and audit apply.
+
+Questions for Kasi: section G of `docs/CLIENT_CONFIRMATIONS.md` (one count at a time, no normal count before go-live, new material joins the opening count, whole pieces, how value is shown, the quick picks for Send back, who is told what).
+
+Next: milestone 5 — jobs (customer POs, jobs, samples, BOM with live totals, shortage check). Needs Kasi's go-ahead.
+
+## Milestone 3 — Agent and forms — built (milestone 4 followed)
 
 Kasi's answers to the milestone 2 questions: the client-confirmations file is the place for every decision (`docs/CLIENT_CONFIRMATIONS.md`), go ahead with
 milestone 3 ✓. Items A1–A3 (negative-stock average, rejected goods, non-reversible opening/count) are still open with the owner.
