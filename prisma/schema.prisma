@@ -1,0 +1,936 @@
+// Vijaya Stores — schema. Source of truth for tables.
+// Everything Prisma cannot express (triggers, CHECKs, views) is in prisma/migrations/*_ledger_guards, which `migrate deploy`
+// applies on every start. See docs/SAFETY.md T17 and src/server/guards.ts (the boot check).
+//
+// RULES: stock_movements is the append-only ledger; stock_balances is derived by a trigger; nothing is deleted
+// (mistakes are corrected by reversal entries, masters are deactivated); every write has an audit event;
+// document numbers are per Indian financial year.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  STOREKEEPER
+}
+
+enum ActorType {
+  HUMAN
+  AGENT
+}
+
+enum OpenedFrom {
+  CHAT
+  LAUNCHER
+  ARTIFACT
+  AGENT
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  /// Login name. Stored lowercase (a CHECK enforces it).
+  email        String   @unique
+  phone        String?
+  role         UserRole
+  /// bcrypt hash. Never plaintext, never returned by any tool.
+  passwordHash String
+  isActive     Boolean  @default(true)
+  /// "light" | "dark" | null (follow the device)
+  theme        String?
+  /// Last time this person did anything (read at most every 5 minutes). Drives the idle log-out.
+  lastActiveAt DateTime?
+  /// Goes up when the owner resets this person's password: every session made before that stops working.
+  sessionEpoch Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  movementsCreated StockMovement[] @relation("MovementActor")
+  posApproved      PurchaseOrder[] @relation("PoApprover")
+  posCreated       PurchaseOrder[] @relation("PoCreator")
+  countsCounted    StockCount[]    @relation("CountCounter")
+  countsApproved   StockCount[]    @relation("CountApprover")
+  notifications    Notification[]
+  auditEvents      AuditEvent[]
+  pendingActions   PendingAction[]
+  conversations    Conversation[]
+  agentRuns        AgentRun[]
+  artifacts        Artifact[]      @relation("ArtifactOwner")
+  sharesReceived   ArtifactShare[] @relation("ShareTo")
+  sharesGiven      ArtifactShare[] @relation("ShareBy")
+
+  @@map("users")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  PLATFORM CORE  (shared by every future module)
+// ═══════════════════════════════════════════════════════════════════
+
+/// Unified party table. Vijaya's suppliers and customers live here.
+/// A party can be both (some component vendors also buy scrap).
+model Party {
+  id          String   @id @default(uuid())
+  code        String   @unique // auto: PTY-0001 — internal, hidden from storekeeper
+  name        String
+  /// Normalized name used to detect duplicates: lowercase, no spaces/punctuation, no trailing
+  /// "Pvt Ltd"/"Ltd"/"Co" etc. "M/s Sundaram Ferrites Pvt. Ltd." → "sundaramferrites".
+  /// Computed ONLY by partyNameKey() (src/lib/names.ts) — never set it by hand.
+  nameKey     String   @unique
+  isSupplier  Boolean  @default(false)
+  isCustomer  Boolean  @default(false)
+  /// Stored uppercase, no spaces. One GSTIN = one business, so it's unique.
+  gstin       String?  @unique
+  addressLine String?
+  city        String?
+  state       String?
+  pincode     String?
+  phone       String?
+  email       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+  goodsReceipts  GoodsReceipt[]
+  customerPos    CustomerPo[]
+  jobs           Job[]
+  scrapSales     ScrapSale[]
+
+  @@index([isSupplier])
+  @@index([isCustomer])
+  @@index([name])
+  @@map("parties")
+}
+
+/// Runtime configuration the OWNER sets from inside the app.
+/// PO approval threshold, count-difference approval threshold, etc.
+/// Never hardcode a business rule that the owner might want to move.
+model Setting {
+  id          String   @id @default(uuid())
+  key         String   @unique // e.g. "po.approval_threshold_inr"
+  value       String // stored as text, cast by the tool layer
+  valueType   String   @default("string") // string | number | boolean | json
+  description String?
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("settings")
+}
+
+/// Human-readable document numbering, reset every Indian FY (Apr–Mar).
+/// financialYear stored as "2627" for FY 2026-27 → "GRN-2627-0042"
+model NumberSeries {
+  id            String @id @default(uuid())
+  docType       String // PO | GRN | JOB | CNT | SCS | RTS
+  prefix        String
+  financialYear String
+  lastNumber    Int    @default(0)
+  padding       Int    @default(4)
+
+  @@unique([docType, financialYear])
+  @@map("number_series")
+}
+
+/// Full visibility into everything, human or agent. Phase 1, not later.
+model AuditEvent {
+  id              String     @id @default(uuid())
+  entityType      String // "StockMovement", "PurchaseOrder", ...
+  entityId        String
+  action          String // CREATE | UPDATE | APPROVE | REJECT | REVERSE
+  actorType       ActorType
+  actorId         String?
+  agentRunId      String? // ties a change back to an agent conversation
+  toolName        String? // which tool the agent called
+  reason          String?
+  /// Where the person was when they did it: a chat form, a launcher button, an artifact, or the assistant's proposal.
+  /// The launcher's "top used first" order is counted from the LAUNCHER rows.
+  openedFrom      OpenedFrom @default(CHAT)
+  /// The PendingAction that was submitted (every write has one).
+  pendingActionId String?
+  /// Set when the form was opened from an artifact.
+  artifactId      String?
+  artifactVersion Int?
+  beforeJson      Json?
+  afterJson       Json?
+  createdAt       DateTime   @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([agentRunId])
+  @@index([createdAt])
+  @@index([actorId, openedFrom, toolName])
+  @@map("audit_events")
+}
+
+enum NotificationType {
+  MIN_LEVEL_BREACH
+  PO_PENDING_APPROVAL
+  COUNT_PENDING_APPROVAL
+  UNEXPLAINED_VARIANCE
+  NEGATIVE_STOCK_WARNING
+  RECOUNT_REQUIRED
+  // used by the post-submit follow-ups (post-submit-followups.json)
+  PO_APPROVED
+  PO_REJECTED
+  RATE_CHANGE
+  JOB_VARIANCE
+  COUNT_APPROVED
+  MOVEMENT_REVERSED
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String
+  type        NotificationType
+  title       String
+  body        String
+  entityType  String?
+  entityId    String?
+  readAt      DateTime?
+  emailSentAt DateTime?
+  createdAt   DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+/// Generic attachment: supplier invoice photo, weighbridge slip, test cert.
+model Attachment {
+  id           String   @id @default(uuid())
+  entityType   String
+  entityId     String
+  fileName     String
+  fileUrl      String
+  mimeType     String?
+  sizeBytes    Int?
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@map("attachments")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  MATERIAL MASTER
+// ═══════════════════════════════════════════════════════════════════
+
+/// Buy unit ALWAYS equals issue unit at Vijaya — confirmed.
+/// So: one unit per material, no conversion factors anywhere.
+enum Uom {
+  KG
+  NOS // pieces — cores, bobbins, pins, stickers
+  MTR // tape, sleeve
+  LTR // varnish, paint, thinner
+  ROLL
+  SET
+}
+
+/// STANDING  = bought in advance, sits in store, gets a minimum level
+/// PER_JOB   = bought against a specific job's BOM
+enum StockType {
+  STANDING
+  PER_JOB
+}
+
+model Material {
+  id      String @id @default(uuid())
+  /// Auto-generated internal code (MAT-0001). NEVER shown to the
+  /// storekeeper — he only ever sees `name`. He must not learn codes.
+  code    String @unique
+  /// Exactly how the notebook writes it: "22 SWG Copper Wire"
+  name    String
+  /// Normalized name (lowercase, letters and digits only): "22 SWG Copper Wire" and "22 swg copper-wire" are the same
+  /// material. Computed ONLY by materialNameKey() (src/lib/names.ts).
+  nameKey String @unique
+
+  uom       Uom
+  stockType StockType @default(PER_JOB)
+
+  /// Only meaningful when stockType = STANDING. Breach → in-app alert.
+  minimumLevel Decimal? @db.Decimal(18, 4)
+
+  hsnCode String?
+  gstRate Decimal? @db.Decimal(5, 2)
+
+  isScrap  Boolean @default(false) // copper scrap collected & sold
+  isActive Boolean @default(true)
+
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  balance    StockBalance?
+  movements  StockMovement[]
+  poLines    PurchaseOrderLine[]
+  grnLines   GoodsReceiptLine[]
+  bomLines   JobBomLine[]
+  countLines StockCountLine[]
+  scrapSales ScrapSale[]
+
+  @@index([name])
+  @@index([stockType, isActive])
+  @@map("materials")
+}
+
+/// DERIVED. Never written directly — only by the movement transaction.
+/// One row per material, created with the material.
+model StockBalance {
+  materialId  String  @id
+  quantity    Decimal @default(0) @db.Decimal(18, 4)
+  /// Weighted average. Recalculated ONLY on inward movements.
+  averageRate Decimal @default(0) @db.Decimal(18, 4)
+  /// quantity × averageRate, maintained by the same transaction.
+  stockValue  Decimal @default(0) @db.Decimal(18, 2)
+
+  lastMovementAt DateTime?
+  lastCountedAt  DateTime?
+  updatedAt      DateTime  @updatedAt
+
+  material Material @relation(fields: [materialId], references: [id])
+
+  @@map("stock_balances")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  THE LEDGER  — append-only, source of truth
+// ═══════════════════════════════════════════════════════════════════
+
+enum MovementType {
+  OPENING // day-one physical count of ~200 materials
+  RECEIPT // accepted qty from a GRN
+  ISSUE // storekeeper issues against a job (all at job start)
+  RETURN // leftover comes back at job close  ← finds the leak
+  REJECT_RETURN // inspected-and-rejected material sent back to supplier
+  SCRAP_IN // copper scrap collected off the floor
+  SCRAP_SALE // scrap sold out
+  COUNT_ADJUSTMENT // ONLY from an owner-approved StockCount
+  REVERSAL // corrects an earlier movement; never an edit
+}
+
+enum MovementDirection {
+  IN
+  OUT
+}
+
+model StockMovement {
+  id         String            @id @default(uuid())
+  materialId String
+  type       MovementType
+  direction  MovementDirection
+
+  /// Always POSITIVE. Direction carries the sign.
+  quantity Decimal @db.Decimal(18, 4)
+
+  /// Rate SNAPSHOT at the moment of movement, so history survives every future change to the weighted average.
+  /// For every OUT movement, RETURN and COUNT_ADJUSTMENT the DATABASE sets it to the current average, and for OPENING to
+  /// the count line's rate; whatever the caller passes is ignored there. Only RECEIPT, SCRAP_IN and a reversal that
+  /// brings stock back carry a caller-supplied rate.
+  rate  Decimal @db.Decimal(18, 4)
+  value Decimal @default(0) @db.Decimal(18, 2)
+
+  /// Running balance AFTER this movement. Makes the ledger auditable
+  /// without replaying it, and makes a tampered row obvious.
+  /// The three columns below are stamped by trg_apply_stock_movement; code never sets them.
+  balanceQtyAfter   Decimal @default(0) @db.Decimal(18, 4)
+  balanceRateAfter  Decimal @default(0) @db.Decimal(18, 4)
+  balanceValueAfter Decimal @default(0) @db.Decimal(18, 2)
+
+  // ── source document links (exactly one is set, except OPENING) ──
+  jobId            String?
+  grnLineId        String?
+  stockCountLineId String?
+  scrapSaleId      String?
+  reversalOfId     String? @unique
+
+  reasonCode String?
+  notes      String?
+
+  /// Business date (can be backdated within the open period)
+  movementDate DateTime
+  /// System date — when it was actually recorded
+  createdAt    DateTime @default(now())
+
+  actorType  ActorType @default(HUMAN)
+  actorId    String?
+  agentRunId String?
+  toolName   String?
+
+  material       Material          @relation(fields: [materialId], references: [id])
+  job            Job?              @relation(fields: [jobId], references: [id])
+  grnLine        GoodsReceiptLine? @relation(fields: [grnLineId], references: [id])
+  stockCountLine StockCountLine?   @relation(fields: [stockCountLineId], references: [id])
+  scrapSale      ScrapSale?        @relation(fields: [scrapSaleId], references: [id])
+  actor          User?             @relation("MovementActor", fields: [actorId], references: [id])
+  reversalOf     StockMovement?    @relation("Reversal", fields: [reversalOfId], references: [id])
+  reversedBy     StockMovement?    @relation("Reversal")
+
+  @@index([materialId, movementDate])
+  @@index([jobId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([agentRunId])
+  @@map("stock_movements")
+  @@index([scrapSaleId])
+  @@index([actorId])
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  PURCHASING   (written PO → GRN, storekeeper records both)
+// ═══════════════════════════════════════════════════════════════════
+
+enum PoStatus {
+  DRAFT
+  PENDING_APPROVAL // above owner's threshold (set in-app)
+  APPROVED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+  REJECTED
+}
+
+model PurchaseOrder {
+  id         String   @id @default(uuid())
+  number     String   @unique // PO-2627-0001
+  supplierId String
+  poDate     DateTime
+  status     PoStatus @default(DRAFT)
+
+  /// Purchasing here is purely REACTIVE — a job's BOM reveals a
+  /// shortage and a PO is raised. Null for standing-stock top-ups.
+  triggeredByJobId String?
+
+  subTotal   Decimal @default(0) @db.Decimal(18, 2)
+  gstAmount  Decimal @default(0) @db.Decimal(18, 2)
+  totalValue Decimal @default(0) @db.Decimal(18, 2)
+
+  expectedDate    DateTime?
+  notes           String?
+  /// Set by reject_purchase_order. Null unless status = REJECTED.
+  rejectionReason String?
+
+  createdById  String?
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  supplier       Party               @relation(fields: [supplierId], references: [id])
+  createdBy      User?               @relation("PoCreator", fields: [createdById], references: [id])
+  approvedBy     User?               @relation("PoApprover", fields: [approvedById], references: [id])
+  triggeredByJob Job?                @relation(fields: [triggeredByJobId], references: [id])
+  lines          PurchaseOrderLine[]
+  goodsReceipts  GoodsReceipt[]
+
+  @@index([supplierId, poDate])
+  @@index([status])
+  @@map("purchase_orders")
+  @@index([triggeredByJobId])
+  @@index([createdById])
+  @@index([approvedById])
+}
+
+model PurchaseOrderLine {
+  id              String   @id @default(uuid())
+  purchaseOrderId String
+  materialId      String
+  quantity        Decimal  @db.Decimal(18, 4)
+  rate            Decimal  @db.Decimal(18, 4)
+  hsnCode         String?
+  gstRate         Decimal? @db.Decimal(5, 2)
+  amount          Decimal  @db.Decimal(18, 2)
+  /// maintained as GRNs come in
+  receivedQty     Decimal  @default(0) @db.Decimal(18, 4)
+
+  purchaseOrder PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id])
+  material      Material           @relation(fields: [materialId], references: [id])
+  grnLines      GoodsReceiptLine[]
+
+  @@index([purchaseOrderId])
+  @@map("purchase_order_lines")
+  @@index([materialId])
+}
+
+/// Material arrives with supplier invoice / DC. Storekeeper records it
+/// the same day (confirmed). Incoming inspection splits accepted vs
+/// rejected — ONLY accepted quantity becomes stock.
+model GoodsReceipt {
+  id              String   @id @default(uuid())
+  number          String   @unique // GRN-2627-0001
+  supplierId      String
+  /// Null for direct receipts without a PO
+  purchaseOrderId String?
+  receiptDate     DateTime
+
+  supplierInvoiceNo   String?
+  supplierInvoiceDate DateTime?
+  supplierDcNo        String?
+
+  notes     String?
+  createdAt DateTime @default(now())
+
+  supplier      Party              @relation(fields: [supplierId], references: [id])
+  purchaseOrder PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
+  lines         GoodsReceiptLine[]
+
+  @@index([supplierId, receiptDate])
+  @@map("goods_receipts")
+  @@index([purchaseOrderId])
+}
+
+model GoodsReceiptLine {
+  id                  String  @id @default(uuid())
+  goodsReceiptId      String
+  purchaseOrderLineId String?
+  materialId          String
+
+  receivedQty     Decimal @db.Decimal(18, 4)
+  acceptedQty     Decimal @db.Decimal(18, 4) // → becomes a RECEIPT movement
+  rejectedQty     Decimal @default(0) @db.Decimal(18, 4) // → never enters stock
+  rejectionReason String?
+
+  rate    Decimal  @db.Decimal(18, 4)
+  hsnCode String?
+  gstRate Decimal? @db.Decimal(5, 2)
+  amount  Decimal  @db.Decimal(18, 2)
+
+  goodsReceipt      GoodsReceipt       @relation(fields: [goodsReceiptId], references: [id])
+  purchaseOrderLine PurchaseOrderLine? @relation(fields: [purchaseOrderLineId], references: [id])
+  material          Material           @relation(fields: [materialId], references: [id])
+  movements         StockMovement[]
+
+  @@index([goodsReceiptId])
+  @@map("goods_receipt_lines")
+  @@index([purchaseOrderLineId])
+  @@index([materialId])
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  JOBS   (the backbone — every design is one-off, never repeats)
+// ═══════════════════════════════════════════════════════════════════
+
+enum CustomerPoStatus {
+  OPEN
+  CLOSED
+}
+
+/// Umbrella PO. The number persists; releases are SEQUENTIAL — the
+/// customer adds the next item only after the previous is delivered.
+/// Item, qty and price may differ every release. Each release = one Job.
+/// No delivery-schedule machinery needed.
+model CustomerPo {
+  id         String           @id @default(uuid())
+  number     String
+  customerId String
+  poDate     DateTime?
+  status     CustomerPoStatus @default(OPEN)
+  notes      String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  customer Party @relation(fields: [customerId], references: [id])
+  jobs     Job[]
+
+  @@unique([customerId, number])
+  @@map("customer_pos")
+}
+
+enum JobType {
+  PRODUCTION
+  SAMPLE // prototype before the main run; material cost absorbed
+}
+
+enum JobStatus {
+  OPEN
+  MATERIAL_ISSUED
+  IN_PRODUCTION
+  COMPLETED
+  CLOSED
+  CANCELLED
+}
+
+/// Designs never repeat → no product/SKU master, no category tree.
+/// The product is a PROPERTY of the job, described in text.
+/// Production stages are NOT tracked (out of scope); material leaves
+/// stock at issue and per-job material cost is built from
+/// issues − returns.
+model Job {
+  id           String  @id @default(uuid())
+  number       String  @unique // JOB-2627-0001
+  customerId   String
+  customerPoId String?
+  type         JobType @default(PRODUCTION)
+  /// Sample jobs link to the production job they precede
+  parentJobId  String?
+
+  productDescription String
+  quantity           Int
+  jobDate            DateTime
+  dueDate            DateTime?
+  status             JobStatus @default(OPEN)
+
+  /// Filled at close: total value of ISSUE − RETURN movements
+  materialCost Decimal?  @db.Decimal(18, 2)
+  closedAt     DateTime?
+
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer   Party       @relation(fields: [customerId], references: [id])
+  customerPo CustomerPo? @relation(fields: [customerPoId], references: [id])
+  parentJob  Job?        @relation("SampleOf", fields: [parentJobId], references: [id])
+  sampleJobs Job[]       @relation("SampleOf")
+
+  bomLines       JobBomLine[]
+  movements      StockMovement[]
+  purchaseOrders PurchaseOrder[]
+
+  @@index([customerId, jobDate])
+  @@index([status])
+  @@map("jobs")
+  @@index([parentJobId])
+  @@index([customerPoId])
+}
+
+/// THIS REPLACES THE EXCEL SHEET handed to the storekeeper.
+/// Quantities are captured PER PIECE (confirmed) and the total is
+/// derived. Material is issued in full at job start.
+model JobBomLine {
+  id         String @id @default(uuid())
+  jobId      String
+  materialId String
+
+  qtyPerPiece Decimal @db.Decimal(18, 6)
+  /// qtyPerPiece × job.quantity — maintained by the tool layer
+  requiredQty Decimal @db.Decimal(18, 4)
+  /// running total of ISSUE − RETURN for this job+material
+  issuedQty   Decimal @default(0) @db.Decimal(18, 4)
+  returnedQty Decimal @default(0) @db.Decimal(18, 4)
+
+  notes String?
+
+  job      Job      @relation(fields: [jobId], references: [id])
+  material Material @relation(fields: [materialId], references: [id])
+
+  @@unique([jobId, materialId])
+  @@map("job_bom_lines")
+  @@index([materialId])
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  PHYSICAL COUNT  — the anti-overwrite mechanism
+// ═══════════════════════════════════════════════════════════════════
+
+enum CountStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+/// The owner's actual problem: when staff can't explain a gap, they
+/// overwrite the notebook and the leak disappears.
+///
+/// Here a count is an EVENT, not an edit. System qty, counted qty,
+/// difference, reason, who and when are all preserved forever. Stock
+/// only moves after OWNER APPROVAL, via a COUNT_ADJUSTMENT movement.
+/// Unexplained differences accumulate visibly per material until the
+/// pattern shows itself.
+model StockCount {
+  id        String      @id @default(uuid())
+  number    String      @unique // CNT-2627-0001
+  countDate DateTime
+  status    CountStatus @default(DRAFT)
+  /// true for the day-one opening count of ~200 materials
+  isOpening Boolean     @default(false)
+
+  countedById   String?
+  approvedById  String?
+  approvedAt    DateTime?
+  rejectionNote String?
+
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  countedBy  User?            @relation("CountCounter", fields: [countedById], references: [id])
+  approvedBy User?            @relation("CountApprover", fields: [approvedById], references: [id])
+  lines      StockCountLine[]
+
+  @@index([countDate])
+  @@index([status])
+  @@map("stock_counts")
+  @@index([countedById])
+  @@index([approvedById])
+}
+
+model StockCountLine {
+  id           String @id @default(uuid())
+  stockCountId String
+  materialId   String
+
+  /// Frozen snapshot taken when counting began — never recomputed
+  systemQty     Decimal  @db.Decimal(18, 4)
+  /// Null until submit_count_line runs — a line starts life system-qty-only.
+  countedQty    Decimal? @db.Decimal(18, 4)
+  /// countedQty − systemQty (signed). Null until countedQty is set —
+  /// chk_count_difference tolerates NULL under SQL's three-valued logic.
+  differenceQty Decimal? @db.Decimal(18, 4)
+
+  /// OPENING COUNT ONLY. Rate per unit, taken by the storekeeper from the
+  /// last purchase invoice for this material. Required (> 0) on every opening
+  /// line with stock before the count can be submitted — enforced by
+  /// trg_guard_count_submission in inventory_guards.sql. Ignored on normal
+  /// counts, which post differences at the current average rate.
+  unitRate          Decimal?  @db.Decimal(18, 4)
+  /// OPENING COUNT ONLY, optional. The invoice the rate came from, so the
+  /// owner can check a rate that looks wrong before approving.
+  sourceInvoiceNo   String?
+  sourceInvoiceDate DateTime? @db.Date
+
+  /// SPILLAGE | EXTRA_WASTAGE | MISSING | ENTRY_ERROR | UNEXPLAINED.
+  /// Always null on the opening count — nothing "differs" on day one.
+  reasonCode String?
+  notes      String?
+
+  stockCount StockCount      @relation(fields: [stockCountId], references: [id])
+  material   Material        @relation(fields: [materialId], references: [id])
+  movements  StockMovement[]
+
+  @@unique([stockCountId, materialId])
+  @@map("stock_count_lines")
+  @@index([materialId])
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  SCRAP  (copper collected off the floor and sold)
+// ═══════════════════════════════════════════════════════════════════
+
+/// Gives the owner a number nobody can produce today: whether the
+/// scrap sold matches the scrap generated.
+model ScrapSale {
+  id         String   @id @default(uuid())
+  number     String   @unique // SCS-2627-0001
+  buyerId    String?
+  materialId String
+  saleDate   DateTime
+  quantity   Decimal  @db.Decimal(18, 4)
+  rate       Decimal  @db.Decimal(18, 4)
+  amount     Decimal  @db.Decimal(18, 2)
+  invoiceNo  String?
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  buyer     Party?          @relation(fields: [buyerId], references: [id])
+  material  Material        @relation(fields: [materialId], references: [id])
+  movements StockMovement[]
+
+  @@index([saleDate])
+  @@map("scrap_sales")
+  @@index([materialId])
+  @@index([buyerId])
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  CONFIRMATION, CONVERSATIONS, AGENT, ARTIFACTS
+// ═══════════════════════════════════════════════════════════════════
+
+enum PendingOrigin {
+  LAUNCHER
+  AGENT
+  ARTIFACT
+}
+
+enum PendingStatus {
+  OPEN
+  SUBMITTED
+  CANCELLED
+  EXPIRED
+}
+
+/// A form waiting for a person. Write tools never run until THIS user submits THIS form (VIJAYA prompt §3.3).
+/// One-shot, 15 minutes, bound to the user and to the tool.
+model PendingAction {
+  id              String        @id @default(uuid())
+  userId          String
+  toolName        String
+  /// Already passed through sanitizePrefill(): only suggestions, never a rate when the origin is the agent or an artifact.
+  proposedInput   Json
+  origin          PendingOrigin
+  conversationId  String?
+  agentRunId      String?
+  /// When the form was opened from an artifact.
+  artifactId      String?
+  artifactVersion Int?
+  status          PendingStatus @default(OPEN)
+  expiresAt       DateTime
+  submittedAt     DateTime?
+  createdAt       DateTime      @default(now())
+
+  user         User          @relation(fields: [userId], references: [id])
+  conversation Conversation? @relation(fields: [conversationId], references: [id])
+
+  @@index([userId, toolName, status])
+  @@index([conversationId, toolName, status])
+  @@map("pending_actions")
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id])
+  messages       Message[]
+  agentRuns      AgentRun[]
+  pendingActions PendingAction[]
+  artifacts      Artifact[]
+
+  @@index([userId, updatedAt])
+  @@map("conversations")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  /// Cards drawn by the server (opening card, "Saved" stamp, approvals), never model text.
+  CARD
+}
+
+model Message {
+  id             String      @id @default(uuid())
+  /// Order inside the whole table; the chat is read back in this order (createdAt can tie within a millisecond).
+  seq            Int         @default(autoincrement())
+  conversationId String
+  role           MessageRole
+  /// Text, tool calls and results, card data. Never a password.
+  content        Json
+  agentRunId     String?
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId, seq])
+  @@map("messages")
+}
+
+enum AgentRunStatus {
+  RUNNING
+  DONE
+  FAILED
+  LIMITED
+}
+
+model AgentRun {
+  id             String         @id @default(uuid())
+  userId         String
+  conversationId String?
+  model          String
+  status         AgentRunStatus @default(RUNNING)
+  /// Tools called, inputs, result sizes.
+  toolCalls      Json           @default("[]")
+  inputTokens    Int            @default(0)
+  outputTokens   Int            @default(0)
+  latencyMs      Int?
+  error          String?
+  startedAt      DateTime       @default(now())
+  finishedAt     DateTime?
+
+  user         User          @relation(fields: [userId], references: [id])
+  conversation Conversation? @relation(fields: [conversationId], references: [id])
+
+  @@index([userId, startedAt])
+  @@map("agent_runs")
+  @@index([conversationId])
+}
+
+enum ArtifactKind {
+  PAGE
+  DOCUMENT
+}
+
+enum ArtifactStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum VersionMadeBy {
+  AGENT
+  RESTORE
+}
+
+model Artifact {
+  id               String         @id @default(uuid())
+  ownerId          String
+  conversationId   String?
+  title            String
+  /// Never changes after creation.
+  kind             ArtifactKind
+  status           ArtifactStatus @default(ACTIVE)
+  savedAt          DateTime?
+  currentVersionId String?        @unique
+  createdAt        DateTime       @default(now())
+
+  owner          User              @relation("ArtifactOwner", fields: [ownerId], references: [id])
+  conversation   Conversation?     @relation(fields: [conversationId], references: [id])
+  versions       ArtifactVersion[] @relation("VersionOf")
+  currentVersion ArtifactVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  shares         ArtifactShare[]
+
+  @@index([ownerId, status])
+  @@map("artifacts")
+  @@index([conversationId])
+}
+
+/// Immutable (trigger): a version is never edited, only superseded.
+model ArtifactVersion {
+  id          String        @id @default(uuid())
+  artifactId  String
+  n           Int
+  /// The page's HTML fragment or the document's VDoc text, according to Artifact.kind.
+  source      String
+  request     String
+  summary     String?
+  madeBy      VersionMadeBy
+  checkReport Json          @default("{}")
+  createdAt   DateTime      @default(now())
+
+  artifact  Artifact        @relation("VersionOf", fields: [artifactId], references: [id])
+  currentOf Artifact?       @relation("CurrentVersion")
+  shares    ArtifactShare[]
+
+  @@unique([artifactId, n])
+  @@map("artifact_versions")
+}
+
+model ArtifactShare {
+  id         String    @id @default(uuid())
+  artifactId String
+  versionId  String
+  toUserId   String
+  sharedById String
+  sharedAt   DateTime  @default(now())
+  revokedAt  DateTime?
+
+  artifact Artifact        @relation(fields: [artifactId], references: [id])
+  version  ArtifactVersion @relation(fields: [versionId], references: [id])
+  to       User            @relation("ShareTo", fields: [toUserId], references: [id])
+  sharedBy User            @relation("ShareBy", fields: [sharedById], references: [id])
+
+  @@index([toUserId, revokedAt])
+  @@map("artifact_shares")
+  @@index([versionId])
+  @@index([sharedById])
+  @@index([artifactId])
+}

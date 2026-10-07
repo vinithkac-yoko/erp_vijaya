@@ -347,4 +347,13 @@ Decided provisionally in the kit; confirm or change before the milestone that bu
 3. **Printouts** (ARTIFACTS: the five fixed printouts): purchase order, goods receipt note, issue slip /
    pick list, count sheet, job cost sheet. Anything else that leaves the building on paper?
 4. **PO paper:** should the printed purchase order carry payment/delivery terms? What standard text?
-
+5. **A receipt after stock went negative** (§14). The formula "(old value + incoming value) ÷ (old quantity + incoming
+   quantity)" gives nonsense when the old quantity is below zero: if 5 kg is given out before the first receipt is
+   written down, then 10 kg arrives at ₹100, the formula makes the average ₹200. Milestone 2 provisionally does this:
+   **when stock on hand was zero or negative, the new average is simply the rate that came in** (₹100). If stock is
+   still negative afterwards, the average does not change. Confirm or change.
+6. **How a rejected quantity shows in the ledger** (§10, built in the purchasing milestone). §10 says only the accepted
+   quantity becomes stock *and* that "both movements are recorded". Two ways to do that: (a) post a RECEIPT for the
+   **accepted** quantity only, and show the rejection on the receipt line (stock is right, the ledger has one row); or
+   (b) post a RECEIPT for **everything received** and a REJECT_RETURN for the rejected part (the ledger shows both,
+   stock ends up the same). Kit assumption: **(b)**, because the owner wants the ledger to show what happened. Confirm.

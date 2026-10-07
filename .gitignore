@@ -6,3 +6,9 @@ node_modules/
 dist/
 *.log
 .DS_Store
+.env.test
+tsconfig.tsbuildinfo
+test-results/
+playwright-report/
+next-env.d.ts
+evals/reports/*.transcripts.json

@@ -20,6 +20,7 @@ RATE = "Never fill in a rate yourself. If the user gave one, pass it; otherwise 
 IDS = "Ids come from earlier read-tool results; never show them to the user."
 NAMES = "Material names as returned by search_materials, e.g. [\"22 SWG Copper Wire\"]."
 DATE = "Date as YYYY-MM-DD (Asia/Kolkata)."
+DATE_REL = "Date as YYYY-MM-DD (Asia/Kolkata), or @today, @today-7d (days back), or @month (the first of this month)."
 
 T = {}
 
@@ -72,7 +73,8 @@ STANDING materials need a minimum level. """ + FORM,
       "stockType": "STANDING (kept in stock, needs a minimum) or PER_JOB (bought only for a job).",
       "minimumLevel": "Reorder level in the material's unit. Required for STANDING; leave empty for PER_JOB.",
       "hsnCode": "HSN code, if the user has it.", "gstRate": "GST %, if the user has it (e.g. 18).",
-      "isScrap": "true only for scrap materials such as copper offcuts."})
+      "isScrap": "true only for scrap materials such as copper offcuts.",
+      "confirmNotDuplicate": "true only after the user has said a similar existing material is a different one."})
 
 tool("update_material", "write", SK_OW, """
 Opens the form to change a material's name, minimum level, HSN code or GST rate. It cannot change the
@@ -118,6 +120,12 @@ purchase orders, customer POs or jobs; say which ones if so. """ + FORM,
      {"partyId": "The business. " + IDS, "reason": "Why, in the user's words."})
 
 # ─────────────────────────────── 3. Customer POs, jobs, BOM ───────────────────────────────
+tool("list_customer_pos", "read", SK_OW, """
+Purchase orders our CUSTOMERS sent us, with PO number, customer, date and how many jobs run under each.
+Use it to check whether a customer's PO is already recorded (an open PO keeps its number and each item
+released is a new job), or to find a PO to put a job under. Not for orders we send suppliers.""",
+     {"customerId": "One customer. " + IDS, "customerName": "A saved customer's name, as returned by search_parties."})
+
 tool("list_jobs", "read", SK_OW, """
 Jobs with number, customer, product description, pieces, status, dates and (for closed jobs) material
 cost. Filter by status, customer, customer PO or dates. Use to find "job 31" (match the end of the
@@ -294,10 +302,9 @@ Stock counts with number, date, type (opening or normal), status and progress (c
      {"status": "DRAFT, PENDING_APPROVAL (with the owner), APPROVED or REJECTED (sent back to recount)."})
 
 tool("list_count_lines", "read", SK_OW, """
-A count's lines by material: counted quantity, reason, and for the opening count the rate and invoice.
-BLIND for the storekeeper: the system quantity and difference come back only for lines he has already
-counted (null before) — never tell him what to expect for a line he hasn't counted. The owner sees
-everything. Defaults to the count in progress.""",
+A count's lines by material: system quantity (frozen when the count started), counted quantity, difference,
+reason, and for the opening count the rate and invoice. Both roles see the system quantity; the owner
+dropped blind counting, so say it plainly when asked. Defaults to the count in progress.""",
      {"stockCountId": "The count. Default: the one in progress. " + IDS, "onlyUnfinished": "true for lines still to count or missing a rate."})
 
 tool("start_stock_count", "write", SK_OW, """
@@ -341,10 +348,19 @@ bobbins"). No stock moves. """ + FORM,
      {"stockCountId": "The count. " + IDS, "rejectionNote": "What to recount or fix — the storekeeper will read this."})
 
 tool("get_leak_report", "read", OW, """
-OWNER ONLY. Per material across approved normal counts (never the opening count): times counted, times
-mismatched, net and total shortage with units, rupee value, number of unexplained differences, and when
-last counted; ranked by value. State facts and numbers only — never guess who is responsible.""",
-     {"from": "From date. " + DATE, "to": "To date. " + DATE, "materialNames": "Only these materials. " + NAMES})
+OWNER ONLY. Per material across approved monthly counts (never the opening count): how many times it
+differed out of how many counts, the total short, what that is worth at today's average rate, how many
+differences were not explained, and the reasons given; ranked by rupee value. Use it for "where is my stock
+leaking", "which materials keep going missing" (look at how often each differed) and "how many unexplained
+differences this month" (from @month). It only reads approved counts. State facts and numbers only: never
+guess who is responsible, and say plainly that the system cannot tell who, if asked.""",
+     {"from": "Counts from this date. " + DATE_REL, "to": "Counts up to this date. " + DATE_REL, "materialNames": "Only these materials. " + NAMES})
+
+tool("get_count_history", "read", SK_OW, """
+Every time one material was counted, newest first: the system quantity at the time, what was counted, the
+difference, the reason, who counted it and which count it was. Nothing is ever overwritten. Use it for
+"show the bobbin count history" and "who counted the bobbins". Both roles may see the system quantity.""",
+     {"materialNames": "The material. " + NAMES, "materialId": "The material. " + IDS})
 
 # ─────────────────────────────── 9. Corrections ───────────────────────────────
 tool("reverse_movement", "write", OW, """
@@ -372,24 +388,39 @@ STANDING materials below their minimum level: on hand, minimum and shortfall, wi
 purchase order for the shortfall (rate empty).""")
 
 tool("get_stock_value", "read", OW, """
-OWNER ONLY. Total stock value and value per material at average rates.""")
+OWNER ONLY. Total stock value and value per material at average rates (quantity times average rate). Name materials to get
+only those, e.g. "value of copper wire in stock".""",
+     {"materialNames": "Only these materials. " + NAMES})
 
 tool("estimate_job_cost", "read", OW, """
-OWNER ONLY. What-if: open jobs' material cost now versus if one material's rate changed — e.g. copper
-at ₹900/kg. Same costing as the job cost report. Nothing is saved and no price changes anywhere. Use it
-for "what if copper goes to…" questions and in what-if artifacts.""",
+OWNER ONLY. What-if: the material cost of the jobs not yet closed at today's average rates, against the same
+with one material's rate changed — e.g. copper at ₹900/kg. Same costing as the job cost report. Nothing is
+saved and no price changes anywhere. Use it for "what if copper goes to…" questions and in what-if artifacts.
+Never do the sums yourself.""",
      {"jobIds": "Only these jobs; leave out for all open jobs. " + IDS, "materialNames": "The material whose rate changes. " + NAMES,
       "newRate": "The rate to try, in ₹ per unit. This is a what-if input, not a price."})
 
 tool("get_job_cost_report", "read", OW, """
-OWNER ONLY. Closed jobs in a period: customer, product, pieces, value issued and returned, material
-cost and cost per piece.""",
-     {"from": "Closed from. " + DATE, "to": "Closed to. " + DATE, "customerId": "One customer. " + IDS})
+OWNER ONLY. Material cost per job: pieces, cost (value issued less value returned) and cost per piece. By
+default the jobs closed in the period; set includeOpen for open jobs too (their cost so far), which is also
+how to see every job under one customer PO, each costed separately.""",
+     {"from": "From (closed on or after; job date when includeOpen). " + DATE_REL, "to": "To. " + DATE_REL, "customerId": "One customer. " + IDS,
+      "customerPoId": "Only jobs under this customer PO, from list_customer_pos. " + IDS, "includeOpen": "true to include jobs that are not closed yet."})
 
 tool("get_activity", "read", OW, """
-OWNER ONLY. Who did what and when, and whether from chat, a button or an artifact. Filter by person, tool or
-date.""",
-     {"userId": "One person. " + IDS, "from": "From. " + DATE, "to": "To. " + DATE, "tool": "One kind of action, e.g. issue_material."})
+OWNER ONLY. Who did what and when, newest first, and whether it was done through the chat assistant, a
+form, a button or an artifact. Filter by person, kind of action, date or one job (every change to that job).
+Use it for "everything the agent did today" (from @today) and "all changes to job 31".""",
+     {"userId": "One person. " + IDS, "from": "From. " + DATE_REL, "to": "To. " + DATE_REL, "tool": "One kind of action, e.g. issue_material.", "jobId": "Only changes to this job. " + IDS})
+
+tool("reset_demo_data", "write", OW, """
+OWNER ONLY. Demo copy only. Opens the form to wipe the demo stock, jobs, orders and history and fill in a fresh demo month. Logins and settings
+stay. Use it only when the owner asks to start the demo again; say it cannot be undone. On a real copy it refuses. """ + FORM,
+     {"confirm": "Leave empty: the owner ticks the box on the form."})
+
+tool("get_print_data", "read", SK_OW, """
+Used by the app to fill the five printouts. Never called by the assistant.""",
+     {"template": "Which printout.", "purchaseOrderId": "The purchase order.", "receiptId": "The goods receipt.", "jobId": "The job.", "countId": "The count."}, agent=False)
 
 # ─────────────────────────────── 11. Settings and users ───────────────────────────────
 tool("list_settings", "read", SK_OW, """
@@ -408,6 +439,11 @@ OWNER ONLY. Opens the form to add a login. The owner types the initial password 
 a password in the chat or in this call. """ + FORM,
      {"name": "The person's full name.", "login": "Email or username.", "role": "STOREKEEPER or OWNER."})
 
+tool("reset_user_password", "write", OW, """
+OWNER ONLY. Opens the form to set a new password for someone who forgot theirs. The owner types the new
+password in the form; never put a password in the chat or in this call. """ + FORM,
+     {"userId": "The person. " + IDS})
+
 tool("deactivate_user", "write", OW, """
 OWNER ONLY. Opens the form to stop a person logging in. The last active owner can't be deactivated.
 """ + FORM,
@@ -417,7 +453,8 @@ OWNER ONLY. Opens the form to stop a person logging in. The last active owner ca
 tool("list_artifacts", "app", SK_OW, """
 The user's saved and recent artifacts and, for the storekeeper, the ones the owner shared with him.
 ALWAYS call this before make_artifact when someone asks for a report, chart or dashboard: if one
-already does the job, open it with open_artifact and say so instead of building a duplicate.""",
+already does the job, open it with open_artifact and say so instead of building a duplicate.
+For the owner, each one says whether it can be shared with the storekeeper; if it says it cannot, do not open the share form.""",
      {"query": "Words from the title or what it shows, e.g. \"copper\" or \"below minimum\"."})
 
 tool("open_artifact", "app", SK_OW, """

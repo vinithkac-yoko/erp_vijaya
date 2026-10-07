@@ -60,7 +60,8 @@
     "minimumLevel": "Reorder level in the material's unit. Required for STANDING; leave empty for PER_JOB.",
     "hsnCode": "HSN code, if the user has it.",
     "gstRate": "GST %, if the user has it (e.g. 18).",
-    "isScrap": "true only for scrap materials such as copper offcuts."
+    "isScrap": "true only for scrap materials such as copper offcuts.",
+    "confirmNotDuplicate": "true only after the user has said a similar existing material is a different one."
    }
   },
   "update_material": {
@@ -158,6 +159,19 @@
    "inputs": {
     "partyId": "The business. Ids come from earlier read-tool results; never show them to the user.",
     "reason": "Why, in the user's words."
+   }
+  },
+  "list_customer_pos": {
+   "kind": "read",
+   "roles": [
+    "STOREKEEPER",
+    "OWNER"
+   ],
+   "agent": true,
+   "description": "Purchase orders our CUSTOMERS sent us, with PO number, customer, date and how many jobs run under each. Use it to check whether a customer's PO is already recorded (an open PO keeps its number and each item released is a new job), or to find a PO to put a job under. Not for orders we send suppliers.",
+   "inputs": {
+    "customerId": "One customer. Ids come from earlier read-tool results; never show them to the user.",
+    "customerName": "A saved customer's name, as returned by search_parties."
    }
   },
   "list_jobs": {
@@ -524,7 +538,7 @@
     "OWNER"
    ],
    "agent": true,
-   "description": "A count's lines by material: counted quantity, reason, and for the opening count the rate and invoice. BLIND for the storekeeper: the system quantity and difference come back only for lines he has already counted (null before) — never tell him what to expect for a line he hasn't counted. The owner sees everything. Defaults to the count in progress.",
+   "description": "A count's lines by material: system quantity (frozen when the count started), counted quantity, difference, reason, and for the opening count the rate and invoice. Both roles see the system quantity; the owner dropped blind counting, so say it plainly when asked. Defaults to the count in progress.",
    "inputs": {
     "stockCountId": "The count. Default: the one in progress. Ids come from earlier read-tool results; never show them to the user.",
     "onlyUnfinished": "true for lines still to count or missing a rate."
@@ -616,11 +630,24 @@
     "OWNER"
    ],
    "agent": true,
-   "description": "OWNER ONLY. Per material across approved normal counts (never the opening count): times counted, times mismatched, net and total shortage with units, rupee value, number of unexplained differences, and when last counted; ranked by value. State facts and numbers only — never guess who is responsible.",
+   "description": "OWNER ONLY. Per material across approved monthly counts (never the opening count): how many times it differed out of how many counts, the total short, what that is worth at today's average rate, how many differences were not explained, and the reasons given; ranked by rupee value. Use it for \"where is my stock leaking\", \"which materials keep going missing\" (look at how often each differed) and \"how many unexplained differences this month\" (from @month). It only reads approved counts. State facts and numbers only: never guess who is responsible, and say plainly that the system cannot tell who, if asked.",
    "inputs": {
-    "from": "From date. Date as YYYY-MM-DD (Asia/Kolkata).",
-    "to": "To date. Date as YYYY-MM-DD (Asia/Kolkata).",
+    "from": "Counts from this date. Date as YYYY-MM-DD (Asia/Kolkata), or @today, @today-7d (days back), or @month (the first of this month).",
+    "to": "Counts up to this date. Date as YYYY-MM-DD (Asia/Kolkata), or @today, @today-7d (days back), or @month (the first of this month).",
     "materialNames": "Only these materials. Material names as returned by search_materials, e.g. [\"22 SWG Copper Wire\"]."
+   }
+  },
+  "get_count_history": {
+   "kind": "read",
+   "roles": [
+    "STOREKEEPER",
+    "OWNER"
+   ],
+   "agent": true,
+   "description": "Every time one material was counted, newest first: the system quantity at the time, what was counted, the difference, the reason, who counted it and which count it was. Nothing is ever overwritten. Use it for \"show the bobbin count history\" and \"who counted the bobbins\". Both roles may see the system quantity.",
+   "inputs": {
+    "materialNames": "The material. Material names as returned by search_materials, e.g. [\"22 SWG Copper Wire\"].",
+    "materialId": "The material. Ids come from earlier read-tool results; never show them to the user."
    }
   },
   "reverse_movement": {
@@ -684,8 +711,10 @@
     "OWNER"
    ],
    "agent": true,
-   "description": "OWNER ONLY. Total stock value and value per material at average rates.",
-   "inputs": {}
+   "description": "OWNER ONLY. Total stock value and value per material at average rates (quantity times average rate). Name materials to get only those, e.g. \"value of copper wire in stock\".",
+   "inputs": {
+    "materialNames": "Only these materials. Material names as returned by search_materials, e.g. [\"22 SWG Copper Wire\"]."
+   }
   },
   "estimate_job_cost": {
    "kind": "read",
@@ -693,7 +722,7 @@
     "OWNER"
    ],
    "agent": true,
-   "description": "OWNER ONLY. What-if: open jobs' material cost now versus if one material's rate changed — e.g. copper at ₹900/kg. Same costing as the job cost report. Nothing is saved and no price changes anywhere. Use it for \"what if copper goes to…\" questions and in what-if artifacts.",
+   "description": "OWNER ONLY. What-if: the material cost of the jobs not yet closed at today's average rates, against the same with one material's rate changed — e.g. copper at ₹900/kg. Same costing as the job cost report. Nothing is saved and no price changes anywhere. Use it for \"what if copper goes to…\" questions and in what-if artifacts. Never do the sums yourself.",
    "inputs": {
     "jobIds": "Only these jobs; leave out for all open jobs. Ids come from earlier read-tool results; never show them to the user.",
     "materialNames": "The material whose rate changes. Material names as returned by search_materials, e.g. [\"22 SWG Copper Wire\"].",
@@ -706,11 +735,13 @@
     "OWNER"
    ],
    "agent": true,
-   "description": "OWNER ONLY. Closed jobs in a period: customer, product, pieces, value issued and returned, material cost and cost per piece.",
+   "description": "OWNER ONLY. Material cost per job: pieces, cost (value issued less value returned) and cost per piece. By default the jobs closed in the period; set includeOpen for open jobs too (their cost so far), which is also how to see every job under one customer PO, each costed separately.",
    "inputs": {
-    "from": "Closed from. Date as YYYY-MM-DD (Asia/Kolkata).",
-    "to": "Closed to. Date as YYYY-MM-DD (Asia/Kolkata).",
-    "customerId": "One customer. Ids come from earlier read-tool results; never show them to the user."
+    "from": "From (closed on or after; job date when includeOpen). Date as YYYY-MM-DD (Asia/Kolkata), or @today, @today-7d (days back), or @month (the first of this month).",
+    "to": "To. Date as YYYY-MM-DD (Asia/Kolkata), or @today, @today-7d (days back), or @month (the first of this month).",
+    "customerId": "One customer. Ids come from earlier read-tool results; never show them to the user.",
+    "customerPoId": "Only jobs under this customer PO, from list_customer_pos. Ids come from earlier read-tool results; never show them to the user.",
+    "includeOpen": "true to include jobs that are not closed yet."
    }
   },
   "get_activity": {
@@ -719,12 +750,40 @@
     "OWNER"
    ],
    "agent": true,
-   "description": "OWNER ONLY. Who did what and when, and whether from chat, a button or an artifact. Filter by person, tool or date.",
+   "description": "OWNER ONLY. Who did what and when, newest first, and whether it was done through the chat assistant, a form, a button or an artifact. Filter by person, kind of action, date or one job (every change to that job). Use it for \"everything the agent did today\" (from @today) and \"all changes to job 31\".",
    "inputs": {
     "userId": "One person. Ids come from earlier read-tool results; never show them to the user.",
-    "from": "From. Date as YYYY-MM-DD (Asia/Kolkata).",
-    "to": "To. Date as YYYY-MM-DD (Asia/Kolkata).",
-    "tool": "One kind of action, e.g. issue_material."
+    "from": "From. Date as YYYY-MM-DD (Asia/Kolkata), or @today, @today-7d (days back), or @month (the first of this month).",
+    "to": "To. Date as YYYY-MM-DD (Asia/Kolkata), or @today, @today-7d (days back), or @month (the first of this month).",
+    "tool": "One kind of action, e.g. issue_material.",
+    "jobId": "Only changes to this job. Ids come from earlier read-tool results; never show them to the user."
+   }
+  },
+  "reset_demo_data": {
+   "kind": "write",
+   "roles": [
+    "OWNER"
+   ],
+   "agent": true,
+   "description": "OWNER ONLY. Demo copy only. Opens the form to wipe the demo stock, jobs, orders and history and fill in a fresh demo month. Logins and settings stay. Use it only when the owner asks to start the demo again; say it cannot be undone. On a real copy it refuses. Calling this opens the form for the user to check and submit; nothing is saved until they submit it. Pass everything you can work out and leave the rest for the form.",
+   "inputs": {
+    "confirm": "Leave empty: the owner ticks the box on the form."
+   }
+  },
+  "get_print_data": {
+   "kind": "read",
+   "roles": [
+    "STOREKEEPER",
+    "OWNER"
+   ],
+   "agent": false,
+   "description": "Used by the app to fill the five printouts. Never called by the assistant.",
+   "inputs": {
+    "template": "Which printout.",
+    "purchaseOrderId": "The purchase order.",
+    "receiptId": "The goods receipt.",
+    "jobId": "The job.",
+    "countId": "The count."
    }
   },
   "list_settings": {
@@ -771,6 +830,17 @@
     "role": "STOREKEEPER or OWNER."
    }
   },
+  "reset_user_password": {
+   "kind": "write",
+   "roles": [
+    "OWNER"
+   ],
+   "agent": true,
+   "description": "OWNER ONLY. Opens the form to set a new password for someone who forgot theirs. The owner types the new password in the form; never put a password in the chat or in this call. Calling this opens the form for the user to check and submit; nothing is saved until they submit it. Pass everything you can work out and leave the rest for the form.",
+   "inputs": {
+    "userId": "The person. Ids come from earlier read-tool results; never show them to the user."
+   }
+  },
   "deactivate_user": {
    "kind": "write",
    "roles": [
@@ -789,7 +859,7 @@
     "OWNER"
    ],
    "agent": true,
-   "description": "The user's saved and recent artifacts and, for the storekeeper, the ones the owner shared with him. ALWAYS call this before make_artifact when someone asks for a report, chart or dashboard: if one already does the job, open it with open_artifact and say so instead of building a duplicate.",
+   "description": "The user's saved and recent artifacts and, for the storekeeper, the ones the owner shared with him. ALWAYS call this before make_artifact when someone asks for a report, chart or dashboard: if one already does the job, open it with open_artifact and say so instead of building a duplicate. For the owner, each one says whether it can be shared with the storekeeper; if it says it cannot, do not open the share form.",
    "inputs": {
     "query": "Words from the title or what it shows, e.g. \"copper\" or \"below minimum\"."
    }
