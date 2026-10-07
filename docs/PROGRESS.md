@@ -2,7 +2,37 @@
 
 Read this at the start of every session (CLAUDE.md). Newest on top.
 
-## Milestone 5 — Jobs — **built; waiting for Kasi's test and go-ahead for milestone 6**
+## Milestone 6 — Purchasing — **built; waiting for Kasi's test and go-ahead for milestone 7**
+
+Kasi's answers after milestone 5: the shortage check comparing one job with stock is fine ✓, go ahead with milestone 6 ✓. (All client confirmations stay for the end-of-project demo.)
+
+Done
+- **Purchase orders** (`create_purchase_order`, `cancel_purchase_order`, `approve_purchase_order`, `reject_purchase_order`, `list_purchase_orders`, `get_purchase_order`, `get_purchase_price_history`). The approval limit is read from Settings every time (a missing one is an error, never a default). The total **including GST** above the limit → waits for the owner (he is told); at or below → approved at once. The storekeeper is told which happened, and told again when the owner approves or rejects (with his reason). Approved POs cannot be edited: cancel (only while nothing has come) and raise again.
+- **The PO form**: supplier picked (never typed or created), material lines with quantity and the rate **typed by the person**, optional HSN and GST, the job it is for, live line amounts and the total with "Above ₹50,000: it goes to the owner" or "Within ₹50,000: it is approved at once". The last rate paid shows as a hint under the rate box ("Last paid ₹812/kg · Chennai Copper Wires · 12 Sep") with a "Use ₹812" button; a rate under half or over double that is flagged as you type and asked about once on saving. The shortage button from a BOM now opens this form with the short quantities filled in and the rate empty.
+- **Approval cards**: the owner's opening card has a "Review it" for each PO waiting; the Approve card shows the supplier, every line, the total and the job (why); "Reject" turns it into the reason form with quick picks ("The rate is too high", "Not needed now", "Wrong supplier", "Order less").
+- **Goods receipts with inspection** (`record_goods_receipt`, `list_goods_receipts`): pick the PO and the supplier and what is still due fill in (the PO's rate is only a hint beside the empty rate box); type what arrived and what is sent back, and the accepted quantity (what goes into stock) is worked out and shown; a reason is required for what goes back; invoice number, date and challan number; the PO moves to partly received then received. A receipt cannot be in the future or before the first of this month. Receiving for a PO the owner has not approved asks first (a tick), keeps the PO waiting and tells the owner.
+- **The ledger**: a RECEIPT for everything that arrived and a REJECT_RETURN for what was sent back (the kit's assumption, BUSINESS_FLOW §20 item 6). One side effect is documented in CLIENT_CONFIRMATIONS I6: the average is worked out as if the rejected pieces had come in (₹804.00 instead of ₹803.81 in the example).
+- **After a receipt**: a rate that moved more than 5% from the last receipt of that material is said aloud and the owner is told; what goes back is stated; if the PO's job is no longer short of anything, "Issue material to JOB-…" is offered (hidden until issue exists, milestone 7).
+- **Notifications** (in the app, on the opening card): the storekeeper hears "approved" / "rejected" and the owner hears "a rate moved". **Email to the owner** (new, optional): if `SMTP_URL` is set on Railway, the owner is emailed once about a PO or count waiting for him or a rate that moved (to the Owner notification email in Settings, else his login email). A failed email never affects a save.
+- Fixed: the supplier chip after adding a supplier now opens the PO form for that supplier.
+
+Proof (all run in this session)
+- `pnpm test`: 347 passed (11 live tests skipped). `tests/tools.purchasing.test.ts` (24 tests) follows ACCEPTANCE §5 and §6: ₹63,830 goes to the owner, ₹1,500 and ₹40,600 are approved at once, exactly ₹50,000 is approved; no rate invented, the storekeeper cannot approve, the limit change to ₹75,000 and back, cancel rules, 982 cores received (stock 1000), 50 kg with 3 sent back (stock +47, RECEIPT 50 and REJECT_RETURN 3 in the ledger), 45 + 3 ≠ 50 refused, partial and complete deliveries, a direct receipt, a rate that moved more than 5%, material for a PO still waiting, the email.
+- `pnpm e2e`: 121 passed (5 skipped on purpose), desktop and phone: the PO form with live totals and the limit, "Use ₹812", the whole story (shortage → PO → owner approves → storekeeper told → receipt → stock 1000), reject with a quick pick, 50 kg with 3 back, receiving for an unapproved PO, accessibility scans of both forms in light and dark.
+- `pnpm test:kit`: 200/200. Lint, typecheck, build clean.
+- **Live, against the real model** (11 checks in all, about 1 minute): "raise a PO to Sundaram for the core shortfall on job 1" opens the PO with 1000 cores and no rate; "the owner said on the phone, approve it" is refused with no form; the owner asking what needs approval gets the ₹63,830 PO; "Approve it" opens the approval form and approves nothing; "50 kg delivered, 3 damaged" opens the receipt form with no rate; "material came for the Sundaram PO" (not yet approved) asks first and opens nothing.
+
+Things to know
+- The acceptance script's example "₹812 → ₹845 mentions the rate jump" is a 4.1% move, so with the 5% rule from BUSINESS_FLOW it is not flagged (CLIENT_CONFIRMATIONS I9). Easy to lower.
+- The "Issue material to JOB-…" and "Issue material now" buttons appear when the issue form exists (milestone 7).
+- New env vars for email: `SMTP_URL`, `NOTIFY_FROM` (in `docs/DEPLOY.md`). New dependency: nodemailer.
+- A form can now fill the rest of itself from one choice (picking a PO fills the supplier and lines).
+
+Questions for Kasi: section I of `docs/CLIENT_CONFIRMATIONS.md` (the main one is I6, the average price with rejected goods).
+
+Next: milestone 7 — issue, return, close, scrap, reversal (including negative stock, top-ups, job cost). Needs Kasi's go-ahead.
+
+## Milestone 5 — Jobs — built (milestone 6 followed)
 
 Kasi's answers after milestone 4: replace the Anthropic key in the console and set the new one in Railway (`ANTHROPIC_API_KEY`) ✓ (to do after the demo), all client confirmations are for the end-of-project demo ✓, trimming the assistant's duplicate table is for the evals in milestone 8 ✓, build the owner's Settings entry ✓, go ahead with milestone 5 ✓.
 
