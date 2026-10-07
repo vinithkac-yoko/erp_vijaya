@@ -29,7 +29,7 @@ async function openNewJob(page: Page) {
 
 /** Pick from a type-ahead: type a few letters, press the option. */
 async function pick(page: Page, label: string | RegExp, typed: string, option: string | RegExp) {
-  const box = typeof label === 'string' ? page.getByLabel(label, { exact: true }) : page.getByLabel(label);
+  const box = typeof label === 'string' ? page.getByRole('combobox', { name: label, exact: true }) : page.getByRole('combobox', { name: label });
   await box.fill(typed);
   await page.getByRole('option', { name: option }).first().click();
 }
