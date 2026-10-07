@@ -1,12 +1,11 @@
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import type { Card } from '@/lib/cards';
-import { partyNameKey } from '@/lib/names';
 import { dateText, groupIndian, qty, UOM_LONG } from '@/lib/format';
-import { PARTY, search } from '@/lib/similar';
 import { ToolError } from '../errors';
 import { defineTool } from './define';
 import { flag, opt } from './helpers';
+import { findParty, tidy } from './lookup';
 import { nextNumber } from './numbers';
 import { todayIST } from './counts';
 import type { Db } from './types';
@@ -29,7 +28,6 @@ const validYmd = (s: string) => { const d = new Date(`${s}T00:00:00Z`); return !
 const dateOpt = z.preprocess(emptyToUndef, z.string().refine(validYmd, 'That is not a real date.').optional());
 const dateReq = (what: string) => z.string({ required_error: `Choose the ${what}.`, invalid_type_error: `Choose the ${what}.` }).refine(validYmd, `That is not a real date. Choose the ${what}.`);
 const istDate = (ymd: string) => new Date(`${ymd}T00:00:00+05:30`);
-const tidy = (s: string) => s.replace(/\s+/g, ' ').trim();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A per-piece quantity as people say it: wire in grams, liquids in millilitres, the rest in their own unit. */
@@ -58,28 +56,8 @@ export async function findJob(db: Db, ref: string): Promise<JobRow> {
 
 const jobLabel = (j: Pick<JobRow, 'number' | 'quantity'> & { customer: { name: string } }) => `${j.number} · ${j.customer.name} · ${groupIndian(j.quantity)} pieces`;
 
-/** The business a customer-side form names: exact name first, then the closest. Only customers, only active ones. */
-async function findCustomer(db: Db, input: { customerId?: string; customerName?: string }) {
-  if (input.customerId) {
-    const p = await db.party.findUnique({ where: { id: input.customerId } });
-    if (!p || !p.isActive) throw new ToolError('PARTY_NOT_FOUND', "Couldn't find that customer.", undefined, 'customerId');
-    if (!p.isCustomer) throw new ToolError('PARTY_WRONG_ROLE', `${p.name} is saved as a supplier, not a customer. Add the customer role to it first.`, undefined, 'customerId');
-    return p;
-  }
-  const name = tidy(input.customerName ?? '');
-  if (!name) throw new ToolError('PARTY_NOT_FOUND', 'Choose the customer.', undefined, 'customerId');
-  const all = await db.party.findMany({ where: { isActive: true } });
-  const exact = all.find((p) => p.nameKey === partyNameKey(name));
-  const hits = exact ? [exact] : search(name, all, (p) => p.nameKey, (p) => p.name, PARTY);
-  const only = hits.length === 1 ? hits[0] : undefined;
-  if (!only) {
-    throw new ToolError('PARTY_NOT_FOUND',
-      hits.length ? `Which customer is "${name}"? ${hits.slice(0, 4).map((p) => p.name).join(', ')}.` : `Couldn't find "${name}". Add them as a customer first.`,
-      { suggestions: hits.slice(0, 4).map((p) => p.name) }, 'customerId');
-  }
-  if (!only.isCustomer) throw new ToolError('PARTY_WRONG_ROLE', `${only.name} is saved as a supplier, not a customer. Add the customer role to it first.`, undefined, 'customerId');
-  return only;
-}
+/** The customer a form names: by id (the picker) or by name (the assistant). */
+const findCustomer = (db: Db, input: { customerId?: string; customerName?: string }) => findParty(db, { id: input.customerId, name: input.customerName }, 'CUSTOMER');
 
 // ── create_customer_po ─────────────────────────────────────────────────────────────────────────────
 export const createCustomerPo = defineTool({

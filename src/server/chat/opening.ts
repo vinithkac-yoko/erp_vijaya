@@ -1,4 +1,5 @@
 import type { Card } from '@/lib/cards';
+import { inr } from '@/lib/format';
 import { launcherFor } from '@/lib/launcher/launcher';
 import { notifications, runTool } from '../tools';
 import type { ToolSession } from '../tools/types';
@@ -17,15 +18,16 @@ export async function openingFor(session: ToolSession): Promise<Opening> {
     runTool(session, 'list_reorder_alerts', {}),
     session.role === 'OWNER' ? runTool(session, 'list_pending_approvals', {}) : Promise.resolve(null),
     runTool(session, 'list_counts', {}),
-    notifications.unread(session.userId, ['RECOUNT_REQUIRED', 'COUNT_APPROVED']),
+    notifications.unread(session.userId, ['RECOUNT_REQUIRED', 'COUNT_APPROVED', 'PO_APPROVED', 'PO_REJECTED', 'RATE_CHANGE']),
   ]);
   const below = alerts.ok ? (alerts.data as { rows: unknown[] }).rows.length : 0;
-  const waits = waiting?.ok ? (waiting.data as { purchaseOrders: unknown[]; counts: { id: string; number: string; kind: string; summary: string }[] }) : null;
+  const waits = waiting?.ok ? (waiting.data as { purchaseOrders: { id: string; number: string; supplier: string; total: number; job: string | null }[]; counts: { id: string; number: string; kind: string; summary: string }[] }) : null;
   const pendingApprovals = waits ? waits.purchaseOrders.length + waits.counts.length : 0;
 
-  const lines: { text: string; ask?: string; button?: string; sheet?: boolean; form?: string }[] = [];
+  const lines: { text: string; ask?: string; button?: string; sheet?: boolean; form?: string; prefill?: Record<string, unknown> }[] = [];
   if (session.role === 'OWNER') {
     lines.push(pendingApprovals > 0 ? { text: `${pendingApprovals} waiting for you`, ask: ASK['Waiting for me'], button: 'Review approvals' } : { text: 'Nothing is waiting for you.' });
+    for (const p of waits?.purchaseOrders ?? []) lines.push({ text: `${p.number}: ${p.supplier}, ${inr(p.total)}${p.job ? `, for ${p.job}` : ''}`, form: 'approve_purchase_order', prefill: { purchaseOrderId: p.id }, button: 'Review it' });
     for (const c of waits?.counts ?? []) lines.push({ text: `${c.kind} ${c.number}: ${c.summary}`, form: 'approve_stock_count', button: 'Review it' });
   }
   for (const n of notices) lines.push({ text: `${n.title}: ${n.body}` });

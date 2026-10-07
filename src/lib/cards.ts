@@ -3,7 +3,7 @@ import type { FormDef } from './forms';
 /** Everything the chat can show that is not plain text. Built on the SERVER; the model never writes a card. */
 export interface TableColumn { key: string; label: string; align?: 'right' }
 export type Card =
-  | { kind: 'opening'; title: string; lines: { text: string; ask?: string; button?: string; sheet?: boolean; form?: string }[] }
+  | { kind: 'opening'; title: string; lines: { text: string; ask?: string; button?: string; sheet?: boolean; form?: string; prefill?: Record<string, unknown> }[] }
   | { kind: 'form'; pendingId: string; tool: string; form: FormDef; values: Record<string, unknown>; assisted: boolean; /** Read-only facts the server worked out when the form opened ("9 materials, ₹1,49,672"). */ info?: string[] }
   | { kind: 'saved'; stamp: string; lines: string[]; auditId?: string }
   | { kind: 'table'; title?: string; columns: TableColumn[]; rows: Record<string, string>[]; note?: string }

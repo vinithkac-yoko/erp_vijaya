@@ -97,7 +97,7 @@ export function createPendingService(registry: Registry, client: PrismaClient = 
       let preview: FormPreview | undefined;
       try { preview = tool.preview ? await tool.preview({ db: client, session }, view.input) : undefined; } catch { preview = undefined; } // a form still opens if the extra facts can't be worked out
       return {
-        kind: 'form', pendingId: view.id, tool: view.tool, form: tool.form, values: { ...(preview?.values ?? {}), ...view.input }, assisted: view.assisted,
+        kind: 'form', pendingId: view.id, tool: view.tool, form: tool.form, values: { ...(preview?.values ?? {}), ...view.input, ...(preview?.decorate ?? {}) }, assisted: view.assisted,
         ...(preview?.info.length ? { info: preview.info } : {}),
       };
     },

@@ -69,7 +69,13 @@ export interface WriteTool<I extends z.ZodTypeAny = z.ZodTypeAny, O = unknown> e
   /** When the form opens: read-only facts to show on it, and values it should carry that the person never types (which count). */
   preview?: (ctx: { db: Db; session: ToolSession }, input: Record<string, unknown>) => Promise<FormPreview>;
 }
-export interface FormPreview { info: string[]; values?: Record<string, unknown> }
+export interface FormPreview {
+  info: string[];
+  /** Starting values the tool knows (today's date, which count): what was asked for wins over these. */
+  values?: Record<string, unknown>;
+  /** Extra detail the tool adds to what was asked for (the PO's rate beside each receipt line): this wins, so the hints are always there. */
+  decorate?: Record<string, unknown>;
+}
 /** Follow-ups only READ, and only through the gateway, as the person who just saved. */
 export interface FollowUpContext { session: ToolSession; read: (tool: string, input?: unknown) => Promise<ToolOutcome> }
 export interface FollowUpResult { facts: string[]; chips: Chip[]; /** Cards the server draws after the saved card (a shortage table): from read-only checks, never from model text. */ cards?: Card[] }

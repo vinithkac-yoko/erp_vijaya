@@ -4,7 +4,9 @@ import { z } from 'zod';
 import type { ChatItem } from '@/lib/cards';
 import type { PickerOption } from '@/lib/forms';
 import { currentUser } from '../auth/session';
-import { conversations, currentCount, pendingActions, registry } from '../tools';
+import { dateText } from '@/lib/format';
+import { conversations, currentCount, pendingActions, registry, runTool } from '../tools';
+import { rateText } from '../tools/purchasing';
 import type { ToolSession } from '../tools/types';
 import { ensureConversation } from './conversation';
 import { pickerLabel, pickerOptions, type PickerKind } from './pickers';
@@ -71,7 +73,7 @@ export async function cancelFormAction(input: { pendingId: string; conversationI
 /** Type-ahead for the pickers in a form. */
 export async function pickerAction(input: { kind: PickerKind; query: string; role?: 'SUPPLIER' | 'CUSTOMER'; forId?: string; filter?: string }): Promise<PickerOption[]> {
   const session = await who();
-  const p = z.object({ kind: z.enum(['material', 'party', 'user', 'countLine', 'customerPo', 'job']), query: z.string().max(100), role: z.enum(['SUPPLIER', 'CUSTOMER']).optional(), forId: z.string().max(64).optional(), filter: z.string().max(20).optional() }).safeParse(input);
+  const p = z.object({ kind: z.enum(['material', 'party', 'user', 'countLine', 'customerPo', 'job', 'purchaseOrder']), query: z.string().max(100), role: z.enum(['SUPPLIER', 'CUSTOMER']).optional(), forId: z.string().max(64).optional(), filter: z.string().max(20).optional() }).safeParse(input);
   if (!session || !p.success) return [];
   return pickerOptions(session, p.data.kind, p.data.query, { role: p.data.role, forId: p.data.forId, filter: p.data.filter });
 }
@@ -87,7 +89,7 @@ export async function loadChatAction(id: string): Promise<{ ok: boolean; items: 
 /** The name behind an id the assistant filled into a picker. */
 export async function pickerLabelAction(input: { kind: PickerKind; id: string }): Promise<PickerOption | null> {
   const session = await who();
-  const p = z.object({ kind: z.enum(['material', 'party', 'user', 'countLine', 'customerPo', 'job']), id: z.string().min(1).max(64) }).safeParse(input);
+  const p = z.object({ kind: z.enum(['material', 'party', 'user', 'countLine', 'customerPo', 'job', 'purchaseOrder']), id: z.string().min(1).max(64) }).safeParse(input);
   if (!session || !p.success) return null;
   return pickerLabel(session, p.data.kind, p.data.id);
 }
@@ -132,10 +134,22 @@ export async function switchFormAction(input: { pendingId: string; conversationI
   if (!from || !tool || tool.kind !== 'write' || !tool.form.alt) return { ok: false, code: 'NOT_FOUND', message: "That form isn't open any more." };
   const conv = await ensureConversation(session, from.conversationId ?? p.data.conversationId);
   if (!conv) return { ok: false, code: 'NOT_FOUND', message: "Couldn't find that chat." };
-  const opened = await pendingActions.create(session, { tool: tool.form.alt.tool, origin: 'LAUNCHER', conversationId: conv.id });
+  const opened = await pendingActions.create(session, { tool: tool.form.alt.tool, origin: 'LAUNCHER', conversationId: conv.id, input: from.input, fromChip: true });
   if (!opened.ok) return opened;
   await pendingActions.cancel(session, from.id);
   const card = await pendingActions.formCard(session, opened.data);
   const row = await conversations.append(conv.id, 'CARD', { kind: 'card', card });
   return { ok: true, conversationId: conv.id, created: false, items: [{ id: row.id, role: 'card', card, state: 'open' }] };
+}
+
+/** "Last paid ₹812/kg · Chennai Copper Wires · 12 Sep" for a material: a hint beside the rate box. It is never put in the box for the person. */
+export async function lastRateAction(input: { materialId: string }): Promise<{ rate: number; text: string } | null> {
+  const session = await who();
+  const p = z.object({ materialId: z.string().min(1).max(64) }).safeParse(input);
+  if (!session || !p.success) return null;
+  const r = await runTool(session, 'get_purchase_price_history', { materialId: p.data.materialId });
+  if (!r.ok) return null;
+  const top = (r.data as { rows: { rate: number; unit: string; supplier: string; date: string }[] }).rows[0];
+  if (!top) return null;
+  return { rate: top.rate, text: `Last paid ${rateText(top.rate, top.unit)} · ${top.supplier} · ${dateText(new Date(top.date))}` };
 }

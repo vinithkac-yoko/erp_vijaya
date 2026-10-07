@@ -16,7 +16,7 @@ export const listPendingApprovals = defineTool({
       return { id: c.id, number: c.number, kind: c.isOpening ? 'Opening count' : 'Stock count', summary: s.text, amount: c.isOpening ? s.totalValue : null, date: c.countDate.toISOString(), waitingSince: c.createdAt.toISOString() };
     }));
     return {
-      purchaseOrders: pos.map((p) => ({ number: p.number, supplier: p.supplier.name, total: Number(p.totalValue), job: p.triggeredByJob?.number ?? null, waitingSince: p.createdAt.toISOString() })),
+      purchaseOrders: pos.map((p) => ({ id: p.id, number: p.number, supplier: p.supplier.name, total: Number(p.totalValue), job: p.triggeredByJob?.number ?? null, waitingSince: p.createdAt.toISOString() })),
       counts: countRows,
     };
   },

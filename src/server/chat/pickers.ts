@@ -8,8 +8,8 @@ import type { ToolSession } from '../tools/types';
  * Type-ahead for the pickers in forms. Goes through the same read tools as everything else, so a person only ever finds
  * what their role may read. The value is an id; what is shown is a name and a small second line. Never a code.
  */
-export type PickerKind = 'material' | 'party' | 'user' | 'countLine' | 'customerPo' | 'job';
-export interface PickerScope { role?: 'SUPPLIER' | 'CUSTOMER'; /** The customer, for a customer PO. */ forId?: string; /** 'open' or 'production', for jobs. */ filter?: string }
+export type PickerKind = 'material' | 'party' | 'user' | 'countLine' | 'customerPo' | 'job' | 'purchaseOrder';
+export interface PickerScope { role?: 'SUPPLIER' | 'CUSTOMER'; /** The customer, for a customer PO. */ forId?: string; /** 'open' or 'production' for jobs; 'cancellable' or 'receivable' for purchase orders. */ filter?: string }
 
 /** The materials of the count in progress: pick one to enter its count. Shows the System quantity (the owner dropped blind counting). */
 async function countLineOptions(session: ToolSession, q: string, onlyId?: string): Promise<PickerOption[]> {
@@ -35,6 +35,19 @@ async function jobOptions(session: ToolSession, q: string, filter?: string, only
   return rows.slice(0, 8).map((x) => ({ id: x.id, label: x.number, secondary: `${x.customer} · ${x.quantity.toLocaleString('en-IN')} pcs`, quantity: x.quantity }));
 }
 
+/** A purchase order to pick: its number first, then the supplier, the total and where it stands. */
+async function poOptions(session: ToolSession, q: string, filter?: string, onlyId?: string): Promise<PickerOption[]> {
+  const r = await runTool(session, 'list_purchase_orders', {});
+  if (!r.ok) return [];
+  let rows = (r.data as { rows: { id: string; number: string; supplier: string; total: number; status: string; statusText: string }[] }).rows;
+  if (filter === 'cancellable') rows = rows.filter((x) => ['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(x.status));
+  if (filter === 'receivable') rows = rows.filter((x) => ['PENDING_APPROVAL', 'APPROVED', 'PARTIALLY_RECEIVED'].includes(x.status));
+  if (onlyId) rows = rows.filter((x) => x.id === onlyId);
+  const needle = q.trim().toLowerCase();
+  if (needle) rows = rows.filter((x) => `${x.number} ${x.supplier}`.toLowerCase().includes(needle) || x.number.toLowerCase().endsWith(needle.replace(/^po[-\s]*/, '').padStart(4, '0')));
+  return rows.slice(0, 8).map((x) => ({ id: x.id, label: x.number, secondary: `${x.supplier} · ₹${Math.round(x.total).toLocaleString('en-IN')} · ${x.statusText}` }));
+}
+
 async function customerPoOptions(session: ToolSession, q: string, customerId?: string, onlyId?: string): Promise<PickerOption[]> {
   if (!customerId && !onlyId) return [];
   const r = await runTool(session, 'list_customer_pos', { customerId });
@@ -51,6 +64,7 @@ export async function pickerOptions(session: ToolSession, kind: PickerKind, quer
   const role = scope.role;
   if (kind === 'countLine') return countLineOptions(session, q);
   if (kind === 'job') return jobOptions(session, q, scope.filter);
+  if (kind === 'purchaseOrder') return poOptions(session, q, scope.filter);
   if (kind === 'customerPo') return customerPoOptions(session, q, scope.forId);
   if (kind === 'material') {
     const r = await runTool(session, 'search_materials', { query: q });
@@ -73,6 +87,7 @@ export async function pickerOptions(session: ToolSession, kind: PickerKind, quer
 export async function pickerLabel(session: ToolSession, kind: PickerKind, id: string): Promise<PickerOption | null> {
   if (kind === 'countLine') return (await countLineOptions(session, '', id))[0] ?? null;
   if (kind === 'job') return (await jobOptions(session, '', undefined, id))[0] ?? null;
+  if (kind === 'purchaseOrder') return (await poOptions(session, '', undefined, id))[0] ?? null;
   if (kind === 'customerPo') return (await customerPoOptions(session, '', undefined, id))[0] ?? null;
   const all = await pickerOptions(session, kind, '', {});
   if (all.some((o) => o.id === id)) return all.find((o) => o.id === id) ?? null;

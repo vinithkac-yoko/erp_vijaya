@@ -8,6 +8,7 @@ import { cancelFormAction, submitFormAction, switchFormAction } from '@/server/c
 import { Button } from '@/components/ui/button';
 import { Picker } from './picker';
 import { LinesEditor, type BomLineValue } from './lines-editor';
+import { GrnLinesEditor, PoLinesEditor, type GrnLineValue, type PoLineValue } from './purchasing-lines';
 
 const box = 'block w-full min-h-12 rounded-md border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-faint aria-[invalid=true]:border-alert';
 
@@ -23,7 +24,7 @@ export function payload(form: FormDef, v: Values, notDuplicate: boolean, confirm
     if (!visible(f, v)) continue;
     const x = v[f.name];
     if (f.type === 'checkbox') { if (x === true) out[f.name] = true; continue; }
-    if (f.type === 'lines') { if (Array.isArray(x) && x.length) out[f.name] = x; continue; }
+    if (f.type === 'lines' || f.type === 'poLines' || f.type === 'grnLines') { if (Array.isArray(x) && x.length) out[f.name] = x; continue; }
     if (x === undefined || x === null || x === '') continue;
     out[f.name] = f.type === 'number' ? Number(String(x).replace(/,/g, '')) : typeof x === 'string' ? x.trim() : x;
   }
@@ -131,7 +132,7 @@ export function FormCard({ pendingId, tool, form, values, assisted, info, state,
                 </label>
               ) : (
                 <>
-                  {f.type === 'lines'
+                  {f.type === 'lines' || f.type === 'poLines' || f.type === 'grnLines'
                     ? <p id={`${id}-label`} className="font-medium">{f.label}{f.required && <span aria-hidden className="text-alert"> *</span>}</p>
                     : <label htmlFor={id} className="font-medium">{f.label}{f.required && <span aria-hidden className="text-alert"> *</span>}</label>}
                   <div className="mt-1">
@@ -142,7 +143,11 @@ export function FormCard({ pendingId, tool, form, values, assisted, info, state,
                       </select>
                     ) : f.type === 'lines' ? (
                       <LinesEditor id={id} value={(Array.isArray(v[f.name]) ? v[f.name] : []) as BomLineValue[]} onChange={(x) => setV((p) => ({ ...p, [f.name]: x }))} jobQuantity={jobQty} invalid={!!err} describedBy={described} />
-                    ) : f.type === 'material' || f.type === 'party' || f.type === 'user' || f.type === 'countLine' || f.type === 'customerPo' || f.type === 'job' ? (
+                    ) : f.type === 'poLines' ? (
+                      <PoLinesEditor id={id} value={(Array.isArray(v[f.name]) ? v[f.name] : []) as PoLineValue[]} onChange={(x) => setV((p) => ({ ...p, [f.name]: x }))} limit={typeof v.approvalLimit === 'number' ? v.approvalLimit : null} />
+                    ) : f.type === 'grnLines' ? (
+                      <GrnLinesEditor id={id} value={(Array.isArray(v[f.name]) ? v[f.name] : []) as GrnLineValue[]} onChange={(x) => setV((p) => ({ ...p, [f.name]: x }))} />
+                    ) : f.type === 'material' || f.type === 'party' || f.type === 'user' || f.type === 'countLine' || f.type === 'customerPo' || f.type === 'job' || f.type === 'purchaseOrder' ? (
                       <Picker kind={f.type} id={id} value={String(v[f.name] ?? '')} onChange={(x) => set(f.name, x)} partyRole={f.partyRole} invalid={!!err} describedBy={described}
                         onOption={f.type === 'job' ? (o) => { if (o.quantity !== undefined) setJobQty(o.quantity); } : undefined}
                         forId={f.dependsOn ? String(v[f.dependsOn] ?? '') || undefined : undefined} filter={f.pickerFilter}

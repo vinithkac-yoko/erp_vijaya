@@ -137,7 +137,7 @@ export function ChatView(p: ChatViewProps) {
             if (it.role === 'user') return <div key={it.id} className="flex justify-end"><p className="max-w-[85%] whitespace-pre-wrap rounded-md bg-plate px-4 py-2.5 text-plate-ink">{it.text}</p></div>;
             if (it.role === 'assistant') return <p key={it.id} className="whitespace-pre-wrap rounded-md border border-line border-l-4 border-l-copper bg-surface px-4 py-3">{it.text}</p>;
             const c = it.card;
-            if (c.kind === 'opening') return <OpeningCard key={it.id} card={c} assistantOn={p.assistantOn} onAsk={(ask, label) => void send(ask, label)} onSheet={p.onOpenSheet} onForm={(tool) => void openForm(tool)} />;
+            if (c.kind === 'opening') return <OpeningCard key={it.id} card={c} assistantOn={p.assistantOn} onAsk={(ask, label) => void send(ask, label)} onSheet={p.onOpenSheet} onForm={(tool, prefill) => void openForm(tool, prefill)} />;
             if (c.kind === 'table') return <TableCard key={it.id} card={c} />;
             if (c.kind === 'notice') return <NoticeCard key={it.id} card={c} />;
             if (c.kind === 'saved') return <SavedCard key={it.id} card={c} />;
