@@ -127,7 +127,7 @@ test.describe('returning and closing (ACCEPTANCE 8.1–8.7)', () => {
   });
 
   test('closing without a return asks "did anything come back?"; "Nothing came back" is accepted (8.1, 8.7)', async ({ page }) => {
-    const job = await seed();
+    await seed();
     await login(page, STOREKEEPER);
     await buttons(page).getByRole('button', { name: /Issue to a job/ }).click();
     const f = form(page, 'Give out material to a job');
@@ -135,18 +135,35 @@ test.describe('returning and closing (ACCEPTANCE 8.1–8.7)', () => {
     await f.getByRole('button', { name: 'Give out material' }).click();
     await expect(saved(page)).toContainText('MATERIAL GIVEN OUT');
     await page.goto('/');
-    await buttons(page).getByRole('button', { name: 'More' }).first().click();
-    await expect(page.getByRole('menuitem', { name: /New PO/ })).toBeVisible();
-    await page.keyboard.press('Escape');
-    // Close job is not a launcher button: it comes from the chip after a return, or from the assistant; open it from a return
-    await buttons(page).getByRole('button', { name: /^Return/ }).click();
-    const r = form(page, 'Material back from a job');
-    await pick(r, 'Job', 'JOB', /JOB-2627-0001/);
-    await pick(r, 'Material, line 1', 'Ferrite', 'Ferrite Core E-30');
-    await r.getByLabel('How much came back, line 1').fill('1');
-    await r.getByRole('button', { name: 'Take back into stock' }).click();
-    await expect(saved(page)).toContainText('MATERIAL TAKEN BACK');
-    void job;
+    await say(page, 'close the job');
+    const c = form(page, 'Close a job');
+    await pick(c, 'Job', 'JOB', /JOB-2627-0001/);
+    await expect(c.getByTestId('form-info')).toContainText('Nothing has come back yet. If something did, record the return first.');
+    await c.getByRole('button', { name: 'Close job' }).click();
+    await expect(c.getByText('Did any material come back?')).toBeVisible();
+    expect((await prisma.job.findFirstOrThrow()).status).toBe('MATERIAL_ISSUED');
+    await c.getByLabel('Nothing came back').check();
+    await c.getByRole('button', { name: 'Close job' }).click();
+    await expect(saved(page)).toContainText('✓ JOB CLOSED');
+    expect(Number((await prisma.job.findFirstOrThrow()).materialCost)).toBe(5300);
+  });
+
+  test('the owner closing a job is shown what it cost, and per piece', async ({ page }) => {
+    await seed();
+    await login(page, OWNER);
+    await buttons(page).getByRole('button', { name: /Issue to a job/ }).click();
+    const f = form(page, 'Give out material to a job');
+    await pick(f, 'Job', 'JOB', /JOB-2627-0001/);
+    await f.getByRole('button', { name: 'Give out material' }).click();
+    await expect(saved(page)).toContainText('MATERIAL GIVEN OUT');
+    await page.goto('/');
+    await say(page, 'close the job');
+    const c = form(page, 'Close a job');
+    await pick(c, 'Job', 'JOB', /JOB-2627-0001/);
+    await c.getByLabel('Nothing came back').check();
+    await c.getByRole('button', { name: 'Close job' }).click();
+    await expect(saved(page)).toContainText('Material cost ₹5,300');
+    await expect(saved(page)).toContainText('Cost per piece ₹530');
   });
 });
 

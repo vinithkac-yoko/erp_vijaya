@@ -24,6 +24,7 @@ function script(r: StubRequest): StubReply {
   if (t.includes('switch the assistant off')) return call('update_setting', { key: 'agent.enabled', value: 'off' }, 'This switches the assistant off.');
   if (t.includes('record a customer po')) return call('create_customer_po', { customerName: 'Ashok Transformers', number: 'AT/2627/118' }, 'Check the PO number.');
   if (t.includes('open jobs')) return answered ? say('Here are the open jobs.') : call('list_jobs', { status: 'OPEN' });
+  if (t.includes('close the job')) return call('close_job', {}, 'Check the job and say if anything came back.');
   if (t.includes('collected scrap')) return call('record_scrap_in', {}, 'Check the scrap and the quantity.');
   if (t.includes('sold scrap')) return call('record_scrap_sale', {}, 'Check the buyer, the quantity and the rate.');
   if (t.includes('reverse an entry')) return owner ? call('reverse_movement', {}, 'Choose the entry and say why.') : say('Only the owner can reverse an entry.');

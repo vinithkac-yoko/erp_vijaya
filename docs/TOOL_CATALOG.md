@@ -160,6 +160,13 @@ balance, rate empty).
 *Follow-ups (must):* owner: state cost and cost per piece; storekeeper: say the job is closed (job cost is owner-only); any material > 5% over BOM → list it and notify
 the owner.
 
+**As built (milestone 7):**
+- `issue_material` with no lines gives out everything the BOM still needs (required less already given out), once: a second time is `NOTHING_TO_ISSUE`. With lines: part of it (more than the BOM still needs is `OVER_BOM` unless the line is ticked **extra, for rework**); a material not on the BOM goes out only as marked rework (`NOT_ON_BOM`). Marked rework is a movement with `reasonCode = TOP_UP`, which `get_job_bom_variance` shows as "extra". The first issue makes the job `MATERIAL_ISSUED`. A job with no BOM, or closed, cancelled or completed, refuses (`NO_BOM`, `JOB_NOT_ISSUABLE`).
+- The rate of an issue and of a return is the current average, set by the database; nobody types it. Negative stock is allowed: the owner is told (`NEGATIVE_STOCK_WARNING`), and the sentence says it once. A standing material that falls below its minimum with this issue tells the owner and the other storekeepers (`MIN_LEVEL_BREACH`) and offers "Raise a PO for …" (the shortfall, no rate).
+- `return_material`: only what is out with that job (issued less returned, from the ledger): `NOT_ISSUED_TO_JOB`, `RETURN_EXCEEDS_ISSUE` (also when it has all come back). Not on a closed job (`JOB_CLOSED`).
+- `close_job`: refused if nothing was ever given out (`JOB_NOTHING_ISSUED`: cancel it instead). If material went out and none came back, the form must say so (`nothingReturned`, otherwise `RETURN_ANSWER_REQUIRED`). The cost is the value out less the value back from the ledger, to the paisa, stored on the job; only the owner is shown it (the saved card has `showCost`). Any material used more than 5% over its BOM is said and the owner is told (`JOB_VARIANCE`).
+- `get_job` costs come from the same ledger totals (`src/server/tools/jobcost.ts`), including reversals.
+
 ## 7. Scrap
 
 | Tool | Kind | Roles | Purpose |
@@ -170,6 +177,8 @@ the owner.
 
 **record_scrap_in** — `NOT_SCRAP_MATERIAL`. **record_scrap_sale** — selling more than on hand is
 allowed and flagged. *Follow-ups:* scrap left in stock; flag over-sale.
+
+**As built (milestone 7):** `record_scrap_in` and `record_scrap_sale` only take a material marked as scrap (`NOT_SCRAP_MATERIAL`). Scrap comes in at no value; a sale needs a customer as buyer, a typed rate above zero and a date that is not in the future. Selling more than is on hand is recorded and flagged (`overBy`). `get_scrap_summary` (owner) counts collected, sold, on hand and sale value per scrap material, by job where known; a reversed entry no longer counts.
 
 ## 8. Stock counts
 
@@ -231,6 +240,8 @@ Rules (full detail in BUSINESS_FLOW §11):
 | Tool | Kind | Roles | Purpose |
 |---|---|---|---|
 | `reverse_movement` | W | **OW** | Opposite movement, reason required. Confirmation shows material, qty, job, original date, balance after |
+
+**As built (milestone 7):** `get_movement_history` is built (newest first, 50 at a time, `@today-7d` style dates work). `reverse_movement` is the owner's; the form shows the entry, the balance now and the balance after. Reversible: an issue, a return, scrap in, a scrap sale, and a whole receipt (the PO line and its status follow). Not reversible (`NOT_REVERSIBLE`): opening stock, count adjustments, a reversal, goods sent back, and a receipt that had part sent back. Once only (`ALREADY_REVERSED`). Not on a closed job (`JOB_CLOSED`). The reversal has the same job, material and quantity in the opposite direction (the database checks it); an entry that took stock out comes back at the rate it went out. A fully reversed issue puts the job back to open (the BOM can be changed again). The person who made the entry is told, with the owner's reason (`MOVEMENT_REVERSED`).
 
 `ALREADY_REVERSED`; reversing an OPENING or COUNT_ADJUSTMENT → `NOT_REVERSIBLE` (counts are
 corrected by a later count). *Follow-ups:* new balance; notify the storekeeper.

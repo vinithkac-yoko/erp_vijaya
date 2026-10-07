@@ -10,7 +10,7 @@ bottom of each milestone's section.
 - ✅ = Kasi already agreed. The owner should still hear it once.
 - ❓ = nobody has agreed yet. **These are the important ones.**
 
-Last updated: after milestone 6 (section I).
+Last updated: after milestone 7 (section J).
 
 ---
 
@@ -147,3 +147,25 @@ Last updated: after milestone 6 (section I).
 | I10 | ❓ | **Email to the owner.** | If email is set up on Railway, the owner gets an email for: a PO or a count waiting, a rate that moved. Only him. It goes to the "Owner notification email" in Settings. | Which address: ____________ |
 | I11 | ❓ | **Over-delivery.** | If more arrives than was ordered it is received as it is (no stop). The PO shows as received. | ☐ OK ☐ Warn / refuse: |
 | I12 | ❓ | **Who may receive stock or raise a PO.** | Storekeeper and owner both. | ☐ OK ☐ Change: |
+
+---
+
+## J. Added in milestone 7 — giving out, taking back, closing, scrap, corrections
+
+| # | Status | The question | What we did | Owner says |
+|---|---|---|---|---|
+| J1 | ✅ | **Material is given out all at once, against the BOM.** | "Issue for job 31" gives out everything the BOM still needs, once; a second press finds nothing left. The form lists each material with its quantity and unit before anything is given out. | ☐ OK ☐ Change: |
+| J2 | ❓ | **Extra material (rework).** | More than the BOM needs, or a material that is not on the BOM, can only go out ticked **"Extra, for rework"**. It is marked in the history and shown as "extra" when the owner asks whether a job used more than planned. | ☐ OK ☐ Change: |
+| J3 | ✅ | **Stock may go below zero.** | It is allowed, recorded, said in one sentence, and the owner is told. Nobody is blocked or lectured. | ☐ OK ☐ Change: |
+| J4 | ❓ | **A standing material falling below its minimum.** | Said, and the **owner and the other storekeepers** are told. A "Raise a PO for …" button offers the shortfall (no rate). Told only when this issue is the one that crosses the minimum. | ☐ OK ☐ Also tell the one who gave it out: |
+| J5 | ✅ | **Returns.** | Go back in at the **current average price** (never typed). Only what is out with that job can come back. | ☐ OK ☐ Change: |
+| J6 | ❓ | **After a job is closed.** | Nothing can be returned to it or reversed on it, because its cost is fixed. If something was forgotten, there is no way to add it yet. | ☐ OK ☐ Allow the owner to reopen a job: |
+| J7 | ✅ | **Closing a job asks what came back.** | If material went out and none came back, the form asks "Did any material come back?" and needs "Nothing came back" ticked. Never assumed. | ☐ OK ☐ Change: |
+| J8 | ❓ | **A job with nothing given out cannot be closed.** | It says to cancel it instead. | ☐ OK ☐ Change: |
+| J9 | ❓ | **Who sees what a job cost.** | The **owner** is shown the material cost and the cost per piece when a job closes. The storekeeper is told the job is closed and that the cost is in the owner's report. | ☐ OK ☐ Storekeeper may see: |
+| J10 | ❓ | **A job that used too much.** | When a job closes, any material used more than **5% over** its BOM is said and the owner is told. | ☐ 5% ☐ Change to ___%: |
+| J11 | ❓ | **A sample job.** | Closes like any job; its saved card says its cost stays with the company. Reports will show it separately. | ☐ OK ☐ Change: |
+| J12 | ❓ | **Scrap.** | Only a material marked as scrap takes scrap. Scrap comes in at no value. A sale is to one of your customers, with the rate typed, never in the future. Selling more than collected is recorded and **flagged**. The owner's "scrap sold against collected" shows collected, sold, on hand and the sale value. | ☐ OK ☐ Change: |
+| J13 | ❓ | **Corrections (reversals).** | **Owner only**, with a reason. Both rows stay. Can be reversed: an issue, a return, scrap in, a scrap sale, and a whole receipt. Cannot: opening stock and count adjustments (the next count corrects them), a reversal, goods sent back, a receipt that had part sent back, anything on a closed job. Once per entry. | ☐ OK ☐ Change: |
+| J14 | ❓ | **At what price a reversal comes back.** | An entry that took stock out comes back at the price it went out at. An entry that brought stock in is taken out at the current average. | ☐ OK ☐ Change: |
+| J15 | ❓ | **Who is told of a reversal.** | The person who made the entry, with the owner's reason, at the top of their next new chat. | ☐ OK ☐ Also all storekeepers: |

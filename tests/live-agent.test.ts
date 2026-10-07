@@ -199,4 +199,76 @@ live('the real assistant (needs LIVE_ANTHROPIC_API_KEY)', () => {
     expect(r.forms).toHaveLength(0);
     expect(r.said.toLowerCase()).toMatch(/approv|waiting/);
   }, 180_000);
+
+  /** A job with its BOM, stock to cover it, scrap and a scrap buyer. */
+  async function floor() {
+    await resetDb(); await seedSettings();
+    const s = await storekeeper(); const o = await owner();
+    const today = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
+    const customer = (await ok<{ id: string }>(save(s, 'create_party', { name: 'Ashok Transformers', role: 'CUSTOMER', city: 'Chennai' }))).id;
+    await ok(save(s, 'create_party', { name: 'Murugan Metal Scrap', role: 'CUSTOMER', city: 'Chennai' }));
+    const wire = (await ok<{ id: string }>(save(s, 'create_material', material('22 SWG Copper Wire', { uom: 'KG' })))).id;
+    const core = (await ok<{ id: string }>(save(s, 'create_material', material('Ferrite Core E-30', { uom: 'NOS' })))).id;
+    await ok(save(s, 'create_material', material('Copper Scrap', { uom: 'KG', isScrap: true })));
+    const { receive } = await import('./helpers/db');
+    await receive(wire, 100, 800); await receive(core, 100, 65);
+    const job = await ok<{ id: string }>(save(s, 'create_job', { customerId: customer, productDescription: 'SMPS transformer', quantity: 10, jobDate: today }));
+    await ok(save(s, 'set_job_bom', { jobId: job.id, lines: [{ materialId: wire, qtyPerPiece: 0.5 }, { materialId: core, qtyPerPiece: 2 }] }));
+    return { s, o, wire, core, job };
+  }
+
+  it('the floor: "issue for job 1" opens the give-out form for the job and issues nothing; "5 kg wire" with no job asks which job', async () => {
+    const { s, job } = await floor();
+    const r = await say(s, 'Issue for job 1');
+    expect(r.forms[0]?.tool).toBe('issue_material');
+    expect(r.forms[0]?.values.jobId).toBe(job.id);
+    expect(r.forms[0]?.values.lines).toBeUndefined(); // no lines: everything the BOM still needs
+    expect(await prisma.stockMovement.count({ where: { type: 'ISSUE' } })).toBe(0);
+    const none = await say(s, 'Issue 5 kg wire');
+    expect(none.forms.filter((f) => f.tool === 'issue_material' && f.values.jobId)).toHaveLength(0);
+    expect(none.said.toLowerCase()).toContain('job');
+  }, 240_000);
+
+  it('the floor: "2 kg extra wire for rework" is a marked top-up line', async () => {
+    const { s, wire, job } = await floor();
+    await ok(save(s, 'issue_material', { jobId: job.id })); // everything the BOM needs has gone out; now some pieces need rework
+    const r = await say(s, 'Give 2 kg extra wire to job 1, some pieces needed rework');
+    expect(r.forms[0]?.tool).toBe('issue_material');
+    const lines = r.forms[0]?.values.lines as { materialId: string; quantity: number; topUp?: boolean }[];
+    expect(lines).toMatchObject([{ materialId: wire, quantity: 2, topUp: true }]);
+  }, 180_000);
+
+  it('the floor: closing a job that had material issued asks what came back before any form opens', async () => {
+    const { s, job } = await floor();
+    await ok(save(s, 'issue_material', { jobId: job.id }));
+    const r = await say(s, 'Close job 1');
+    expect(r.forms.filter((f) => f.tool === 'close_job')).toHaveLength(0);
+    expect(r.said.toLowerCase()).toMatch(/come back|came back|returned|leftover/);
+  }, 180_000);
+
+  it('the floor: the storekeeper asking to reverse or delete an entry is told the owner does reversals; the owner gets the form', async () => {
+    const { s, o, job } = await floor();
+    await ok(save(s, 'issue_material', { jobId: job.id, lines: [{ materialId: (await prisma.material.findFirstOrThrow({ where: { name: '22 SWG Copper Wire' } })).id, quantity: 5 }] }));
+    const sk = await say(s, 'I issued 5 kg wire to job 1 by mistake. Reverse it, or just delete that issue.');
+    expect(sk.forms).toHaveLength(0);
+    expect(sk.calls).not.toContain('reverse_movement');
+    expect(sk.said.toLowerCase()).toContain('owner');
+    const ow = await say(o, 'Reverse the 5 kg wire issue to job 1, it went to the wrong job');
+    expect(ow.forms[0]?.tool).toBe('reverse_movement');
+    expect(ow.calls).toContain('get_movement_history');
+    expect(await prisma.stockMovement.count({ where: { type: 'REVERSAL' } })).toBe(0); // a form, not a reversal
+  }, 300_000);
+
+  it('the floor: "sold 1.5 kg scrap at 620" opens the scrap sale for the buyer with no rate filled in; the owner can ask if sold matches collected', async () => {
+    const { s, o } = await floor();
+    const scrap = await prisma.material.findFirstOrThrow({ where: { name: 'Copper Scrap' } });
+    await ok(save(s, 'record_scrap_in', { materialId: scrap.id, quantity: 1.8 }));
+    const r = await say(s, 'Sold 1.5 kg scrap to Murugan Metal Scrap at ₹620 per kg');
+    expect(r.forms[0]?.tool).toBe('record_scrap_sale');
+    expect(r.forms[0]?.values.quantity).toBe(1.5);
+    expect(r.forms[0]?.values.rate).toBeUndefined();
+    const q = await say(o, 'Is the scrap we sold matching what we collected?');
+    expect(q.calls).toContain('get_scrap_summary');
+    expect(q.said).toMatch(/1\.8/);
+  }, 240_000);
 });
