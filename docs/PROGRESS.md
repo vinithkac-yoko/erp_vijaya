@@ -2,7 +2,35 @@
 
 Read this at the start of every session (CLAUDE.md). Newest on top.
 
-## Milestone 4 — Opening count — **built; waiting for Kasi's test and go-ahead for milestone 5**
+## Milestone 5 — Jobs — **built; waiting for Kasi's test and go-ahead for milestone 6**
+
+Kasi's answers after milestone 4: replace the Anthropic key in the console and set the new one in Railway (`ANTHROPIC_API_KEY`) ✓ (to do after the demo), all client confirmations are for the end-of-project demo ✓, trimming the assistant's duplicate table is for the evals in milestone 8 ✓, build the owner's Settings entry ✓, go ahead with milestone 5 ✓.
+
+Done
+- **Settings for the owner**: "Settings" in the menu under his name opens the form for changing a setting. It is a form, so it works with the assistant off (the earlier gap is closed): the owner can switch the assistant back on himself.
+- **Customer POs** (`create_customer_po`, new `list_customer_pos`): the customer is picked (never typed, never created from here); the same customer and PO number comes back as "already recorded" (an open PO releases item by item). A chip offers "Create a job for this PO".
+- **Jobs** (`create_job`, `list_jobs`, `get_job`, `cancel_job`): numbered per financial year, a customer picked from the list, that customer's PO, whole pieces above zero (over 1,00,000 asks once), samples linked to their production job, due date not before the job date. The job form is the fourth-most-used button after the first use, so it moves up into the row on its own (top used first).
+- **The BOM** (`set_job_bom`): quantities per piece, with the total for the whole job shown live and read-only beside every line before saving; wire and varnish start in grams and millilitres and are stored as kg and litres (18.4 g → 0.0184 kg → 9.2 kg for 500 pieces); duplicates, zero, part pieces and tiny numbers are refused or asked about in plain words; replaced as a whole, only while the job is open. The saved card lists each line as *name — per piece → total*.
+- **The shortage check runs by itself after a BOM is saved**: the server draws the table (needed, in stock, short) and offers a purchase order for exactly the shortfall (rate left out) or "Issue material now". Those two buttons stay hidden until their forms exist (milestones 6 and 7).
+- `check_job_shortage`, `get_job_bom_variance` (planned against used; top-up marking comes with issue in milestone 7).
+- Chips can now carry starting values into a form (they are cleaned like the assistant's but not flagged as the assistant's, and a rate never gets in). The form card has new field types: a bill-of-materials editor, job and customer-PO pickers (a PO list is that customer's), a date, and an "is that right?" tick for unusual numbers.
+
+Proof (all run in this session)
+- `pnpm test`: 323 passed (7 live tests skipped). `tests/tools.jobs.test.ts` follows ACCEPTANCE §3 and §4: totals 9.2 kg, 1000 cores, 500 bobbins, 150 m, 2.5 L; ferrite cores need 1000, have 18, short 982; a changed BOM (19 g → 9.5 kg); refusals; job cost owner-only; the forms open with what the tool knows.
+- `pnpm e2e`: 105 passed (5 skipped on purpose), desktop and phone: New job, the BOM with live totals and the shortage table appearing by itself, refusals beside the box, the customer-PO flow with the assistant's stand-in, accessibility scans of both forms in light and dark, the owner's Settings with the assistant off.
+- `pnpm test:kit`: 200/200. Lint, typecheck, build clean.
+- **Live, against the real model** (7 checks, about 35 s): "New job for Ashok Transformers, 500 pieces" opens the job form with the customer found and 500 pieces, nothing saved; "BOM: wire 18.4 grams each, core 2 each, varnish 5 ml each" opens the BOM form with 0.0184 kg per piece; "9.2 kg of wire for this job" gets the question "per piece or for all the pieces?" and no form; "same as last time" copies nothing.
+
+Things to know
+- The shortage check compares one job's needs with stock only; it does not count what other open jobs also need (H11 in CLIENT_CONFIRMATIONS).
+- Added a read tool, `list_customer_pos`, to the catalog (66 tools); catalog, kit copy, descriptions and docs are in sync.
+- Notes for milestone 6: the PO form's prefill keys are `supplierName`, `lines[].materialId`, `lines[].quantity` and `triggeredByJobId` (the shortage chip already sends them); `create_party`'s "Raise a purchase order" chip still sends `supplierId`, which is dropped, and should be changed to `supplierName`.
+
+Questions for Kasi: section H of `docs/CLIENT_CONFIRMATIONS.md`.
+
+Next: milestone 6 — purchasing: purchase orders with the approval limit, approval cards in the chat, goods receipts with inspection, price history, notifications (in-app; email to the owner). Needs Kasi's go-ahead.
+
+## Milestone 4 — Opening count — built (milestone 5 followed)
 
 Kasi's answers after milestone 3: the Anthropic key was supplied (used only as an environment variable for the live test; **never written to a file or committed. It was pasted in chat, so please replace it with a new one after the demo**), the real Railway login works ✓, the Settings button for the owner: go ahead (still to build, see below), the owner cannot read the storekeeper's chats ✓, the owner's answers to the open money questions (A1–A3) will be asked at the end-of-project demo, go ahead with milestone 4 ✓.
 
