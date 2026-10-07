@@ -72,7 +72,7 @@ export interface WriteTool<I extends z.ZodTypeAny = z.ZodTypeAny, O = unknown> e
 export interface FormPreview { info: string[]; values?: Record<string, unknown> }
 /** Follow-ups only READ, and only through the gateway, as the person who just saved. */
 export interface FollowUpContext { session: ToolSession; read: (tool: string, input?: unknown) => Promise<ToolOutcome> }
-export interface FollowUpResult { facts: string[]; chips: Chip[] }
+export interface FollowUpResult { facts: string[]; chips: Chip[]; /** Cards the server draws after the saved card (a shortage table): from read-only checks, never from model text. */ cards?: Card[] }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyTool = ReadTool<any, any> | WriteTool<any, any>;
 

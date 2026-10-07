@@ -53,7 +53,7 @@ export function Shell({ user, chats, currentChatId, allForms, chat, viewKey }: S
 
   return (
     <div className="flex h-dvh flex-col">
-      <TopBar user={user} chats={chats} currentChatId={currentChatId} onHelp={() => setPanel('shortcuts')} />
+      <TopBar user={user} chats={chats} currentChatId={currentChatId} onHelp={() => setPanel('shortcuts')} onSettings={user.role === 'OWNER' ? () => openForm.current('update_setting') : undefined} />
       <div className="relative flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col xl:min-w-[420px]">
           <ChatView key={viewKey} {...chat} inputRef={chatInput} registerOpenForm={register} onOpenSheet={() => setPanel('sheet')} />

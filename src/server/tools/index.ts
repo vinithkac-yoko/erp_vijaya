@@ -2,6 +2,7 @@ import { db } from '../db';
 import { listPendingApprovals } from './approvals';
 import { listReorderAlerts } from './alerts';
 import { approveStockCount, openCount, listCountLines, listCounts, rejectStockCount, saveCountSheet, startStockCount, submitCountLine, submitStockCount } from './counts';
+import { cancelJob, checkJobShortage, createCustomerPo, createJob, getJob, getJobBomVariance, listCustomerPos, listJobs, setJobBom } from './jobs';
 import { createMaterial, deactivateMaterial, getMaterialBalance, searchMaterials, updateMaterial } from './materials';
 import { createParty, deactivateParty, searchParties, updateParty } from './parties';
 import { createPendingService } from './pending';
@@ -22,6 +23,7 @@ export const registry = new Registry([
   listSettings, updateSetting,
   listUsers, createUser, resetUserPassword, deactivateUser,
   listReorderAlerts, listPendingApprovals, getStockValue,
+  listCustomerPos, listJobs, getJob, checkJobShortage, getJobBomVariance, createCustomerPo, createJob, setJobBom, cancelJob,
   listCounts, listCountLines, startStockCount, submitCountLine, saveCountSheet, submitStockCount, approveStockCount, rejectStockCount,
 ]);
 

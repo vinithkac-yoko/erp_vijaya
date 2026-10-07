@@ -110,9 +110,9 @@ export function ChatView(p: ChatViewProps) {
     }
   }, [busy, handle]);
 
-  const openForm = useCallback(async (tool: string) => {
+  const openForm = useCallback(async (tool: string, prefill?: Record<string, unknown>) => {
     setChips([]);
-    const r = await openFormAction({ tool, conversationId: convRef.current });
+    const r = await openFormAction({ tool, conversationId: convRef.current, prefill });
     if (!r.ok) { setItems((cur) => [...cur, NOTICE(r.message)]); return; }
     if (r.sheet) { p.onOpenSheet(); return; }
     adopt(r.conversationId);
@@ -153,7 +153,7 @@ export function ChatView(p: ChatViewProps) {
           {chips.length > 0 && !busy && (
             <div className="flex flex-wrap gap-2" aria-label="Suggestions">
               {chips.map((c) => (
-                <button key={c.label} type="button" onClick={() => ('ask' in c ? void send(c.ask) : 'sheet' in c ? p.onOpenSheet() : void openForm(c.form))}
+                <button key={c.label} type="button" onClick={() => ('ask' in c ? void send(c.ask) : 'sheet' in c ? p.onOpenSheet() : void openForm(c.form, c.prefill))}
                   className="inline-flex min-h-11 md:min-h-9 items-center rounded-full border border-line bg-copper-wash px-4 text-base hover:border-copper">{c.label}</button>
               ))}
             </div>

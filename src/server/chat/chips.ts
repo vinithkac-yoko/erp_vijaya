@@ -20,6 +20,9 @@ const NEXT: Record<string, string[]> = {
   list_reorder_alerts: ['Stock today', 'Open jobs'],
   list_pending_approvals: ['Low stock', 'Stock today'],
   search_parties: ['Stock today', 'Low stock'],
+  list_jobs: ['Low stock', 'Stock today'],
+  get_job: ['Open jobs', 'Low stock'],
+  check_job_shortage: ['Low stock', 'Open jobs'],
 };
 
 /**

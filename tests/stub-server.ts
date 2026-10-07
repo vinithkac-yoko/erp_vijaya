@@ -22,6 +22,8 @@ function script(r: StubRequest): StubReply {
   if (t.includes('approval limit')) return owner ? call('update_setting', { key: 'po.approval_limit', value: 75000 }, 'Check the new limit.') : say('Only the owner can change the approval limit. It is ₹50,000 now.');
   if (t.includes('create a login')) return owner ? call('create_user', { name: 'Ravi Kumar', login: 'ravi@e2e.local', role: 'STOREKEEPER' }, 'You type the first password in the form.') : say('Only the owner adds logins.');
   if (t.includes('switch the assistant off')) return call('update_setting', { key: 'agent.enabled', value: 'off' }, 'This switches the assistant off.');
+  if (t.includes('record a customer po')) return call('create_customer_po', { customerName: 'Ashok Transformers', number: 'AT/2627/118' }, 'Check the PO number.');
+  if (t.includes('open jobs')) return answered ? say('Here are the open jobs.') : call('list_jobs', { status: 'OPEN' });
   return say('I can help with stock questions, and with adding materials, suppliers and customers.');
 }
 

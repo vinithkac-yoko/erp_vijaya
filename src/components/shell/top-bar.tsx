@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTransition } from 'react';
-import { Bookmark, Check, ChevronDown, CircleHelp, History, LogOut, Monitor, Moon, Plus, Sun } from 'lucide-react';
+import { Bookmark, Check, ChevronDown, CircleHelp, History, LogOut, Monitor, Moon, Plus, Settings, Sun } from 'lucide-react';
 import { logoutAction, setThemeAction } from '@/server/auth/actions';
 import { CoilLine, BrandMark } from '@/components/brand';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -21,7 +21,7 @@ function applyTheme(value: 'light' | 'dark' | 'system') {
   if (value === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', value);
 }
 
-export function TopBar({ user, chats, currentChatId, onHelp }: { user: ShellUser; chats: ChatLink[]; currentChatId: string | null; onHelp: () => void }) {
+export function TopBar({ user, chats, currentChatId, onHelp, onSettings }: { user: ShellUser; chats: ChatLink[]; currentChatId: string | null; onHelp: () => void; /** Owner only: opens the form for changing a setting. It needs no assistant, so it also works when the assistant is off. */ onSettings?: () => void }) {
   const [, startTransition] = useTransition();
   const current = user.theme === 'light' || user.theme === 'dark' ? user.theme : 'system';
   const choose = (v: 'light' | 'dark' | 'system') => { applyTheme(v); startTransition(() => { void setThemeAction(v); }); };
@@ -94,6 +94,11 @@ export function TopBar({ user, chats, currentChatId, onHelp }: { user: ShellUser
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
+              {onSettings && (
+                <DropdownMenuItem onSelect={onSettings}>
+                  <Settings aria-hidden className="size-4" />Settings
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onSelect={onHelp} className="md:hidden">
                 <CircleHelp aria-hidden className="size-4" />Keyboard shortcuts
               </DropdownMenuItem>

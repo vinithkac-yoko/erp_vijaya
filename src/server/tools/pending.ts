@@ -19,6 +19,8 @@ export interface CreatePendingArgs {
   agentRunId?: string;
   artifactId?: string;
   artifactVersion?: number;
+  /** A chip the server offered after a save ("Add the BOM"): its starting values are cleaned like an assistant's, but are not flagged as the assistant's. */
+  fromChip?: boolean;
 }
 
 export interface PendingView {
@@ -56,7 +58,8 @@ export function createPendingService(registry: Registry, client: PrismaClient = 
           if (own !== 1) return fail('NOT_FOUND', "Couldn't find that chat.");
         }
 
-        const clean = sanitizePrefill(a.tool, a.input, LOWER[a.origin]);
+        const clean = sanitizePrefill(a.tool, a.input, a.fromChip ? 'agent' : LOWER[a.origin]);
+        if (a.fromChip) clean.assisted = false;
         const created = await client.$transaction(async (tx) => {
           // Opening the same form again in the same chat replaces the earlier one ("issue for job 31… actually job 32").
           await tx.pendingAction.updateMany({

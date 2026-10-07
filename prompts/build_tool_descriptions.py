@@ -119,6 +119,12 @@ purchase orders, customer POs or jobs; say which ones if so. """ + FORM,
      {"partyId": "The business. " + IDS, "reason": "Why, in the user's words."})
 
 # ─────────────────────────────── 3. Customer POs, jobs, BOM ───────────────────────────────
+tool("list_customer_pos", "read", SK_OW, """
+Purchase orders our CUSTOMERS sent us, with PO number, customer, date and how many jobs run under each.
+Use it to check whether a customer's PO is already recorded (an open PO keeps its number and each item
+released is a new job), or to find a PO to put a job under. Not for orders we send suppliers.""",
+     {"customerId": "One customer. " + IDS, "customerName": "A saved customer's name, as returned by search_parties."})
+
 tool("list_jobs", "read", SK_OW, """
 Jobs with number, customer, product description, pieces, status, dates and (for closed jobs) material
 cost. Filter by status, customer, customer PO or dates. Use to find "job 31" (match the end of the

@@ -161,6 +161,19 @@
     "reason": "Why, in the user's words."
    }
   },
+  "list_customer_pos": {
+   "kind": "read",
+   "roles": [
+    "STOREKEEPER",
+    "OWNER"
+   ],
+   "agent": true,
+   "description": "Purchase orders our CUSTOMERS sent us, with PO number, customer, date and how many jobs run under each. Use it to check whether a customer's PO is already recorded (an open PO keeps its number and each item released is a new job), or to find a PO to put a job under. Not for orders we send suppliers.",
+   "inputs": {
+    "customerId": "One customer. Ids come from earlier read-tool results; never show them to the user.",
+    "customerName": "A saved customer's name, as returned by search_parties."
+   }
+  },
   "list_jobs": {
    "kind": "read",
    "roles": [

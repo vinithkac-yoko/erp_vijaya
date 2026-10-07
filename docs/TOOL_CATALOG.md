@@ -64,6 +64,7 @@ until the user ticks "different business"; bad GSTIN → `INVALID_GSTIN`.
 
 | Tool | Kind | Roles | Purpose |
 |---|---|---|---|
+| `list_customer_pos` | R | SK OW | The customer POs, by customer: number, date, how many jobs run under each. Added in milestone 5, so the forms can pick "that customer's PO" and the assistant can check whether one is already recorded |
 | `list_jobs` | R | SK OW | Filter by status, customer, customer PO, date. Number, customer, product, qty, status, cost (closed) |
 | `get_job` | R | SK OW | Customer, PO, product, qty, status, BOM lines (per piece, total, issued, returned), cost so far |
 | `check_job_shortage` | R | SK OW | Per BOM line: needed (still to issue), in stock, short |

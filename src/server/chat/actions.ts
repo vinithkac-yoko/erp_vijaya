@@ -26,16 +26,16 @@ export type OpenFormResult =
   | { ok: false; code: string; message: string };
 
 /** A launcher button: opens the tool's form with nothing filled in. No model is involved, so it works with the assistant off. */
-export async function openFormAction(input: { tool: string; conversationId?: string | null }): Promise<OpenFormResult> {
+export async function openFormAction(input: { tool: string; conversationId?: string | null; prefill?: Record<string, unknown> }): Promise<OpenFormResult> {
   const session = await who();
   if (!session) return LOGGED_OUT;
-  const p = z.object({ tool: z.string().min(1).max(60), conversationId: uuid.nullish() }).safeParse(input);
+  const p = z.object({ tool: z.string().min(1).max(60), conversationId: uuid.nullish(), prefill: z.record(z.unknown()).optional() }).safeParse(input);
   if (!p.success) return { ok: false, code: 'INVALID_INPUT', message: 'Something went wrong. Please try again.' };
   // "Count stock" while a count is open means "carry on counting" (or, once it is with the owner, look at it): the sheet, not a second count.
   if (p.data.tool === 'start_stock_count' && (await currentCount())) return { ok: true, sheet: true };
   const conv = await ensureConversation(session, p.data.conversationId);
   if (!conv) return { ok: false, code: 'NOT_FOUND', message: "Couldn't find that chat." };
-  const opened = await pendingActions.create(session, { tool: p.data.tool, origin: 'LAUNCHER', conversationId: conv.id });
+  const opened = await pendingActions.create(session, { tool: p.data.tool, origin: 'LAUNCHER', conversationId: conv.id, input: p.data.prefill, fromChip: !!p.data.prefill });
   if (!opened.ok) return opened;
   const card = await pendingActions.formCard(session, opened.data);
   const row = await conversations.append(conv.id, 'CARD', { kind: 'card', card });
@@ -69,11 +69,11 @@ export async function cancelFormAction(input: { pendingId: string; conversationI
 }
 
 /** Type-ahead for the pickers in a form. */
-export async function pickerAction(input: { kind: PickerKind; query: string; role?: 'SUPPLIER' | 'CUSTOMER' }): Promise<PickerOption[]> {
+export async function pickerAction(input: { kind: PickerKind; query: string; role?: 'SUPPLIER' | 'CUSTOMER'; forId?: string; filter?: string }): Promise<PickerOption[]> {
   const session = await who();
-  const p = z.object({ kind: z.enum(['material', 'party', 'user', 'countLine']), query: z.string().max(100), role: z.enum(['SUPPLIER', 'CUSTOMER']).optional() }).safeParse(input);
+  const p = z.object({ kind: z.enum(['material', 'party', 'user', 'countLine', 'customerPo', 'job']), query: z.string().max(100), role: z.enum(['SUPPLIER', 'CUSTOMER']).optional(), forId: z.string().max(64).optional(), filter: z.string().max(20).optional() }).safeParse(input);
   if (!session || !p.success) return [];
-  return pickerOptions(session, p.data.kind, p.data.query, p.data.role);
+  return pickerOptions(session, p.data.kind, p.data.query, { role: p.data.role, forId: p.data.forId, filter: p.data.filter });
 }
 
 /** An earlier chat, as the person's own. */
@@ -87,7 +87,7 @@ export async function loadChatAction(id: string): Promise<{ ok: boolean; items: 
 /** The name behind an id the assistant filled into a picker. */
 export async function pickerLabelAction(input: { kind: PickerKind; id: string }): Promise<PickerOption | null> {
   const session = await who();
-  const p = z.object({ kind: z.enum(['material', 'party', 'user', 'countLine']), id: z.string().min(1).max(64) }).safeParse(input);
+  const p = z.object({ kind: z.enum(['material', 'party', 'user', 'countLine', 'customerPo', 'job']), id: z.string().min(1).max(64) }).safeParse(input);
   if (!session || !p.success) return null;
   return pickerLabel(session, p.data.kind, p.data.id);
 }

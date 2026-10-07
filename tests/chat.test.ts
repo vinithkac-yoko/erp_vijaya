@@ -257,7 +257,7 @@ describe('type-ahead in forms', () => {
     await ok(save(s, 'create_party', { name: 'Sundaram Ferrites', role: 'SUPPLIER', city: 'Chennai' }));
     await ok(save(s, 'create_party', { name: 'Ashok Transformers', role: 'CUSTOMER' }));
     expect(await pickerOptions(s, 'party', 'sundaram')).toMatchObject([{ label: 'Sundaram Ferrites', secondary: 'Supplier · Chennai' }]);
-    expect((await pickerOptions(s, 'party', '', 'CUSTOMER')).map((p) => p.label)).toEqual(['Ashok Transformers']);
+    expect((await pickerOptions(s, 'party', '', { role: 'CUSTOMER' })).map((p) => p.label)).toEqual(['Ashok Transformers']);
   });
   it('only the owner can look people up', async () => {
     const o = await owner();

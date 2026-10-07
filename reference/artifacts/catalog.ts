@@ -45,6 +45,8 @@ export const TOOLS: Record<string, ToolMeta> = Object.fromEntries(
     t({ name: 'create_party', kind: 'write', roles: BOTH, inputs: { name: { required: true }, role: { required: true }, gstin: {}, city: {}, state: {}, addressLine: {}, pincode: {}, phone: {}, email: {}, confirmNotDuplicate: {} } }),
     t({ name: 'update_party', kind: 'write', roles: BOTH, inputs: { partyId: { required: true }, name: {}, gstin: {}, city: {}, state: {}, addressLine: {}, pincode: {}, phone: {}, email: {}, addRole: {} } }),
     // ── jobs ──
+    t({ name: 'list_customer_pos', kind: 'read', roles: BOTH, inputs: { customerId: {}, customerName: {} },
+        outputs: ['number', 'customer', 'date', 'jobs'], bindOnly: ['id', 'customerId'] }),
     t({ name: 'list_jobs', kind: 'read', roles: BOTH, inputs: { status: {}, customerId: {}, customerPoId: {}, from: {}, to: {} },
         outputs: ['number', 'customer', 'product', 'quantity', 'status', 'jobDate', 'dueDate', 'materialCost', 'costPerPiece'], bindOnly: ['id', 'customerId'] }),
     t({ name: 'get_job', kind: 'read', roles: BOTH, inputs: { jobId: { required: true } },

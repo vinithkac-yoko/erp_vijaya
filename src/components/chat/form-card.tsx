@@ -7,6 +7,7 @@ import type { FieldDef, FormDef } from '@/lib/forms';
 import { cancelFormAction, submitFormAction, switchFormAction } from '@/server/chat/actions';
 import { Button } from '@/components/ui/button';
 import { Picker } from './picker';
+import { LinesEditor, type BomLineValue } from './lines-editor';
 
 const box = 'block w-full min-h-12 rounded-md border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-faint aria-[invalid=true]:border-alert';
 
@@ -16,16 +17,18 @@ interface Similar { message: string; matches: { name: string; city?: string | nu
 const visible = (f: FieldDef, v: Values) => !f.showWhen || f.showWhen.in.includes(String(v[f.showWhen.field] ?? ''));
 
 /** What goes to the server: only what is visible and filled; numbers as numbers; a ticked box as true. */
-export function payload(form: FormDef, v: Values, notDuplicate: boolean): Values {
+export function payload(form: FormDef, v: Values, notDuplicate: boolean, confirmUnusual = false): Values {
   const out: Values = {};
   for (const f of form.fields) {
     if (!visible(f, v)) continue;
     const x = v[f.name];
     if (f.type === 'checkbox') { if (x === true) out[f.name] = true; continue; }
+    if (f.type === 'lines') { if (Array.isArray(x) && x.length) out[f.name] = x; continue; }
     if (x === undefined || x === null || x === '') continue;
     out[f.name] = f.type === 'number' ? Number(String(x).replace(/,/g, '')) : typeof x === 'string' ? x.trim() : x;
   }
   if (notDuplicate) out.confirmNotDuplicate = true;
+  if (confirmUnusual) out.confirmUnusual = true;
   return out;
 }
 
@@ -38,6 +41,11 @@ export function FormCard({ pendingId, tool, form, values, assisted, info, state,
   const [general, setGeneral] = useState<string | null>(null);
   const [similar, setSimilar] = useState<Similar | null>(null);
   const [notDuplicate, setNotDuplicate] = useState(false);
+  /** "Is that right?": an unusual number is asked about once, and the answer is the person's. */
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  /** The pieces in the job, for the live totals in a bill of materials. */
+  const [jobQty, setJobQty] = useState<number | null>(typeof values.jobQuantity === 'number' ? values.jobQuantity : null);
   const [busy, setBusy] = useState(false);
   const root = useRef<HTMLFormElement>(null);
 
@@ -51,9 +59,10 @@ export function FormCard({ pendingId, tool, form, values, assisted, info, state,
   async function submit() {
     if (busy) return;
     setBusy(true); setGeneral(null);
-    const r = await submitFormAction({ pendingId, values: payload(form, v, notDuplicate) });
+    const r = await submitFormAction({ pendingId, values: payload(form, v, notDuplicate, confirmed) });
     setBusy(false);
     if (r.ok) { onSaved(r.items, r.chips); return; }
+    if (r.code.startsWith('CONFIRM_')) { setConfirm(r.message); setConfirmed(false); return; }
     if (r.code.startsWith('SIMILAR_') && r.details) {
       setSimilar({ message: r.message, matches: (r.details as { matches: Similar['matches'] }).matches });
       setNotDuplicate(false);
@@ -122,15 +131,22 @@ export function FormCard({ pendingId, tool, form, values, assisted, info, state,
                 </label>
               ) : (
                 <>
-                  <label htmlFor={id} className="font-medium">{f.label}{f.required && <span aria-hidden className="text-alert"> *</span>}</label>
+                  {f.type === 'lines'
+                    ? <p id={`${id}-label`} className="font-medium">{f.label}{f.required && <span aria-hidden className="text-alert"> *</span>}</p>
+                    : <label htmlFor={id} className="font-medium">{f.label}{f.required && <span aria-hidden className="text-alert"> *</span>}</label>}
                   <div className="mt-1">
                     {f.type === 'select' ? (
                       <select {...common} value={String(v[f.name] ?? '')} onChange={(e) => set(f.name, e.target.value)} className={box}>
                         {!f.options?.some((o) => o.value === '') && <option value="">Choose…</option>}
                         {f.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
-                    ) : f.type === 'material' || f.type === 'party' || f.type === 'user' || f.type === 'countLine' ? (
-                      <Picker kind={f.type} id={id} value={String(v[f.name] ?? '')} onChange={(x) => set(f.name, x)} partyRole={f.partyRole} invalid={!!err} describedBy={described} />
+                    ) : f.type === 'lines' ? (
+                      <LinesEditor id={id} value={(Array.isArray(v[f.name]) ? v[f.name] : []) as BomLineValue[]} onChange={(x) => setV((p) => ({ ...p, [f.name]: x }))} jobQuantity={jobQty} invalid={!!err} describedBy={described} />
+                    ) : f.type === 'material' || f.type === 'party' || f.type === 'user' || f.type === 'countLine' || f.type === 'customerPo' || f.type === 'job' ? (
+                      <Picker kind={f.type} id={id} value={String(v[f.name] ?? '')} onChange={(x) => set(f.name, x)} partyRole={f.partyRole} invalid={!!err} describedBy={described}
+                        onOption={f.type === 'job' ? (o) => { if (o.quantity !== undefined) setJobQty(o.quantity); } : undefined}
+                        forId={f.dependsOn ? String(v[f.dependsOn] ?? '') || undefined : undefined} filter={f.pickerFilter}
+                        waitFor={f.dependsOn && !v[f.dependsOn] ? 'Pick the customer first' : undefined} />
                     ) : f.type === 'textarea' ? (
                       <textarea {...common} rows={3} value={String(v[f.name] ?? '')} onChange={(e) => set(f.name, e.target.value)} className={box + ' py-3'} />
                     ) : (
@@ -169,10 +185,20 @@ export function FormCard({ pendingId, tool, form, values, assisted, info, state,
           <p className="text-sm text-ink-soft">If it is the same one, press Not now and use the one in the list.</p>
         </div>
       )}
+      {confirm && (
+        <div role="alert" className="mt-4 rounded-md border border-attention bg-copper-wash p-3">
+          <p className="font-medium">{confirm}</p>
+          <label className="mt-2 flex min-h-11 items-center gap-3 font-medium">
+            <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="size-5 accent-[var(--copper)]" />
+            Yes, that is right
+          </label>
+          <p className="text-sm text-ink-soft">If it is a slip, change the number above and press the button again.</p>
+        </div>
+      )}
       {general && <p role="alert" className="mt-4 flex items-start gap-1.5 text-alert"><CircleAlert aria-hidden className="mt-0.5 size-5 shrink-0" />{general}</p>}
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={busy || (!!similar && !notDuplicate)}>{busy ? 'Saving…' : form.verb}</Button>
+        <Button type="submit" disabled={busy || (!!similar && !notDuplicate) || (!!confirm && !confirmed)}>{busy ? 'Saving…' : form.verb}</Button>
         {form.alt && <Button type="button" variant="secondary" onClick={() => void switchTo()} disabled={busy}>{form.alt.label}</Button>}
         <Button type="button" variant="ghost" onClick={() => void notNow()} disabled={busy}>Not now</Button>
         <span className="text-sm text-ink-faint">Ctrl+Enter saves</span>

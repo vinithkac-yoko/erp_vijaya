@@ -2,7 +2,7 @@
  * A form is data. Each write tool owns its definition, so the same task always looks the same, wherever the form opens
  * from and whoever asked for it (INTERFACE §1: "it comes from the tool's form definition, not from the model").
  */
-export type FieldType = 'text' | 'textarea' | 'number' | 'select' | 'checkbox' | 'password' | 'email' | 'date' | 'hidden' | 'material' | 'party' | 'user' | 'countLine';
+export type FieldType = 'text' | 'textarea' | 'number' | 'select' | 'checkbox' | 'password' | 'email' | 'date' | 'hidden' | 'material' | 'party' | 'user' | 'countLine' | 'customerPo' | 'job' | 'lines';
 
 export interface FieldDef {
   name: string;
@@ -22,6 +22,10 @@ export interface FieldDef {
   autoComplete?: string;
   /** Quick picks under a text box ("Recount the bobbins"): one tap fills the box. */
   suggestions?: string[];
+  /** Pickers: another field decides what is offered (a customer PO is one of THAT customer's). */
+  dependsOn?: string;
+  /** Pickers of jobs: which jobs are offered ('open' or 'production'). */
+  pickerFilter?: string;
 }
 
 export interface FormDef {
@@ -35,4 +39,4 @@ export interface FormDef {
 }
 
 /** What a picker offers: a name to read and a small second line. The id is the value, never shown. */
-export interface PickerOption { id: string; label: string; secondary?: string }
+export interface PickerOption { id: string; label: string; secondary?: string; /** A material's unit (KG, NOS…) and a job's number of pieces, for the live totals. */ unit?: string; quantity?: number }

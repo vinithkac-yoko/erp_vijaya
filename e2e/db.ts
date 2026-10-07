@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { SETTINGS } from '../src/lib/settings';
-import { materialNameKey } from '../src/lib/names';
+import { materialNameKey, partyNameKey } from '../src/lib/names';
 import { OWNER, STOREKEEPER } from './users';
 
 export const prisma = new PrismaClient();
@@ -21,4 +21,23 @@ export async function addMaterials(list: { name: string; uom?: 'KG' | 'NOS' | 'M
   for (const m of list) {
     await prisma.material.create({ data: { code: `MAT-E${String(++n).padStart(4, '0')}`, name: m.name, nameKey: materialNameKey(m.name), uom: m.uom ?? 'NOS', stockType: 'PER_JOB', isScrap: m.isScrap ?? false } });
   }
+}
+
+/** Businesses put straight into the table, as the owner would have added them. */
+export async function addParties(list: { name: string; kind?: 'customer' | 'supplier'; city?: string }[]) {
+  const ids: Record<string, string> = {};
+  for (const p of list) {
+    const row = await prisma.party.create({ data: { code: `PTY-E${String(++n).padStart(4, '0')}`, name: p.name, nameKey: partyNameKey(p.name), isCustomer: (p.kind ?? 'customer') === 'customer', isSupplier: p.kind === 'supplier', city: p.city ?? 'Chennai' } });
+    ids[p.name] = row.id;
+  }
+  return ids;
+}
+
+/** Stock that is already on the shelf: a receipt, the way the ledger takes it. */
+export async function addStock(materialName: string, quantity: number, rate: number) {
+  const m = await prisma.material.findFirstOrThrow({ where: { name: materialName } });
+  const supplier = (await prisma.party.findFirst({ where: { isSupplier: true } })) ?? (await prisma.party.create({ data: { code: `PTY-E${String(++n).padStart(4, '0')}`, name: 'Test Supplier', nameKey: partyNameKey('Test Supplier'), isSupplier: true } }));
+  const grn = await prisma.goodsReceipt.create({ data: { number: `GRN-E-${++n}`, supplierId: supplier.id, receiptDate: new Date() } });
+  const line = await prisma.goodsReceiptLine.create({ data: { goodsReceiptId: grn.id, materialId: m.id, receivedQty: quantity, acceptedQty: quantity, rejectedQty: 0, rate, amount: quantity * rate } });
+  await prisma.stockMovement.create({ data: { materialId: m.id, type: 'RECEIPT', direction: 'IN', quantity, rate, grnLineId: line.id, movementDate: new Date() } });
 }

@@ -54,6 +54,11 @@ export async function submitAndFollow(session: ToolSession, pendingId: string, v
     try {
       const f = await tool.followUps({ session, read: (name, input) => runRead(session, name, input) }, (values ?? {}) as Record<string, unknown>, out.data);
       chips = f.chips.filter((c) => usable(session, c));
+      // cards the server draws from its own read-only checks (a shortage table), straight after the saved card
+      for (const c of f.cards ?? []) {
+        if (convId) { const row = await conversations.append(convId, 'CARD', { kind: 'card', card: c }); items.push({ id: row.id, role: 'card', card: c }); }
+        else items.push({ id: `f-${items.length}-${Date.now()}`, role: 'card', card: c });
+      }
       if (f.facts.length && agent && convId) {
         const sentence = await agent.followUp(session, convId, f.facts);
         if (sentence) {
