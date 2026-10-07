@@ -18,7 +18,7 @@ export async function openingFor(session: ToolSession): Promise<Opening> {
     runTool(session, 'list_reorder_alerts', {}),
     session.role === 'OWNER' ? runTool(session, 'list_pending_approvals', {}) : Promise.resolve(null),
     runTool(session, 'list_counts', {}),
-    notifications.unread(session.userId, ['RECOUNT_REQUIRED', 'COUNT_APPROVED', 'PO_APPROVED', 'PO_REJECTED', 'RATE_CHANGE']),
+    notifications.unread(session.userId, ['RECOUNT_REQUIRED', 'COUNT_APPROVED', 'PO_APPROVED', 'PO_REJECTED', 'RATE_CHANGE', 'MOVEMENT_REVERSED', 'NEGATIVE_STOCK_WARNING', 'MIN_LEVEL_BREACH', 'JOB_VARIANCE']),
   ]);
   const below = alerts.ok ? (alerts.data as { rows: unknown[] }).rows.length : 0;
   const waits = waiting?.ok ? (waiting.data as { purchaseOrders: { id: string; number: string; supplier: string; total: number; job: string | null }[]; counts: { id: string; number: string; kind: string; summary: string }[] }) : null;

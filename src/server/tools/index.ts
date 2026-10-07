@@ -5,6 +5,9 @@ import { approveStockCount, openCount, listCountLines, listCounts, rejectStockCo
 import { cancelJob, checkJobShortage, createCustomerPo, createJob, getJob, getJobBomVariance, listCustomerPos, listJobs, setJobBom } from './jobs';
 import { approvePurchaseOrder, cancelPurchaseOrder, createPurchaseOrder, getPurchaseOrder, getPurchasePriceHistory, listPurchaseOrders, rejectPurchaseOrder } from './purchasing';
 import { listGoodsReceipts, recordGoodsReceipt } from './receipts';
+import { getMovementHistory, reverseMovement } from './corrections';
+import { getScrapSummary, recordScrapIn, recordScrapSale } from './scrap';
+import { closeJob, issueMaterial, returnMaterial } from './stockmoves';
 import { createMaterial, deactivateMaterial, getMaterialBalance, searchMaterials, updateMaterial } from './materials';
 import { createParty, deactivateParty, searchParties, updateParty } from './parties';
 import { createPendingService } from './pending';
@@ -27,6 +30,7 @@ export const registry = new Registry([
   listReorderAlerts, listPendingApprovals, getStockValue,
   listCustomerPos, listJobs, getJob, checkJobShortage, getJobBomVariance, createCustomerPo, createJob, setJobBom, cancelJob,
   listPurchaseOrders, getPurchaseOrder, getPurchasePriceHistory, createPurchaseOrder, cancelPurchaseOrder, approvePurchaseOrder, rejectPurchaseOrder, listGoodsReceipts, recordGoodsReceipt,
+  issueMaterial, returnMaterial, closeJob, recordScrapIn, recordScrapSale, getScrapSummary, getMovementHistory, reverseMovement,
   listCounts, listCountLines, startStockCount, submitCountLine, saveCountSheet, submitStockCount, approveStockCount, rejectStockCount,
 ]);
 

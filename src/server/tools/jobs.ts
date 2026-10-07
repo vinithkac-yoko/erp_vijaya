@@ -5,6 +5,7 @@ import { dateText, groupIndian, qty, UOM_LONG } from '@/lib/format';
 import { ToolError } from '../errors';
 import { defineTool } from './define';
 import { flag, opt } from './helpers';
+import { jobCost, jobTotals } from './jobcost';
 import { findParty, tidy } from './lookup';
 import { nextNumber } from './numbers';
 import { todayIST } from './counts';
@@ -266,8 +267,7 @@ export const getJob = defineTool({
     const owner = ctx.session.role === 'OWNER';
     let costSoFar: number | null = null;
     if (owner) {
-      const m = await ctx.db.stockMovement.findMany({ where: { jobId: j.id, type: { in: ['ISSUE', 'RETURN'] } }, select: { type: true, value: true } });
-      costSoFar = Math.round(m.reduce((s, x) => s + (x.type === 'ISSUE' ? 1 : -1) * Number(x.value), 0) * 100) / 100;
+      costSoFar = await jobCost(ctx.db, j.id);
     }
     return { job: jobRowOf(j, owner), bom, costSoFar };
   },
@@ -317,17 +317,27 @@ export const getJobBomVariance = defineTool({
   handler: async (ctx, input) => {
     const j = await findJob(ctx.db, input.jobId);
     const bom = await bomOf(ctx.db, j.id, j.quantity);
+    const totals = await jobTotals(ctx.db, j.id);
+    const tops = await ctx.db.stockMovement.findMany({ where: { jobId: j.id, type: 'ISSUE', reasonCode: 'TOP_UP', reversedBy: null }, select: { materialId: true, quantity: true } });
+    const topUp = (materialId: string) => Math.round(tops.filter((t) => t.materialId === materialId).reduce((s, t) => s + Number(t.quantity), 0) * 10_000) / 10_000;
     const rows = bom.map((b) => {
-      const used = Math.round((b.issued - b.returned) * 10_000) / 10_000;
+      const used = Math.round(((totals.get(b.materialId)?.net) ?? (b.issued - b.returned)) * 10_000) / 10_000;
       const diff = Math.round((used - b.required) * 10_000) / 10_000;
-      return { material: b.material, unit: b.unit, planned: b.required, used, difference: diff, differencePct: b.required > 0 ? Math.round((diff / b.required) * 10_000) / 100 : null };
+      return { material: b.material, unit: b.unit, planned: b.required, used, difference: diff, differencePct: b.required > 0 ? Math.round((diff / b.required) * 10_000) / 100 : null, topUp: topUp(b.materialId) };
     });
+    // material given out that was never on the BOM is all extra: planned nothing, used something
+    const planned = new Set(bom.map((b) => b.materialId));
+    const extra = [...totals.values()].filter((t) => !planned.has(t.materialId) && t.net > 0);
+    if (extra.length) {
+      const mats = await ctx.db.material.findMany({ where: { id: { in: extra.map((e) => e.materialId) } }, select: { id: true, name: true, uom: true } });
+      for (const e of extra) { const m = mats.find((x) => x.id === e.materialId); if (m) rows.push({ material: m.name, unit: m.uom, planned: 0, used: e.net, difference: e.net, differencePct: null, topUp: topUp(e.materialId) }); }
+    }
     return { number: j.number, rows };
   },
   view: (d) => [{
     kind: 'table', title: `${d.number} · planned against used`,
     columns: [{ key: 'm', label: 'Material' }, { key: 'p', label: 'Planned', align: 'right' }, { key: 'u', label: 'Used', align: 'right' }, { key: 'd', label: 'Difference', align: 'right' }],
-    rows: d.rows.slice(0, 12).map((r) => ({ m: r.material, p: qty(r.planned, r.unit), u: qty(r.used, r.unit), d: r.differencePct === null ? '–' : `${r.difference > 0 ? '+' : ''}${qty(r.difference, r.unit)} (${r.differencePct > 0 ? '+' : ''}${r.differencePct}%)` })),
+    rows: d.rows.slice(0, 12).map((r) => ({ m: r.material, p: qty(r.planned, r.unit), u: qty(r.used, r.unit), d: `${r.differencePct === null ? (r.difference > 0 ? '+' : '') + qty(r.difference, r.unit) : `${r.difference > 0 ? '+' : ''}${qty(r.difference, r.unit)} (${r.differencePct > 0 ? '+' : ''}${r.differencePct}%)`}${r.topUp > 0 ? ` · ${qty(r.topUp, r.unit)} extra for rework` : ''}` })),
     note: d.rows.length === 0 ? 'There is no bill of materials yet.' : undefined,
   }],
 });

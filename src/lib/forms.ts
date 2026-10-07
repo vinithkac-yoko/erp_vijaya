@@ -2,7 +2,7 @@
  * A form is data. Each write tool owns its definition, so the same task always looks the same, wherever the form opens
  * from and whoever asked for it (INTERFACE §1: "it comes from the tool's form definition, not from the model").
  */
-export type FieldType = 'text' | 'textarea' | 'number' | 'select' | 'checkbox' | 'password' | 'email' | 'date' | 'hidden' | 'material' | 'party' | 'user' | 'countLine' | 'customerPo' | 'job' | 'lines' | 'purchaseOrder' | 'poLines' | 'grnLines';
+export type FieldType = 'text' | 'textarea' | 'number' | 'select' | 'checkbox' | 'password' | 'email' | 'date' | 'hidden' | 'material' | 'party' | 'user' | 'countLine' | 'customerPo' | 'job' | 'lines' | 'purchaseOrder' | 'poLines' | 'grnLines' | 'issueLines' | 'returnLines' | 'movement';
 
 export interface FieldDef {
   name: string;
