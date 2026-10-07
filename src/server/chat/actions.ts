@@ -73,7 +73,7 @@ export async function cancelFormAction(input: { pendingId: string; conversationI
 /** Type-ahead for the pickers in a form. */
 export async function pickerAction(input: { kind: PickerKind; query: string; role?: 'SUPPLIER' | 'CUSTOMER'; forId?: string; filter?: string }): Promise<PickerOption[]> {
   const session = await who();
-  const p = z.object({ kind: z.enum(['material', 'party', 'user', 'countLine', 'customerPo', 'job', 'purchaseOrder']), query: z.string().max(100), role: z.enum(['SUPPLIER', 'CUSTOMER']).optional(), forId: z.string().max(64).optional(), filter: z.string().max(20).optional() }).safeParse(input);
+  const p = z.object({ kind: z.enum(['material', 'party', 'user', 'countLine', 'customerPo', 'job', 'purchaseOrder', 'movement']), query: z.string().max(100), role: z.enum(['SUPPLIER', 'CUSTOMER']).optional(), forId: z.string().max(64).optional(), filter: z.string().max(20).optional() }).safeParse(input);
   if (!session || !p.success) return [];
   return pickerOptions(session, p.data.kind, p.data.query, { role: p.data.role, forId: p.data.forId, filter: p.data.filter });
 }
@@ -89,7 +89,7 @@ export async function loadChatAction(id: string): Promise<{ ok: boolean; items: 
 /** The name behind an id the assistant filled into a picker. */
 export async function pickerLabelAction(input: { kind: PickerKind; id: string }): Promise<PickerOption | null> {
   const session = await who();
-  const p = z.object({ kind: z.enum(['material', 'party', 'user', 'countLine', 'customerPo', 'job', 'purchaseOrder']), id: z.string().min(1).max(64) }).safeParse(input);
+  const p = z.object({ kind: z.enum(['material', 'party', 'user', 'countLine', 'customerPo', 'job', 'purchaseOrder', 'movement']), id: z.string().min(1).max(64) }).safeParse(input);
   if (!session || !p.success) return null;
   return pickerLabel(session, p.data.kind, p.data.id);
 }

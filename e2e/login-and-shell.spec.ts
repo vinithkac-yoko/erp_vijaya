@@ -45,11 +45,11 @@ test.describe('login', () => {
 });
 
 test.describe('the shell, by role', () => {
-  test('storekeeper: own buttons only, the unbuilt ones switched off, no owner chips', async ({ page }) => {
+  test('storekeeper: own buttons only, all of them working, no owner chips', async ({ page }) => {
     await login(page, STOREKEEPER);
     const nav = page.getByRole('navigation', { name: 'Quick buttons' });
     for (const label of ['Issue to a job', 'Return']) {
-      await expect(nav.getByRole('button', { name: new RegExp(label) })).toBeDisabled(); // their forms come in later milestones
+      await expect(nav.getByRole('button', { name: new RegExp(label) })).toBeEnabled();
     }
     await expect(nav.getByRole('button', { name: /Count stock/ })).toBeEnabled();
     await expect(nav.getByRole('button', { name: /Receive stock/ })).toBeEnabled();
