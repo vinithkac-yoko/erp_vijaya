@@ -96,6 +96,7 @@ Everything runs by part number (`docs/CLIENT_TEMPLATES.md`, BUSINESS_FLOW §1). 
 | `create_part` | W | SK OW | Customer (picked), part number, description, HSN. Same number for the same customer → `PART_EXISTS`. Follow-ups: "Add its BOM", "Create a job for it" |
 | `update_part` | W | SK OW | Fix a typing mistake in the number (not a clash), the description, the HSN, or mark it no longer made (`PART_NOT_MADE` on a new job). Jobs already made keep what they had |
 | `set_part_bom` | W | SK OW | The part's USUAL bill of materials per piece. Replaces it. A new job's BOM form starts from it; each job keeps its own copy |
+| `update_customer_po_line` | W | SK OW | One line of a customer PO: more or fewer pieces, a new delivery date, or the rate they pay now (the rate is the owner's: a storekeeper's rate → `FORBIDDEN_ROLE`). A part the customer PO does not have → `NOT_FOUND`. Never below the pieces already in jobs (`BELOW_PLANNED`); nothing to change → `NOTHING_TO_CHANGE`. Nothing is rounded. Costs are not stored on a part: they use today's average purchase price whenever a report is asked |
 | `get_customer_po` | R | SK OW | One customer PO by line: ordered, in jobs (production jobs under the PO, not cancelled), left to plan; rate and value for the owner only |
 | `get_margin_by_part` | R | **OW** | Closed production jobs by part in a period: pieces, material cost a piece, the rate a piece from the PO line, margin and %. Material only (no labour). A part with no rate on its PO line shows cost and says so |
 
@@ -301,6 +302,19 @@ corrected by a later count). *Follow-ups:* new balance; notify the storekeeper.
 
 Tools that need a setting read it server-side; they never take it from the caller.
 
+## 12. The owner's questions (milestone 12)
+
+The questions in `docs/CLIENT_CONFIRMATIONS.md` live in the app for the owner to answer (the Questions panel, the top-bar button, the opening card). Only the owner sees or answers them; the keys in that file ("A1", "M11") are never shown. `pnpm decisions:import` (and every start) reads the file's question tables: new questions are added, the wording of known ones is brought up to date, **answers are never touched**.
+
+| Tool | Kind | Roles | Purpose |
+|---|---|---|---|
+| `list_decisions` | R | **OW** | The questions, with topic, what we did meanwhile, why we ask, where each stands (to answer / waiting for the client / later / answered) and the answer. Filters: status, topic, words, "the first ones" |
+| `get_decision` | R | **OW** | One question in full, found by its words (a piece of the question, never a code). Ambiguous words → asks which |
+| `answer_decision` | W | **OW** | The chosen answer (must be one of that question's choices), a note (required when the choice says "write it yourself"). Changing an answer is allowed; every answer is an audit row. Emails Kasi when `DECISIONS_NOTIFY_EMAIL` and `SMTP_URL` are set |
+| `set_decision_status` | W | **OW** | Put a question aside for later, mark it "waiting for the client" with who he will ask, or bring it back to "to answer" |
+
+Errors: `NOT_FOUND`, `DECISION_AMBIGUOUS`, `INVALID_CHOICE`, `NOTE_REQUIRED`. The panel's buttons make a PendingAction (origin LAUNCHER) and run the same tools, so the rules above hold for the panel and the assistant alike; the assistant only opens the "Your answer" form, the owner presses its button.
+
 ## A. Artifact, printout and download tools (see `docs/ARTIFACTS.md`)
 
 These are **app tools**: they store and open artifacts; they are not business data. An artifact reads
@@ -340,3 +354,10 @@ The buttons above the chat input (INTERFACE §3, `reference/artifacts/launcher.t
 `create_job` with **no prefill** (origin LAUNCHER). They work when the assistant is off. Which of them are visible
 (top 4, the rest behind More) is the person's own use, counted from the `AuditEvent` rows with `openedFrom: LAUNCHER`,
 after the role filter.
+
+## C. Not tools: Tamil and the microphone (milestone 12)
+
+Neither touches business data, so neither is in the registry or the catalog.
+
+- **Tamil on request** (`translateAction`, a server action; both roles). A "தமிழ்" button under assistant answers, notices, saved cards, the opening card and the owner's questions sends the **English texts of the screen** (never rows, ids or tool output the person cannot already see) to Claude with a fixed system prompt that says the texts are content, not instructions, and that numbers, units, names, part numbers and codes stay as they are. A translation in which any number of the English is missing is **thrown away** and the English stays. Results are kept in `translations` (SHA-256 of the English + language), so the same words are translated once. At most 24 texts of 2,000 characters a call and 30 calls a person a minute. What is saved by a form or an answer is always the English value.
+- **Speaking** (`POST /api/speech/transcribe`; both roles, logged in only). A recording of at most 60 seconds (3 MB; webm, ogg, mp4, mpeg, wav or aac) is sent to Google's Gemini (`GEMINI_API_KEY`) and comes back as text in the message box (Tamil in Tamil script, English as English, numbers in digits). The person reads it and presses Send. Nothing is stored or logged; 30 recordings a person a minute; with no key the button is not drawn. The words then go through the same assistant, tools and forms as typed ones.

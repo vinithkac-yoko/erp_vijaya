@@ -170,6 +170,18 @@ from a supplier's email). The AI reads them. So:
 | Observability | Every agent run: tools called, inputs, result sizes, tokens, latency in `AgentRun`; owner's Activity answer ("What did the assistant do today?") reads it |
 | Evals | 5 runs per case; mechanical checks first, judged rubric second (`evals/`) |
 
+### Tamil and the microphone (milestone 12)
+
+| Risk | Control |
+|---|---|
+| A translation changes a number, a quantity or a part number | A translation in which any number of the English is missing is thrown away; the English stays. Names, units and codes are told to the translator to stay as they are. The saved value of a form or an answer is always the English one. |
+| Text sent to be translated does something | The texts are sent as a JSON array with a system prompt saying they are content, not instructions; the reply must be a JSON array of the same length or it is refused (tried twice). Only the words already on the person's screen are sent: never rows, ids or tool output they cannot see. |
+| Cost | 30 translations and 30 recordings a person a minute; 24 texts of 2,000 characters a call; results are kept so the same words are translated once. |
+| The recording leaves the building | It goes to Google (Gemini) for the seconds it takes to turn it into text and is not stored, logged or put in the audit by us. The `GEMINI_API_KEY` lives only in Railway variables, is sent in a header (never in an address) and never reaches the browser. The microphone is used only after the person presses the button and is released the moment it stops (at most 60 seconds). |
+| Anyone uses the listener | Logged-in people only (cookie session); size (3 MB) and type are checked before anything is sent on; failures say one plain sentence and never name the provider, a key or a status. |
+| A page, frame or artifact uses the microphone | `Permissions-Policy: microphone=(self)`: only our own page. Artifacts stay in a sandboxed frame that cannot ask for it. `connect-src 'self'` is unchanged: the browser only ever talks to our server. |
+| What is heard is treated as an instruction | The words go into the message box as text. Nothing is sent until the person presses Send, and then they are an ordinary message: the assistant never writes, and every change still needs a form pressed by the person. |
+
 ## 6. Operations
 
 - **Backups:** Railway Postgres daily backups; restore drill once before go-live.

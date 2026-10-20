@@ -2,6 +2,26 @@
 
 Read this at the start of every session (CLAUDE.md). Newest on top.
 
+## Milestone 12 — The owner's questions in the app, Tamil, the microphone, changing a PO line — **built; waiting for Kasi's test and answers**
+
+Kasi's answers after milestone 11 (2026-10-23): the picture's name is "Need urgent qty for E30V due to E36 bobbin shortages" (an urgent request, not a PO); a customer can order a part again; prices must follow every order; do not round the PO; the owner answers the confirmation questions inside the software, in English with a button for Tamil, asking later is "later" (the owner can ask the assistant about a question); Kasi applies setting-type answers himself; the first 15–20 questions; email and the client-side handling "the sensible way"; add Tamil and the microphone from the earlier project for storekeeper and owner.
+
+Done
+- **Questions for you (owner only).** `docs/CLIENT_CONFIRMATIONS.md` is read into the database (137 questions; re-read on every start, answers never touched). A **Questions** button in the top bar (with a count), a line on the opening card, and a panel with four tabs: *To answer*, *Waiting for the client*, *Later*, *Answered*. The 20 that the next work waits on are shown first ("Show all of them" for the rest). Each question shows what we did meanwhile and why we ask, and the choices; "write it yourself" choices need words. **Later**, **I don't know, ask the client** (who he will ask, and a note to copy and send), **Back to answer**, **Ask the assistant about this**. Every answer is an audit row and, when mail and `DECISIONS_NOTIFY_EMAIL` are set, an email to Kasi. Tools `list_decisions`, `get_decision`, `answer_decision`, `set_decision_status` (owner only); the assistant can explain a question or open the "Your answer" form, the owner presses its button.
+- **Tamil on request** (both roles): a "தமிழ்" button under assistant answers, notices, saved cards, the opening card and every question (and its choices) in the panel; "English" brings it back. Done with Claude, kept so the same words are translated once, and **a translation that loses or changes a number is thrown away** (the English stays). What a form or an answer saves is always the English value. The assistant also reads Tamil and Tamil written in English letters and answers in the language used (prompt, `LANGUAGE`).
+- **The microphone** (both roles): a button beside the message box. Press, speak Tamil, English or both (up to a minute), press again; the words appear in the box for the person to read and fix, and are sent only when they press Send. Listening is done by Google's Gemini (Claude takes no audio), as in the earlier project; the recording is not kept. Needs `GEMINI_API_KEY` on the server; without it the button is not shown. `Permissions-Policy` now says `microphone=(self)`; nothing else loosened.
+- **Customer PO lines can be changed** (`update_customer_po_line`): more or fewer pieces (never below what is in jobs), a new delivery date, or the rate they pay now (owner only). The customer PO's total is **no longer rounded**; the amount in words follows the exact total.
+- `docs/SAFETY.md` (Tamil and the microphone), `docs/DEPLOY.md` (Gemini and mail variables), `docs/TOOL_CATALOG.md` (§12 and §C), `docs/AGENT_PROMPT.md` (LANGUAGE, DECISIONS) and section N of `docs/CLIENT_CONFIRMATIONS.md` are brought up to date.
+
+Not done, on purpose
+- The assistant does not ask the owner questions on its own yet ("later"); no reminders.
+- The one-page signed record of the owner's answers (Kasi did not follow it; explained in plain words; not built).
+- Reading a picture of a PO (still words only), urgent customer requests (M19), amending an open PO, charge lines, matching their PO numbers, what IGIR is, the delivery challan: all wait for answers (section M).
+
+Proof (run in this session)
+- RESULTS_PLACEHOLDER
+- Live checks with the real model and keys supplied inline for the run, never written to a file: LIVE_PLACEHOLDER
+
 ## Milestone 11 — Part numbers (from the client's own paperwork) — **built; waiting for Kasi's test and the client's answers**
 
 Kasi sent five of the client's files (three purchase orders, a tax invoice, the factory's work-order form) and a picture of four part lines, and said: everything runs by part number; the same part comes back; two customers may share a number; a job is a work order; materials have codes; design the work order ourselves; round-off, amount in words and due dates are fine; margin by part is wanted. Notes on the files are in `docs/CLIENT_TEMPLATES.md`; the questions and what was done about each answer are in section M of `docs/CLIENT_CONFIRMATIONS.md`.

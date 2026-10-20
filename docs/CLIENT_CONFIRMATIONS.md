@@ -10,7 +10,7 @@ bottom of each milestone's section.
 - ✅ = Kasi already agreed. The owner should still hear it once.
 - ❓ = nobody has agreed yet. **These are the important ones.**
 
-Last updated: after milestone 7 (section J).
+Last updated: after milestone 12 (section N). Since milestone 12 the owner answers these questions inside the app (the Questions panel); this file is where they are written and where Kasi keeps the wording.
 
 ---
 
@@ -248,3 +248,19 @@ See `docs/CLIENT_TEMPLATES.md`. None of this is built yet; these are the questio
 | M16 | "OK" | Each gauge is its own material. Nothing to change. |
 | M17 | "If it's easy, go ahead." | **Not built.** A delivery challan needs a record of what was sent and how many (we have none for finished goods), so it is not a quick change. Say if you want it as the next step. |
 | M18 | "OK" | Built: `get_margin_by_part` (owner only): closed jobs by part, material cost a piece, the rate on the PO line, margin. **Material only**; labour and running costs are not in it. |
+| M19 | (2026-10-23) The picture's name is **"Need urgent qty for E30V due to E36 bobbin shortages"** | Asked to the client (first-pass question): where an urgent request that is a message, not a PO, should live. Nothing is built for "urgent" yet. |
+| M20 | (2026-10-23) "OK, but the prices need to be updated every time, right?" | Yes, and they are, with nothing to remember: a part's usual BOM holds **quantities only**; the cost of a job uses today's average purchase price, so it moves with every receipt; the customer's rate is typed on each PO line (the owner only) and changed later with **Change a PO line** (`update_customer_po_line`, built). |
+
+## N. The questions inside the app, Tamil and the microphone (2026-10-23)
+
+Kasi's answers to the plan for putting these questions in the software, and what was done about each.
+
+| # | Answer | What was done |
+|---|---|---|
+| N1 | Only the **owner** answers. | The Questions panel (top bar, the opening card's "N questions for you", "Questions for you" in the owner's menu) is the owner's; the storekeeper has no button and the tools refuse him. |
+| N2 | English, with an option to translate to Tamil. | Every question can be read in Tamil (button "தமிழ்"); the saved answer is always the English choice. Same button on the assistant's answers and cards, for both roles. |
+| N3 | "I will apply" (setting-type answers). | An answer is only saved and shown to Kasi (an email when `DECISIONS_NOTIFY_EMAIL` and mail are set up). Nothing changes in the software by itself. |
+| N4 | "I don't understand" (the sign-off PDF). | Explained in plain words to Kasi: a one-page paper of the owner's answers that he signs, so there is a record of what he agreed. **Not built.** |
+| N5 | The first 15–20 only. | 20 questions are marked "first": they are shown first, with "Show all of them" for the rest. |
+| N6, N7 | "Do the sensible ones." | Email to Kasi when an answer arrives (if set up); **no** reminders; "I don't know, ask the client" moves a question to *Waiting for the client* with who he will ask, and gives a note to copy and send. The assistant does not ask on its own yet ("later"): the owner can open a question and press *Ask the assistant about this*, or ask in the chat. |
+| N8 | Voice, as in the earlier project (Tamil, English or both). | A microphone beside the message box for both roles. The words land in the box; the person reads them and presses Send. Needs a Google (Gemini) key on the server; without it the button is not there. |

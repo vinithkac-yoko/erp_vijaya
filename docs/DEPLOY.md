@@ -70,6 +70,16 @@ The address the email goes to is the **Owner notification email** the owner sets
 | `AGENT_MESSAGES_PER_MINUTE` | optional, default `20` | Most messages one person can send in a minute |
 | `ANTHROPIC_REFUSAL_FALLBACK` | optional, `off` to turn off the automatic fallback when the model declines | Leave it as it is unless Anthropic's support says otherwise |
 
+**Tamil and the microphone (milestone 12).** Translating to Tamil uses the same Anthropic key as the assistant (nothing to add; it works whenever the assistant has a key). The **microphone button** needs a Google key, because the assistant's maker does not take audio:
+
+| Name | Value | Why |
+|---|---|---|
+| `GEMINI_API_KEY` | a key from aistudio.google.com ("Get API key") | Turns the microphone on for everyone. Leave it out and the button is simply not shown. Keep it private. |
+| `GEMINI_MODEL` | optional, default `gemini-flash-latest` | Which Google model listens |
+| `DECISIONS_NOTIFY_EMAIL` | optional, Kasi's email | With `SMTP_URL` set, an email arrives each time the owner answers a question in the Questions panel |
+
+What is said is sent to Google for the moment it takes to turn it into text, and is not kept by the app. Say so to the owner and the storekeeper before they use it. Browsers ask for the microphone the first time; on a phone the page must be opened over https (Railway's address is).
+
 **Reports, downloads and printouts (milestone 9).** They need a browser (to draw PDFs and pictures) and a program called pandoc (for Word files).
 The repo's `nixpacks.toml` makes Railway install both, so you do nothing. If a download says "Couldn't make that file", open the service's
 Variables and add `CHROMIUM_PATH` with the value `chromium`, then redeploy.
