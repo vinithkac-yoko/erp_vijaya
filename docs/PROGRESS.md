@@ -19,8 +19,8 @@ Not done, on purpose
 - Reading a picture of a PO (still words only), urgent customer requests (M19), amending an open PO, charge lines, matching their PO numbers, what IGIR is, the delivery challan: all wait for answers (section M).
 
 Proof (run in this session)
-- RESULTS_PLACEHOLDER
-- Live checks with the real model and keys supplied inline for the run, never written to a file: LIVE_PLACEHOLDER
+- **Final run: `pnpm test` 546 passed (25 live skipped), `pnpm test:kit` 200/200, `pnpm e2e` 230 passed (6 skipped on purpose), lint, typecheck and build clean.** New: translation (cache, number guard, bad replies), the listener (key in a header, plain failures), the security header, the questions (9 unit, 6 browser), Tamil (8 browser, desktop and phone, with the accessibility check) and the microphone (browser: the fake microphone, "nothing heard", keyboard and touch size, not logged in). One audit test failed on the first run (the new question actions did not use the usual `who()` session check by name); fixed and re-run.
+- Live checks with the real model and keys supplied inline for the run, never written to a file: **Tamil translation**: a stock line, a GSTIN and phone line, and a line that tries to give the translator an order all came back in correct Tamil with every number and code unchanged, the order translated as plain words and not obeyed. **Assistant in Tamil**: "copper wire evlo irukku?" (Tamil in English letters) and a question in Tamil script both reached the right read tool and wrote nothing; the Tamil-script question was answered in Tamil, the English-letters one in English. **Not checked live: the microphone** (it needs a Google key; the browser tests use a stand-in listener).
 
 ## Milestone 11 — Part numbers (from the client's own paperwork) — **built; waiting for Kasi's test and the client's answers**
 

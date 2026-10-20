@@ -398,4 +398,18 @@ live('the real assistant (needs LIVE_ANTHROPIC_API_KEY)', () => {
     const c = await say(o, 'What do my jobs cost so far?');
     expect(c.calls).toContain('get_job_cost_report');
   }, 300_000);
+
+  it('language: Tamil in English letters, and Tamil script, are understood (the same tools), and the answer comes back in the language used', async () => {
+    await resetDb(); await seedSettings();
+    const s = await storekeeper();
+    await ok(save(s, 'create_material', material('22 SWG Copper Wire', { uom: 'KG' })));
+    const before = await prisma.auditEvent.count();
+    const a = await say(s, 'copper wire evlo irukku?');
+    expect(a.calls.some((c) => c === 'get_material_balance' || c === 'search_materials')).toBe(true);
+    expect(a.forms).toHaveLength(0);
+    const b = await say(s, '22 SWG செம்பு கம்பி எவ்வளவு இருக்கிறது?');
+    expect(b.calls.some((c) => c === 'get_material_balance' || c === 'search_materials')).toBe(true);
+    expect(b.said).toMatch(/[\u0B80-\u0BFF]/); // answered in Tamil script
+    expect(await prisma.auditEvent.count()).toBe(before);
+  }, 300_000);
 });
