@@ -200,3 +200,28 @@ Last updated: after milestone 7 (section J).
 | L10 | ❓ | **The demo copy.** | Set `DEMO_MODE=true` on a demo Railway service only. It fills a month of believable stock, jobs, purchase orders, receipts, counts and leaks through the real tools. The owner says "start the demo again" to wipe it and rebuild (a form asks for a tick first; it cannot run on the real copy). | ☐ OK ☐ Change what the demo month shows: |
 | L11 | ❓ | **On the phone.** | The app can be added to the home screen (installable, with an icon). It shows an offline notice when there is no network; it never stores stock or any business data on the phone. | ☐ OK ☐ Change: |
 | L12 | ❓ | **Railway needs two extra programs** for Word and PDF files: Chromium and pandoc. `nixpacks.toml` installs them. If a deploy shows "downloads are not available", this is why (see `docs/DEPLOY.md`). | ☐ Done ☐ Need help: |
+
+## M. Added after the client's own paperwork (2026-10-20): part numbers, their PO and work order
+
+See `docs/CLIENT_TEMPLATES.md`. None of this is built yet; these are the questions that decide how.
+
+| # | Status | The question | Why it matters | Owner says |
+|---|---|---|---|---|
+| M1 | ❓ | **Whose number is the part number?** | The customer's (Medha's `90301030002`)? Or does Vijaya also have its own? One product could have both. | |
+| M2 | ❓ | **Is a part number the same for every customer, or can two customers have the same one?** | Decides whether a part number is unique on its own. | |
+| M3 | ❓ | **Does the same part number come back in later orders?** | Today's rule says a repeat order is a fresh job and a fresh BOM, never copied. If parts repeat, a part would carry its BOM and a new job would start from it. | ☐ Same BOM each time ☐ Changes every time ☐ Sometimes |
+| M4 | ❓ | **Where does the BOM come from?** | The work order shows a BOM per piece against a part. Who writes it, and when does it change? | |
+| M5 | ❓ | **Customer PO lines.** | The picture looks like part, description, quantity from a customer's order. Does the order also carry a rate and a delivery date for each part? | |
+| M6 | ❓ | **Jobs and work orders: one per part?** | A work order has one customer part number and one quantity. Is a "job" the same thing as a work order? | |
+| M7 | ❓ | **Do raw materials also have codes?** | The work order has a "Product Code" for each material. Is that their own item code? Must the storekeeper see and type it? (Today materials are found by name only.) | |
+| M8 | ❓ | **What is the IGIR number?** | Printed beside each material on the work order. Is it the receipt (goods inward inspection) the material came in on? Should the issue say which receipt it was taken from? | |
+| M9 | ❓ | **Print the work order in their layout?** | Replace our issue slip with their form `VEC 47.001 Rev-01`, with Requested by / Issued by / Received by. | ☐ Yes, exactly ☐ Close is fine |
+| M10 | ❓ | **Where do PO numbers come from?** | They number POs in their accounts program (147, 178, 229 and a reference with a supplier code). Do we keep our own numbers, or must ours match theirs? | |
+| M11 | ❓ | **POs changed after they went out ("-Amended").** | Our rule says an approved PO cannot be changed. They amend. How should it work? | |
+| M12 | ❓ | **A charge on a PO** (for example "Cylinder Charges"). | A PO line that is a charge, not stock. Allowed? | |
+| M13 | ❓ | **A different unit on the PO than in stock** (tape described in metres, bought in Nos; varnish in kg drums, bought in Nos). | Our PO line uses the material's own unit. | |
+| M14 | ❓ | **Round-off and amount in words** on the PO. | They print both. We print neither. | ☐ Add both |
+| M15 | ❓ | **A due date on every PO line**, and "Dispatched through", "Terms of payment", "Terms of delivery". | They have them (mostly empty). | |
+| M16 | ❓ | **Wire by gauge.** | Each gauge is a separate item with its own rate (17 SWG to 29 SWG, SS and NON SS). OK to hold each as its own material? | |
+| M17 | ❓ | **Tax invoices.** | They are made in the accounts program with the e-invoice and e-way bill. Do you want anything from us for dispatch (a delivery challan by part number), or do we leave invoices alone? | |
+| M18 | ❓ | **Margin by part number.** | We know the cost of a job and, from the customer's order, the rate per piece. Do you want a report of margin per part number? | |
