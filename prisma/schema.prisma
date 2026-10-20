@@ -65,6 +65,8 @@ model User {
   sharesReceived   ArtifactShare[] @relation("ShareTo")
   sharesGiven      ArtifactShare[] @relation("ShareBy")
 
+  decisionsAnswered Decision[]
+
   @@map("users")
 }
 
@@ -699,6 +701,65 @@ model CustomerPoLine {
   @@unique([customerPoId, partId])
   @@index([partId])
   @@map("customer_po_lines")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  DECISIONS  — the things only the owner can decide (docs/CLIENT_CONFIRMATIONS.md)
+// ═══════════════════════════════════════════════════════════════════
+
+enum DecisionStatus {
+  OPEN
+  ANSWERED
+  NEEDS_CLIENT // the owner does not know: someone else (his customer, his accountant) has to say
+  LATER
+}
+
+/// A question about how the business wants something to work, with what we did meanwhile. The questions come from
+/// docs/CLIENT_CONFIRMATIONS.md (imported by `key`, never shown); the owner's answers live here, and every answer is also an
+/// AuditEvent, so who said what and when is never lost. Owner only: the storekeeper has no tool for these.
+model Decision {
+  id           String         @id @default(uuid())
+  /// "A1", "M11": the row in the confirmations file. Only the importer uses it; no person sees it.
+  key          String         @unique
+  topic        String
+  position     Int
+  question     String
+  whatWeDid    String
+  why          String?
+  /// [{ value, label }]: the choices. Empty means the answer is written in his own words.
+  options      Json
+  /// The first questions to put to the owner (the ones the next work waits on).
+  firstPass    Boolean        @default(false)
+  /// Kasi already said yes; the owner should still hear it once.
+  agreedByKasi Boolean        @default(false)
+  status       DecisionStatus @default(OPEN)
+  answerChoice String?
+  answerNote   String?
+  answeredAt   DateTime?
+  answeredById String?
+  /// Why it is waiting on someone else, or what he wants to ask them.
+  statusNote   String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  answeredBy User? @relation(fields: [answeredById], references: [id])
+
+  @@index([status, firstPass, position])
+  @@index([answeredById])
+  @@map("decisions")
+}
+
+/// Text already put into Tamil (or another language), so the same words are never paid for twice and always read the same.
+model Translation {
+  id        String   @id @default(uuid())
+  /// SHA-256 of the English text.
+  sourceKey String
+  language  String
+  text      String
+  createdAt DateTime @default(now())
+
+  @@unique([sourceKey, language])
+  @@map("translations")
 }
 
 // ═══════════════════════════════════════════════════════════════════

@@ -173,22 +173,28 @@ export const listCustomerPos = defineTool({
   }],
 });
 
+/** A customer PO by its id, or by the number as the customer wrote it (with the customer, if two customers use one number). */
+async function findCustomerPo(db: Db, input: { customerPoId: string; customerId?: string; customerName?: string }) {
+  const customer = input.customerId || input.customerName ? await findCustomer(db, input) : null;
+  const ref = input.customerPoId.trim();
+  const include = { customer: { select: { name: true } }, lines: { include: { part: { select: { id: true, partNumber: true, description: true } } }, orderBy: { createdAt: 'asc' as const } } };
+  let po = UUID.test(ref) ? await db.customerPo.findUnique({ where: { id: ref }, include }) : null;
+  if (!po) {
+    const hits = await db.customerPo.findMany({ where: { number: { equals: ref, mode: 'insensitive' }, ...(customer ? { customerId: customer.id } : {}) }, include, take: 3 });
+    if (hits.length > 1) throw new ToolError('PO_AMBIGUOUS', `More than one customer has a PO ${ref}: ${hits.map((h) => h.customer.name).join(', ')}. Say which customer.`, undefined, 'customerPoId');
+    po = hits[0] ?? null;
+  }
+  if (!po) throw new ToolError('NOT_FOUND', "Couldn't find that customer PO. Check the number.", undefined, 'customerPoId');
+  return po;
+}
+
 // ── get_customer_po ────────────────────────────────────────────────────────────────────────────────
 /** One customer PO, line by line: ordered, already put into jobs, and what is left to plan. What the customer pays is the owner's. */
 export const getCustomerPo = defineTool({
   name: 'get_customer_po', kind: 'read', roles: ['STOREKEEPER', 'OWNER'],
   input: z.object({ customerPoId: z.string({ required_error: 'Which PO?' }).min(1, 'Which PO?').max(100), customerId: z.preprocess(emptyToUndef, z.string().max(64).optional()), customerName: opt(150) }),
   handler: async (ctx, input) => {
-    const customer = input.customerId || input.customerName ? await findCustomer(ctx.db, input) : null;
-    const ref = input.customerPoId.trim();
-    const include = { customer: { select: { name: true } }, lines: { include: { part: { select: { id: true, partNumber: true, description: true } } }, orderBy: { createdAt: 'asc' as const } } };
-    let po = UUID.test(ref) ? await ctx.db.customerPo.findUnique({ where: { id: ref }, include }) : null;
-    if (!po) {
-      const hits = await ctx.db.customerPo.findMany({ where: { number: { equals: ref, mode: 'insensitive' }, ...(customer ? { customerId: customer.id } : {}) }, include, take: 3 });
-      if (hits.length > 1) throw new ToolError('PO_AMBIGUOUS', `More than one customer has a PO ${ref}: ${hits.map((h) => h.customer.name).join(', ')}. Say which customer.`, undefined, 'customerPoId');
-      po = hits[0] ?? null;
-    }
-    if (!po) throw new ToolError('NOT_FOUND', "Couldn't find that customer PO. Check the number.", undefined, 'customerPoId');
+    const po = await findCustomerPo(ctx.db, input);
     const jobs = await ctx.db.job.findMany({ where: { customerPoId: po.id, status: { not: 'CANCELLED' }, type: 'PRODUCTION' }, select: { partId: true, quantity: true, status: true } });
     const owner = ctx.session.role === 'OWNER';
     const rows = po.lines.map((l) => {
@@ -208,6 +214,73 @@ export const getCustomerPo = defineTool({
     rows: d.rows.slice(0, 12).map((r) => ({ p: `${r.partNumber} · ${r.description}`, o: groupIndian(r.ordered), j: groupIndian(r.planned), l: groupIndian(r.left) })),
     note: d.rows.length === 0 ? 'No parts are listed on this PO yet.' : undefined,
   }],
+});
+
+// ── update_customer_po_line ────────────────────────────────────────────────────────────────────────
+/** A line of a customer's PO changed later: more or fewer pieces, a new delivery date, or (the owner only) the rate the customer pays now. */
+export const updateCustomerPoLine = defineTool({
+  name: 'update_customer_po_line', kind: 'write', roles: ['STOREKEEPER', 'OWNER'],
+  input: z.object({
+    customerPoId: z.string({ required_error: 'Which PO?' }).min(1, 'Which PO?').max(100), customerId: z.preprocess(emptyToUndef, z.string().max(64).optional()), customerName: opt(150),
+    partId: z.string({ required_error: 'Which part?' }).min(1, 'Which part?').max(100),
+    quantity: z.preprocess((v) => (typeof v === 'string' && v.trim() !== '' ? Number(v.replace(/,/g, '')) : v === '' || v === null ? undefined : v),
+      z.number({ invalid_type_error: 'Type the number of pieces.' }).int('Pieces are whole numbers.').min(1, 'The quantity must be more than zero.').max(100_000_000, 'That is too many pieces.').optional()),
+    rate: optNum('rate', 0, 10_000_000), dueDate: dateOpt,
+  }),
+  form: {
+    title: 'Change a PO line', verb: 'Save changes',
+    intro: 'More or fewer pieces of a part on a customer PO, a new delivery date, or the rate they pay now. Leave a box empty to keep what is there.',
+    fields: [
+      { name: 'customerId', label: 'Customer', type: 'party', partyRole: 'CUSTOMER', required: true },
+      { name: 'customerPoId', label: "Customer's PO", type: 'customerPo', dependsOn: 'customerId', required: true },
+      { name: 'partId', label: 'Part number', type: 'part', dependsOn: 'customerId', required: true },
+      { name: 'quantity', label: 'Pieces ordered now', type: 'number', unit: 'pcs' },
+      { name: 'ownerRates', label: '', type: 'hidden' },
+      { name: 'rate', label: 'Rate a piece now', type: 'number', unit: '₹', showWhen: { field: 'ownerRates', in: ['yes'] }, hint: 'What the customer pays for one piece on this order.' },
+      { name: 'dueDate', label: 'Delivery date', type: 'date' },
+    ],
+  },
+  stamp: 'PO LINE CHANGED',
+  describe: (a) => [`${a.customer} · PO ${a.number}`, `${a.part} · ${a.description}`, ...Object.entries((a.changes ?? {}) as Record<string, unknown>).map(([k, v]) => `${k}: ${v}`)],
+  preview: async (ctx, input) => {
+    const values: Record<string, unknown> = { ownerRates: ctx.session.role === 'OWNER' ? 'yes' : '' };
+    const info: string[] = [];
+    try {
+      if (typeof input.customerPoId === 'string' && input.customerPoId && typeof input.partId === 'string' && input.partId) {
+        const po = await findCustomerPo(ctx.db, { customerPoId: input.customerPoId, customerId: input.customerId as string | undefined, customerName: input.customerName as string | undefined });
+        const part = await findPart(ctx.db, input.partId, po.customerId);
+        const line = po.lines.find((l) => l.partId === part.id);
+        values.customerId = po.customerId; values.customerPoId = po.id; values.partId = part.id;
+        if (line) {
+          info.push(`${po.customer.name} · PO ${po.number} · ${part.partNumber}: ${groupIndian(line.quantity)} ordered${ctx.session.role === 'OWNER' && line.rate !== null ? `, ₹${Number(line.rate)} a piece now` : ''}.`);
+          if (!input.quantity) values.quantity = line.quantity;
+        } else info.push(`${part.partNumber} is not on this PO yet. Add it with "Record a customer PO".`);
+      }
+    } catch (e) { info.push(e instanceof ToolError ? e.message : 'Check the PO and the part.'); }
+    return { info, values };
+  },
+  handler: async (ctx, input) => {
+    const po = await findCustomerPo(ctx.db, input);
+    const part = await findPart(ctx.db, input.partId, po.customerId);
+    const line = po.lines.find((l) => l.partId === part.id);
+    if (!line) throw new ToolError('NOT_FOUND', `${part.partNumber} is not on PO ${po.number}. Add it by recording the PO again with that part.`, undefined, 'partId');
+    if (input.rate !== undefined && ctx.session.role !== 'OWNER') throw new ToolError('FORBIDDEN_ROLE', 'Only the owner changes the rate the customer pays.', undefined, 'rate');
+    const changes: Record<string, unknown> = {};
+    const data: Prisma.CustomerPoLineUpdateInput = {};
+    if (input.quantity !== undefined && input.quantity !== line.quantity) {
+      const planned = (await ctx.db.job.aggregate({ _sum: { quantity: true }, where: { customerPoId: po.id, partId: part.id, type: 'PRODUCTION', status: { not: 'CANCELLED' } } }))._sum.quantity ?? 0;
+      if (input.quantity < planned) throw new ToolError('BELOW_PLANNED', `${groupIndian(planned)} pieces of ${part.partNumber} are already in jobs under this PO, so it can't be less than that.`, undefined, 'quantity');
+      data.quantity = input.quantity; changes['Pieces'] = `${groupIndian(line.quantity)} → ${groupIndian(input.quantity)}`;
+    }
+    if (input.rate !== undefined && (line.rate === null || Number(line.rate) !== input.rate)) { data.rate = input.rate; changes['Rate a piece'] = `${line.rate === null ? 'none' : `₹${Number(line.rate)}`} → ₹${input.rate}`; }
+    if (input.dueDate) { data.dueDate = istDate(input.dueDate); changes['Delivery date'] = dateText(istDate(input.dueDate)); }
+    if (Object.keys(changes).length === 0) throw new ToolError('NOTHING_TO_CHANGE', 'Nothing to change. Fill in what should be different.');
+    await ctx.db.customerPoLine.update({ where: { id: line.id }, data });
+    return {
+      data: { customer: po.customer.name, number: po.number, part: part.partNumber },
+      audit: { entityType: 'CustomerPoLine', entityId: line.id, action: 'UPDATE', before: { quantity: line.quantity, rate: ctx.session.role === 'OWNER' ? num(line.rate) : undefined }, after: { customer: po.customer.name, number: po.number, part: part.partNumber, description: part.description, changes } },
+    };
+  },
 });
 
 // ── create_job ─────────────────────────────────────────────────────────────────────────────────────

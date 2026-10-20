@@ -48,3 +48,21 @@ export async function sendOwnerEmails(env: NodeJS.ProcessEnv = process.env): Pro
   }
   return sent;
 }
+
+/**
+ * Tells Kasi (the builder) an answer has come in: only when SMTP is set up and DECISIONS_NOTIFY_EMAIL names him. Never the
+ * reason an answer fails to save, and it carries only the question and the answer, never a business number.
+ */
+export async function sendDecisionNotice(subject: string, text: string, env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  const t = transport(env);
+  const to = env.DECISIONS_NOTIFY_EMAIL?.trim();
+  if (!t || !to || !to.includes('@')) return false;
+  try {
+    await t.sendMail({ from: env.NOTIFY_FROM || 'Vijaya Stores <no-reply@vijaya.local>', to, subject, text });
+    if (env.SMTP_URL === 'json:') sentMail.push({ to, subject, text });
+    return true;
+  } catch (err) {
+    console.error('[email] could not send the decision notice:', err instanceof Error ? err.message.slice(0, 200) : 'unknown error');
+    return false;
+  }
+}

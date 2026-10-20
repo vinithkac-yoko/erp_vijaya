@@ -9,7 +9,7 @@ export const prisma = new PrismaClient();
 export async function resetData() {
   await prisma.$transaction([
     prisma.$executeRawUnsafe(`SET LOCAL vijaya.allow_reset = 'on'`),
-    prisma.$executeRawUnsafe(`TRUNCATE materials, parties, number_series, audit_events, stock_movements, pending_actions, conversations, settings, stock_counts, notifications CASCADE`),
+    prisma.$executeRawUnsafe(`TRUNCATE materials, parties, number_series, audit_events, stock_movements, pending_actions, conversations, settings, stock_counts, notifications, decisions, translations CASCADE`),
   ]);
   await prisma.user.deleteMany({ where: { email: { notIn: [OWNER.email, STOREKEEPER.email] } } });
   for (const d of SETTINGS) await prisma.setting.create({ data: { key: d.key, value: d.initial, valueType: d.type } });

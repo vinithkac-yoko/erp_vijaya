@@ -20,6 +20,7 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:if-empty": "tsx prisma/seed.ts --if-empty",
+    "decisions:import": "tsx prisma/seed.ts --if-empty",
     "eval": "vitest run -c vitest.eval.config.ts"
   },
   "dependencies": {

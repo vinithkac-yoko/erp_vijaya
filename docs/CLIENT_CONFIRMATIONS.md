@@ -225,15 +225,17 @@ See `docs/CLIENT_TEMPLATES.md`. None of this is built yet; these are the questio
 | M16 | ❓ | **Wire by gauge.** | Each gauge is a separate item with its own rate (17 SWG to 29 SWG, SS and NON SS). OK to hold each as its own material? | |
 | M17 | ❓ | **Tax invoices.** | They are made in the accounts program with the e-invoice and e-way bill. Do you want anything from us for dispatch (a delivery challan by part number), or do we leave invoices alone? | |
 | M18 | ❓ | **Margin by part number.** | We know the cost of a job and, from the customer's order, the rate per piece. Do you want a report of margin per part number? | |
+| M19 | ❓ | **An urgent request from a customer that is a message, not a PO.** | The picture came with the words "Need urgent qty for E30V due to E36 bobbin shortages": four parts and how many of each, wanted urgently because of a shortage of one bobbin. We have no "urgent" yet. Where should such a request live? | ☐ As a normal customer PO ☐ As a job marked urgent ☐ Just a list we look at |
+| M20 | ❓ | **Prices change with every order.** | The rate the customer pays is typed on each PO line (the owner only) and can be changed later with "Change a PO line". What material costs are worked out at is today's average purchase price, so it moves with every receipt by itself; the usual BOM holds quantities only, never a price. | ☐ OK ☐ Change: |
 
 ### M — Kasi's answers on 2026-10-20, and what was done about each
 
 | # | Answer | What was done |
 |---|---|---|
 | M1, M2 | "Yes, they share." | Read as: the same part number can exist for two customers. A part belongs to one customer and is unique per customer. **To confirm with the client:** is the number the customer's own, and could one customer have the same number twice? |
-| M3 | "Yes, it comes back." | Built. A part keeps its usual BOM; a new job for it starts from that BOM, shown on the BOM form to check; the job keeps its own copy. **Not answered:** is the BOM the same each time, or does it change? (It is a starting point, never silently copied.) |
+| M3 | "Yes, it comes back"; "the customer can order it again" | Built. A part keeps its usual BOM; a new job for it starts from that BOM, shown on the BOM form to check; the job keeps its own copy. **Not answered:** is the BOM the same each time, or does it change? (It is a starting point, never silently copied.) |
 | M4 | (not answered) | The first BOM made for a part becomes its usual one; it is changed with "set part BOM". **To ask the client:** who writes it and when does it change? |
-| M5 | "The picture's name is the request that came with that pic." | Customer POs now list parts and pieces; the owner may type the rate a piece; a delivery date per line may be given. **I could not see the picture's file name** (only the picture came through): please send the name or text. |
+| M5 | "The picture's name is the request that came with that pic": **"Need urgent qty for E30V due to E36 bobbin shortages"** | So the four lines are an urgent request from the customer, not a PO. Customer POs list parts and pieces (the owner may type the rate a piece; a delivery date per line may be given), but there is no "urgent" mark yet: see M19. |
 | M6 | "Yes" | A job is the work order: one part, one quantity. The issue slip is now the **work order**, in our own design. |
 | M7 | "Yes" | Materials have an optional **item code**, typed and shown, found by search. Their own work-order column "Product Code". |
 | M8 | "I don't know." | Left out of our work order. **To ask the client:** what is the IGIR number printed beside each material? |
@@ -242,7 +244,7 @@ See `docs/CLIENT_TEMPLATES.md`. None of this is built yet; these are the questio
 | M11 | "He said there are open POs." | Read as: a PO that is still open may be changed. **Not built yet** (our rule stays: an approved PO is not edited). To confirm what he means, and what may change (quantity, rate, a line added, a line removed) and who must approve it again. |
 | M12 | "I don't understand." | In plain words: on the packing-tape order there is a line "Cylinder Charges, 2 × ₹9,000": something we pay for that is not stock and never arrives on the shelf. Question for the client: do some of your purchase orders carry a line like that? **Not built** until answered. |
 | M13 | (explained) | No change needed: keep each material in the unit it is bought in (a roll of tape as one roll, not metres). |
-| M14, M15 | "OK" | Done on the purchase order printout: **round-off to the whole rupee** (their own POs round, e.g. −₹0.45), the **amount in words** in lakhs and crores, and the delivery date on each line (the PO's date; per-line dates are not stored). One of their three sample POs does not round (₹1,96,965.60): **to ask the client** whether always rounding is right. |
+| M14, M15 | "OK"; then (2026-10-23) "let's not round, for now" | The purchase order prints the **amount in words** in lakhs and crores and the delivery date on each line (the PO's date; per-line dates are not stored). **Not rounded**: the printed total is the saved total to the paisa. (Round-off was built, then taken out.) |
 | M16 | "OK" | Each gauge is its own material. Nothing to change. |
 | M17 | "If it's easy, go ahead." | **Not built.** A delivery challan needs a record of what was sent and how many (we have none for finished goods), so it is not a quick change. Say if you want it as the next step. |
 | M18 | "OK" | Built: `get_margin_by_part` (owner only): closed jobs by part, material cost a piece, the rate on the PO line, margin. **Material only**; labour and running costs are not in it. |

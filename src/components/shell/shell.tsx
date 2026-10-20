@@ -9,9 +9,10 @@ import { Shortcuts } from './shortcuts';
 import { CountSheet } from './count-sheet';
 import { ArtifactPanel } from '@/components/artifacts/artifact-panel';
 import { PrintoutPanel } from '@/components/artifacts/printout-panel';
+import { DecisionsPanel } from '@/components/decisions/decisions-panel';
 import type { Card } from '@/lib/cards';
 
-type PanelView = { kind: 'shortcuts' } | { kind: 'sheet' } | { kind: 'artifact'; id: string; title: string; rev: number } | { kind: 'printout'; template: string; ref: Record<string, string>; title: string } | null;
+type PanelView = { kind: 'shortcuts' } | { kind: 'sheet' } | { kind: 'decisions' } | { kind: 'artifact'; id: string; title: string; rev: number } | { kind: 'printout'; template: string; ref: Record<string, string>; title: string } | null;
 
 function typingInField(t: EventTarget | null) {
   return t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName));
@@ -22,20 +23,25 @@ export interface ShellProps {
   chats: ChatLink[];
   currentChatId: string | null;
   allForms: FormButton[];
-  chat: Omit<ChatViewProps, 'inputRef' | 'registerOpenForm' | 'onOpenSheet' | 'onOpenArtifact' | 'onOpenPrintout' | 'openArtifactId' | 'registerArtifactForm'>;
+  chat: Omit<ChatViewProps, 'inputRef' | 'registerOpenForm' | 'onOpenSheet' | 'onOpenDecisions' | 'registerAsk' | 'onOpenArtifact' | 'onOpenPrintout' | 'openArtifactId' | 'registerArtifactForm'>;
   /** The page's security nonce: the artifact frame's own scripts carry it (docs/ARTIFACTS.md §12). */
   nonce: string;
+  /** Owner only: how many of his questions are still to answer first (the number on the top bar's Decisions button). */
+  decisionsCount?: number;
   /** Changes when another chat is opened (or a new one begun), so the chat view starts from what the server drew. */
   viewKey: string;
 }
 
-export function Shell({ user, chats, currentChatId, allForms, chat, viewKey, nonce }: ShellProps) {
+export function Shell({ user, chats, currentChatId, allForms, chat, viewKey, nonce, decisionsCount = 0 }: ShellProps) {
   const [panel, setPanel] = useState<PanelView>(null);
   // The report last opened in this chat stays "the one we are talking about" after the panel (or a phone's full-screen sheet) is closed.
   const [contextArtifact, setContextArtifact] = useState<string | null>(null);
   const chatInput = useRef<HTMLTextAreaElement>(null);
   const openForm = useRef<(tool: string, prefill?: Record<string, unknown>) => void>(() => {});
   const artifactForm = useRef<(artifactId: string, tool: string, prefill: Record<string, unknown>) => Promise<void>>(async () => {});
+  const [openQuestions, setOpenQuestions] = useState(decisionsCount);
+  const askRef = useRef<(text: string) => void>(() => {});
+  const registerAsk = useCallback((fn: (text: string) => void) => { askRef.current = fn; }, []);
   const close = useCallback(() => setPanel(null), []);
   const register = useCallback((fn: (tool: string, prefill?: Record<string, unknown>) => void) => { openForm.current = fn; }, []);
   const registerArtifact = useCallback((fn: (artifactId: string, tool: string, prefill: Record<string, unknown>) => Promise<void>) => { artifactForm.current = fn; }, []);
@@ -75,14 +81,17 @@ export function Shell({ user, chats, currentChatId, allForms, chat, viewKey, non
 
   return (
     <div className="flex h-dvh flex-col">
-      <TopBar user={user} chats={chats} currentChatId={currentChatId} onHelp={() => setPanel({ kind: 'shortcuts' })} onOpenArtifact={openArtifact} onSettings={user.role === 'OWNER' ? () => openForm.current('update_setting') : undefined} />
+      <TopBar user={user} chats={chats} currentChatId={currentChatId} onHelp={() => setPanel({ kind: 'shortcuts' })} onOpenArtifact={openArtifact} onDecisions={user.role === 'OWNER' ? () => setPanel({ kind: 'decisions' }) : undefined} decisionsCount={openQuestions} onSettings={user.role === 'OWNER' ? () => openForm.current('update_setting') : undefined} />
       <div className="relative flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col xl:min-w-[420px]">
-          <ChatView key={viewKey} {...chat} inputRef={chatInput} registerOpenForm={register} onOpenSheet={() => setPanel({ kind: 'sheet' })}
+          <ChatView key={viewKey} {...chat} inputRef={chatInput} registerOpenForm={register} onOpenSheet={() => setPanel({ kind: 'sheet' })} onOpenDecisions={() => setPanel({ kind: 'decisions' })} registerAsk={registerAsk}
             onOpenArtifact={openArtifact} onOpenPrintout={openPrintout} openArtifactId={panel?.kind === 'artifact' ? panel.id : contextArtifact} registerArtifactForm={registerArtifact} />
         </main>
         <Panel open={panel?.kind === 'shortcuts'} title="Keyboard shortcuts" onClose={close}>
           <Shortcuts forms={allForms} />
+        </Panel>
+        <Panel open={panel?.kind === 'decisions'} title="Questions for you" onClose={close}>
+          {panel?.kind === 'decisions' && <DecisionsPanel onCounts={setOpenQuestions} onAsk={(text) => { if (window.matchMedia('(max-width: 767px)').matches) setPanel(null); askRef.current(text); }} />}
         </Panel>
         <Panel open={panel?.kind === 'sheet'} title="Count sheet" onClose={close} fill wide>
           <CountSheet onSend={() => { close(); openForm.current('submit_stock_count'); }} />

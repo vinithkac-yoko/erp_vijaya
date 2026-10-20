@@ -41,6 +41,13 @@ export const TOOLS: Record<string, ToolMeta> = Object.fromEntries(
     t({ name: 'create_material', kind: 'write', roles: BOTH, inputs: { name: { required: true }, itemCode: {}, uom: { required: true }, stockType: { required: true }, minimumLevel: {}, hsnCode: {}, gstRate: {}, isScrap: {}, confirmNotDuplicate: {} } }),
     t({ name: 'update_material', kind: 'write', roles: BOTH, inputs: { materialId: { required: true }, name: {}, itemCode: {}, minimumLevel: {}, hsnCode: {}, gstRate: {} } }),
     t({ name: 'deactivate_material', kind: 'write', roles: BOTH, inputs: { materialId: { required: true }, reason: {} } }),
+    // ── decisions (the owner's questions) ──
+    t({ name: 'list_decisions', kind: 'read', roles: OWNER, inputs: { status: {}, topic: {}, query: {}, firstPassOnly: {} },
+        outputs: ['topic', 'question', 'whatWeDid', 'why', 'statusText', 'answer', 'note', 'answeredAt'], bindOnly: ['id'] }),
+    t({ name: 'get_decision', kind: 'read', roles: OWNER, inputs: { decisionId: { required: true } },
+        outputs: ['topic', 'question', 'whatWeDid', 'why', 'statusText', 'answer', 'note', 'answeredAt'], bindOnly: ['id'] }),
+    t({ name: 'answer_decision', kind: 'write', roles: OWNER, inputs: { decisionId: { required: true }, choice: { required: true }, note: {} } }),
+    t({ name: 'set_decision_status', kind: 'write', roles: OWNER, inputs: { decisionId: { required: true }, status: { required: true }, note: {} } }),
     // ── parties ──
     t({ name: 'search_parties', kind: 'read', roles: BOTH, inputs: { query: {}, role: {} },
         outputs: ['name', 'type', 'city', 'gstin', 'phone'], bindOnly: ['id'] }),
@@ -56,6 +63,7 @@ export const TOOLS: Record<string, ToolMeta> = Object.fromEntries(
     t({ name: 'set_part_bom', kind: 'write', roles: BOTH, inputs: { partId: { required: true }, lines: { required: true }, 'lines[].materialId': { required: true }, 'lines[].qtyPerPiece': { required: true } } }),
     t({ name: 'list_customer_pos', kind: 'read', roles: BOTH, inputs: { customerId: {}, customerName: {} },
         outputs: ['number', 'customer', 'date', 'jobs', 'parts', 'ordered'], bindOnly: ['id', 'customerId'] }),
+    t({ name: 'update_customer_po_line', kind: 'write', roles: BOTH, inputs: { customerPoId: { required: true }, customerId: {}, customerName: {}, partId: { required: true }, quantity: {}, rate: { rate: true }, dueDate: {} } }),
     t({ name: 'get_customer_po', kind: 'read', roles: BOTH, inputs: { customerPoId: { required: true }, customerId: {}, customerName: {} },
         outputs: ['partNumber', 'description', 'ordered', 'planned', 'made', 'left', 'dueDate'] }),
     t({ name: 'list_jobs', kind: 'read', roles: BOTH, inputs: { status: {}, customerId: {}, customerPoId: {}, from: {}, to: {} },

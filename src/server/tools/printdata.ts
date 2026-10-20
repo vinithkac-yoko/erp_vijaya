@@ -65,8 +65,7 @@ export const getPrintData = defineTool({
         supplier: partyOf(supplier), taxMode,
         lines: po.lines.map((l, i) => ({ n: i + 1, material: l.material.name, itemCode: l.material.itemCode ?? '', hsn: l.hsnCode ?? '', unit: l.material.uom, quantity: Number(l.quantity), rate: Number(l.rate), gstRate: l.gstRate === null ? 0 : Number(l.gstRate), amount: Number(l.amount) })),
         subTotal: Number(po.subTotal), gst: Number(po.gstAmount), total: Number(po.totalValue),
-        // the printed total is to the whole rupee (as on their own purchase orders); the saved total is not changed
-        roundOff: round2(Math.round(Number(po.totalValue)) - Number(po.totalValue)), payable: Math.round(Number(po.totalValue)),
+        // not rounded (Kasi, 2026-10-23): the printed total is the saved total, to the paisa
       };
     }
 

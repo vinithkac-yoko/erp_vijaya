@@ -61,6 +61,8 @@ export const UNIQUES: Record<string, MappedError> = {
   parties_nameKey_key: e('PARTY_EXISTS', 'That name is already saved.'),
   parties_gstin_key: e('PARTY_EXISTS', 'That GSTIN is already saved for another name.'),
   materials_nameKey_key: e('MATERIAL_EXISTS', 'That material is already in the list.'),
+  decisions_key_key: e('ALREADY_EXISTS', 'That question is already there.'),
+  translations_sourceKey_language_key: e('ALREADY_EXISTS', 'That is already translated.'),
   materials_itemCodeKey_key: e('ITEM_CODE_EXISTS', 'That item code is already used for another material.'),
   parts_customerId_partKey_key: e('PART_EXISTS', 'That customer already has a part with that number.'),
   part_bom_lines_partId_materialId_key: e('DUPLICATE_LINE', 'That material is on the list twice.'),

@@ -2,13 +2,14 @@ import { db } from '../db';
 import { listPendingApprovals } from './approvals';
 import { listReorderAlerts } from './alerts';
 import { approveStockCount, openCount, listCountLines, listCounts, rejectStockCount, saveCountSheet, startStockCount, submitCountLine, submitStockCount } from './counts';
-import { cancelJob, checkJobShortage, createCustomerPo, createJob, getCustomerPo, getJob, getJobBomVariance, listCustomerPos, listJobs, setJobBom } from './jobs';
+import { cancelJob, checkJobShortage, createCustomerPo, createJob, getCustomerPo, getJob, updateCustomerPoLine, getJobBomVariance, listCustomerPos, listJobs, setJobBom } from './jobs';
 import { approvePurchaseOrder, cancelPurchaseOrder, createPurchaseOrder, getPurchaseOrder, getPurchasePriceHistory, listPurchaseOrders, rejectPurchaseOrder } from './purchasing';
 import { listGoodsReceipts, recordGoodsReceipt } from './receipts';
 import { getMovementHistory, reverseMovement } from './corrections';
 import { getScrapSummary, recordScrapIn, recordScrapSale } from './scrap';
 import { closeJob, issueMaterial, returnMaterial } from './stockmoves';
 import { createMaterial, deactivateMaterial, getMaterialBalance, searchMaterials, updateMaterial } from './materials';
+import { answerDecision, getDecision, listDecisions, setDecisionStatus } from './decisions';
 import { createPart, getPart, listParts, setPartBom, updatePart } from './parts';
 import { createParty, deactivateParty, searchParties, updateParty } from './parties';
 import { createPendingService } from './pending';
@@ -28,12 +29,13 @@ import type { RunOptions, ToolOutcome, ToolSession } from './types';
  * catalog (src/lib/catalog.ts, docs/TOOL_CATALOG.md). Later milestones add jobs, purchasing and stock movements.
  */
 export const registry = new Registry([
+  listDecisions, getDecision, answerDecision, setDecisionStatus,
   searchMaterials, getMaterialBalance, createMaterial, updateMaterial, deactivateMaterial,
   searchParties, createParty, updateParty, deactivateParty,
   listSettings, updateSetting,
   listUsers, createUser, resetUserPassword, deactivateUser,
   listReorderAlerts, listPendingApprovals, getStockValue,
-  createPart, updatePart, setPartBom, listParts, getPart, listCustomerPos, getCustomerPo, listJobs, getJob, checkJobShortage, getJobBomVariance, createCustomerPo, createJob, setJobBom, cancelJob,
+  createPart, updatePart, setPartBom, listParts, getPart, listCustomerPos, getCustomerPo, updateCustomerPoLine, listJobs, getJob, checkJobShortage, getJobBomVariance, createCustomerPo, createJob, setJobBom, cancelJob,
   listPurchaseOrders, getPurchaseOrder, getPurchasePriceHistory, createPurchaseOrder, cancelPurchaseOrder, approvePurchaseOrder, rejectPurchaseOrder, listGoodsReceipts, recordGoodsReceipt,
   issueMaterial, returnMaterial, closeJob, recordScrapIn, recordScrapSale, getScrapSummary, getMovementHistory, reverseMovement,
   getPrintData, resetDemoData, shareArtifact, unshareArtifact, getLeakReport, getCountHistory, getJobCostReport, getMarginByPart, estimateJobCost, getActivity,

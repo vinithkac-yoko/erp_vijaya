@@ -27,6 +27,10 @@ export interface ChatViewProps {
   registerOpenForm: (fn: (tool: string, prefill?: Record<string, unknown>) => void) => void;
   /** Opens the count sheet in the panel. */
   onOpenSheet: () => void;
+  /** Owner only: opens the Decisions panel. */
+  onOpenDecisions: () => void;
+  /** Lets the shell put a question to the assistant as if it were typed (the panel's "Ask the assistant about this"). */
+  registerAsk: (fn: (text: string) => void) => void;
   /** Opens an artifact, or a printout, beside the chat. */
   onOpenArtifact: (id: string) => void;
   onOpenPrintout: (card: Extract<import('@/lib/cards').Card, { kind: 'printout' }>) => void;
@@ -141,6 +145,7 @@ export function ChatView(p: ChatViewProps) {
   }, [adopt, p]);
 
   useEffect(() => { p.registerOpenForm((tool, prefill) => { void openForm(tool, prefill); }); }, [p, openForm]);
+  useEffect(() => { p.registerAsk((m) => void send(m)); }, [p, send]);
 
   // A row button inside an artifact: the tool's own form opens in the chat, filled in with what the row says (never a rate).
   const openFromArtifact = useCallback(async (artifactId: string, tool: string, prefill: Record<string, unknown>) => {
@@ -167,7 +172,7 @@ export function ChatView(p: ChatViewProps) {
             if (it.role === 'user') return <div key={it.id} className="flex justify-end"><p className="max-w-[85%] whitespace-pre-wrap rounded-md bg-plate px-4 py-2.5 text-plate-ink">{it.text}</p></div>;
             if (it.role === 'assistant') return <p key={it.id} className="whitespace-pre-wrap rounded-md border border-line border-l-4 border-l-copper bg-surface px-4 py-3">{it.text}</p>;
             const c = it.card;
-            if (c.kind === 'opening') return <OpeningCard key={it.id} card={c} assistantOn={p.assistantOn} onAsk={(ask, label) => void send(ask, label)} onSheet={p.onOpenSheet} onForm={(tool, prefill) => void openForm(tool, prefill)} />;
+            if (c.kind === 'opening') return <OpeningCard key={it.id} card={c} assistantOn={p.assistantOn} onAsk={(ask, label) => void send(ask, label)} onSheet={p.onOpenSheet} onDecisions={p.onOpenDecisions} onForm={(tool, prefill) => void openForm(tool, prefill)} />;
             if (c.kind === 'table') return <TableCard key={it.id} card={c} />;
             if (c.kind === 'notice') return <NoticeCard key={it.id} card={c} />;
             if (c.kind === 'saved') return <SavedCard key={it.id} card={c} />;

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
-import { Bookmark, Check, FileText, LayoutDashboard, ChevronDown, CircleHelp, History, LogOut, Monitor, Moon, Plus, Settings, Sun } from 'lucide-react';
+import { Bookmark, Check, FileText, MessageCircleQuestion, LayoutDashboard, ChevronDown, CircleHelp, History, LogOut, Monitor, Moon, Plus, Settings, Sun } from 'lucide-react';
 import { logoutAction, setThemeAction } from '@/server/auth/actions';
 import { CoilLine, BrandMark } from '@/components/brand';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -23,7 +23,7 @@ function applyTheme(value: 'light' | 'dark' | 'system') {
   if (value === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', value);
 }
 
-export function TopBar({ user, chats, currentChatId, onHelp, onSettings, onOpenArtifact }: { user: ShellUser; chats: ChatLink[]; currentChatId: string | null; onHelp: () => void; onOpenArtifact: (id: string, title: string) => void; /** Owner only: opens the form for changing a setting. It needs no assistant, so it also works when the assistant is off. */ onSettings?: () => void }) {
+export function TopBar({ user, chats, currentChatId, onHelp, onSettings, onOpenArtifact, onDecisions, decisionsCount = 0 }: { /** Owner only: opens the questions for him. */ onDecisions?: () => void; decisionsCount?: number; user: ShellUser; chats: ChatLink[]; currentChatId: string | null; onHelp: () => void; onOpenArtifact: (id: string, title: string) => void; /** Owner only: opens the form for changing a setting. It needs no assistant, so it also works when the assistant is off. */ onSettings?: () => void }) {
   const [, startTransition] = useTransition();
   const [saved, setSaved] = useState<{ mine: ArtifactRow[]; shared: ArtifactRow[] } | null>(null);
   const loadSaved = (open: boolean) => { if (open) void listArtifactsAction().then((r) => { if (r.ok) setSaved({ mine: r.mine, shared: r.shared }); }); };
@@ -56,6 +56,13 @@ export function TopBar({ user, chats, currentChatId, onHelp, onSettings, onOpenA
             {saved?.shared.map((a) => <ArtifactItem key={a.artifactId} a={a} onOpen={onOpenArtifact} />)}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {onDecisions && (
+          <button type="button" onClick={onDecisions} className={barButton} aria-label={decisionsCount > 0 ? `Questions for you, ${decisionsCount} to answer` : 'Questions for you'}>
+            <MessageCircleQuestion aria-hidden className="size-5 sm:size-4" /><span className="sr-only sm:not-sr-only">Decisions</span>
+            {decisionsCount > 0 && <span aria-hidden className="num ml-0.5 rounded-full bg-copper px-1.5 text-sm font-semibold text-white">{decisionsCount}</span>}
+          </button>
+        )}
 
         <DropdownMenu>
           <DropdownMenuTrigger className={barButton}>

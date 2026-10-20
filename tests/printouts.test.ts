@@ -75,12 +75,12 @@ describe('the five printouts are fixed templates (ARTIFACTS §9)', () => {
     expect(t).toContain('Printing this gives out nothing');
     for (const w of ['Requested by (planning)', 'Issued by', 'Received by']) expect(t).toContain(w);
   });
-  it('the purchase order rounds to the whole rupee like their own, says the amount in words in lakhs, and shows the delivery date on each line', () => {
-    const p = renderPrintout(poData({ total: 75319.4, roundOff: -0.4, payable: 75319 }));
+  it('the purchase order is not rounded (the saved total, to the paisa), says the amount in words in lakhs, and shows the delivery date on each line', () => {
+    const p = renderPrintout(poData({ total: 75319.4 }));
     const t = text(p.html);
-    expect(t).toContain('Round off −₹0.40');
-    expect(t).toContain('Total ₹75,319');
-    expect(t).toContain('INR Seventy Five Thousand Three Hundred Nineteen Only');
+    expect(t).not.toContain('Round off');
+    expect(t).toContain('Total ₹75,319.40');
+    expect(t).toContain('INR Seventy Five Thousand Three Hundred Nineteen and Forty paise Only');
     expect(t).toContain('Due on');
   });
   it('amounts in words follow the Indian way a bill writes them (their three purchase orders)', () => {

@@ -8,7 +8,10 @@
 import { randomInt } from 'node:crypto';
 import { PrismaClient, type UserRole } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { SETTINGS } from '../src/lib/settings';
+import { importDecisions } from '../src/server/tools/decisions-import';
 
 const prisma = new PrismaClient();
 const ifEmpty = process.argv.includes('--if-empty');
@@ -44,6 +47,15 @@ async function ensureSettings() {
   }
 }
 
+/** The owner's questions (docs/CLIENT_CONFIRMATIONS.md) go into the Decisions list on every start: new ones are added, the wording of known ones is kept current, an answer is never touched. */
+async function ensureDecisions() {
+  try {
+    const md = readFileSync(join(process.cwd(), 'docs', 'CLIENT_CONFIRMATIONS.md'), 'utf8');
+    const r = await importDecisions(prisma, md);
+    console.log(`[seed] Decisions: ${r.added} added, ${r.updated} kept up to date.`);
+  } catch (e) { console.log('[seed] Decisions were not imported:', e instanceof Error ? e.message : e); }
+}
+
 /**
  * DEMO_MODE=true: a realistic finished month, built through the tools. Only when there is no stock at all (so a restart never
  * adds a second demo on top of a first, and a real copy, where DEMO_MODE is off, is never touched).
@@ -62,6 +74,7 @@ async function maybeSeedDemo() {
 
 async function main() {
   await ensureSettings();
+  await ensureDecisions();
   if (ifEmpty && (await prisma.user.count()) > 0) {
     console.log('[seed] Users already exist. Nothing to do.');
     await maybeSeedDemo();

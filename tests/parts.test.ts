@@ -186,6 +186,31 @@ describe('a customer\'s order by part, and what is left to plan', () => {
   });
 });
 
+describe('a PO line changed later (the customer\'s price is different on every order)', () => {
+  it('the owner changes the rate now; the storekeeper cannot, but can change the pieces; never below what is already in jobs; the margin follows the new rate', async () => {
+    const s = await storekeeper(); const o = await owner();
+    const c = await party(s, 'Medha Servo Drives'); const a = await part(s, c, '90305600201', 'L9 TXFR');
+    const po = await ok<{ id: string }>(save(o, 'create_customer_po', { customerId: c, number: 'P1', lines: [{ partId: a.id, quantity: 500, rate: 148 }] }));
+    const job = await ok<{ id: string }>(save(s, 'create_job', { partId: a.id, customerPoId: po.id, quantity: 400, jobDate: today() }));
+    expect((await fails(save(s, 'update_customer_po_line', { customerPoId: 'P1', customerName: 'Medha Servo Drives', partId: '90305600201', rate: 150 }))).code).toBe('FORBIDDEN_ROLE');
+    expect((await fails(save(o, 'update_customer_po_line', { customerPoId: 'P1', customerName: 'Medha Servo Drives', partId: '90305600201', quantity: 300 }))).code).toBe('BELOW_PLANNED');
+    expect((await fails(save(o, 'update_customer_po_line', { customerPoId: 'P1', customerName: 'Medha Servo Drives', partId: '90305600201' }))).code).toBe('NOTHING_TO_CHANGE');
+    await ok(save(s, 'update_customer_po_line', { customerPoId: 'P1', customerName: 'Medha Servo Drives', partId: '90305600201', quantity: 600 }));
+    await ok(save(o, 'update_customer_po_line', { customerPoId: po.id, partId: a.id, rate: 155 }));
+    const line = await prisma.customerPoLine.findFirstOrThrow({ where: { customerPoId: po.id } });
+    expect(line.quantity).toBe(600); expect(Number(line.rate)).toBe(155);
+    const ev = await prisma.auditEvent.findFirstOrThrow({ where: { toolName: 'update_customer_po_line', actorId: o.userId } });
+    expect(JSON.stringify(ev.afterJson)).toMatch(/₹148 → ₹155/);
+    // the margin uses the rate on the order the job came from, as it stands now
+    await prisma.job.update({ where: { id: job.id }, data: { status: 'CLOSED', materialCost: 48_000, closedAt: new Date() } });
+    const m = await ok<{ rows: { ratePerPiece: number }[] }>(runTool(o, 'get_margin_by_part', {}));
+    expect(m.rows[0]?.ratePerPiece).toBe(155);
+    // the form carries the rate box for the owner only
+    expect((await pendingActions.previewFor(o, 'update_customer_po_line', { customerPoId: 'P1', customerName: 'Medha Servo Drives', partId: '90305600201' }))?.values.ownerRates).toBe('yes');
+    expect((await pendingActions.previewFor(s, 'update_customer_po_line', { customerPoId: 'P1', customerName: 'Medha Servo Drives', partId: '90305600201' }))?.values.ownerRates).toBe('');
+  });
+});
+
 describe('the margin by part (owner)', () => {
   it('closed jobs by part: cost a piece, the rate on the PO, the margin; a part with no rate shows its cost and says so', async () => {
     const s = await storekeeper(); const o = await owner();

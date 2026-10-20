@@ -169,7 +169,7 @@ export function FormCard({ pendingId, tool, form, values, assisted, info, state,
                     {f.type === 'select' ? (
                       <select {...common} value={String(v[f.name] ?? '')} onChange={(e) => set(f.name, e.target.value)} className={box}>
                         {!f.options?.some((o) => o.value === '') && <option value="">Choose…</option>}
-                        {f.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        {(Array.isArray(v[`${f.name}Options`]) ? (v[`${f.name}Options`] as { value: string; label: string }[]) : f.options)?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
                     ) : f.type === 'lines' ? (
                       <LinesEditor id={id} value={(Array.isArray(v[f.name]) ? v[f.name] : []) as BomLineValue[]} onChange={(x) => setV((p) => ({ ...p, [f.name]: x }))} jobQuantity={jobQty} invalid={!!err} describedBy={described} />

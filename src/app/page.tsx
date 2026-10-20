@@ -31,6 +31,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
       allForms={state.allForms}
       viewKey={existing && c ? c : `new-${randomUUID()}`}
       nonce={nonce}
+      decisionsCount={opening.decisionsToAnswer}
       chat={{
         initialItems: items, conversationId: existing ? (c ?? null) : null, launcher: state.launcher, formEnabled: state.formEnabled, chipEnabled: state.chipEnabled,
         badges: opening.badges, assistantOn: on, offMessage: ASSISTANT_OFF,

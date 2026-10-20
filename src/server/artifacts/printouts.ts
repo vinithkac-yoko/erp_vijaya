@@ -59,8 +59,8 @@ export function renderPrintout(d: any): Printed {
     const body = letterhead(co, 'PURCHASE ORDER', d.po.number, dt(d.po.date), stamp) +
       `<div class="cols">${party('To (supplier)', d.supplier)}${party('Bill to', { name: co.name, address: co.address, state: co.state, gstin: co.gstin, phone: co.phone })}</div>` +
       `<table>${head(['#', 'Material', 'HSN', 'Due on', 'Quantity', 'Unit', 'Rate', 'GST', 'Amount'], [0, 4, 6, 7, 8])}${d.lines.map((l: any) => row([l.n, l.itemCode ? `${l.material} (${l.itemCode})` : l.material, l.hsn, dt(d.po.expected), num(l.quantity), unit(l.unit), inr(l.rate), l.gstRate ? `${l.gstRate}%` : '', inr(l.amount)], [0, 4, 6, 7, 8])).join('')}</table>` +
-      `<table class="totals"><tr><td>Sub-total</td><td class="n">${esc(inr(d.subTotal))}</td></tr>${tax}${d.roundOff ? `<tr><td>Round off</td><td class="n">${esc(`${d.roundOff < 0 ? '−' : '+'}${inr(Math.abs(d.roundOff))}`)}</td></tr>` : ''}<tr class="grand"><td>Total</td><td class="n">${esc(inr(d.payable ?? d.total))}</td></tr></table>` +
-      `<div class="note"><strong>${esc(rupeesInWords(d.payable ?? d.total))}</strong></div>` +
+      `<table class="totals"><tr><td>Sub-total</td><td class="n">${esc(inr(d.subTotal))}</td></tr>${tax}<tr class="grand"><td>Total</td><td class="n">${esc(inr(d.total))}</td></tr></table>` +
+      `<div class="note"><strong>${esc(rupeesInWords(d.total))}</strong></div>` +
       (d.po.expected ? `<div class="note">Please deliver by ${esc(dt(d.po.expected))}.</div>` : '') +
       `<div class="sign"><div>Prepared by</div><div>Authorised signatory, ${esc(co.name)}</div></div>`;
     return { title: `Purchase order ${d.po.number}`, html: doc(`Purchase order ${d.po.number}`, body), filename: `purchase-order-${slug(d.po.number)}` };
