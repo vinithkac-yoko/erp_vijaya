@@ -16,13 +16,13 @@ export interface DecisionCard {
 export interface DecisionList { counts: { toAnswer: number; firstPassToAnswer: number; answered: number; waitingForClient: number; later: number }; rows: DecisionCard[] }
 type Done = { ok: true } | { ok: false; message: string; field?: string };
 
-async function ownerSession(): Promise<ToolSession | null> {
+async function who(): Promise<ToolSession | null> {
   const u = await currentUser();
   return u && u.role === 'OWNER' ? { userId: u.id, name: u.name, role: u.role } : null;
 }
 
 export async function listDecisionsAction(): Promise<{ ok: true; data: DecisionList } | { ok: false }> {
-  const s = await ownerSession();
+  const s = await who();
   if (!s) return { ok: false };
   const r = await runTool(s, 'list_decisions', {});
   return r.ok ? { ok: true, data: r.data as DecisionList } : { ok: false };
@@ -36,14 +36,14 @@ async function press(s: ToolSession, tool: string, input: Record<string, unknown
 }
 
 export async function answerDecisionAction(input: { decisionId: string; choice: string; note?: string }): Promise<Done> {
-  const s = await ownerSession();
+  const s = await who();
   const p = z.object({ decisionId: z.string().uuid(), choice: z.string().min(1).max(120), note: z.string().max(1000).optional() }).safeParse(input);
   if (!s || !p.success) return { ok: false, message: 'Please log in again.' };
   return press(s, 'answer_decision', { decisionId: p.data.decisionId, choice: p.data.choice, ...(p.data.note?.trim() ? { note: p.data.note.trim() } : {}) });
 }
 
 export async function setDecisionStatusAction(input: { decisionId: string; status: 'OPEN' | 'NEEDS_CLIENT' | 'LATER'; note?: string }): Promise<Done> {
-  const s = await ownerSession();
+  const s = await who();
   const p = z.object({ decisionId: z.string().uuid(), status: z.enum(['OPEN', 'NEEDS_CLIENT', 'LATER']), note: z.string().max(400).optional() }).safeParse(input);
   if (!s || !p.success) return { ok: false, message: 'Please log in again.' };
   return press(s, 'set_decision_status', { decisionId: p.data.decisionId, status: p.data.status, ...(p.data.note?.trim() ? { note: p.data.note.trim() } : {}) });
