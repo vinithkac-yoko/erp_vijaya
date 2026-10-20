@@ -106,16 +106,17 @@ live('the real assistant (needs LIVE_ANTHROPIC_API_KEY)', () => {
   it('jobs: opens the job form for the customer, the BOM per piece in kg with the totals, and asks when a number sounds like a total', async () => {
     await resetDb(); await seedSettings();
     const s = await storekeeper();
-    await ok(save(s, 'create_party', { name: 'Ashok Transformers', role: 'CUSTOMER', city: 'Chennai' }));
     for (const [name, uom] of [['22 SWG Copper Wire', 'KG'], ['Ferrite Core E-30', 'NOS'], ['Varnish', 'LTR']] as const) await ok(save(s, 'create_material', material(name, { uom })));
 
-    const j = await say(s, 'New job for Ashok Transformers, 500 pieces, SMPS transformer 12V 2A');
+    const c = await ok<{ id: string }>(save(s, 'create_party', { name: 'Medha Servo Drives', role: 'CUSTOMER', city: 'Hyderabad' }));
+    const part = await ok<{ id: string }>(save(s, 'create_part', { customerId: c.id, partNumber: '90301030002', description: 'MPS8T 24V SINGLE TXFR FOR ELECTRIC' }));
+    const j = await say(s, 'New job for part 90301030002, 500 pieces');
     expect(j.forms[0]?.tool).toBe('create_job');
     expect(Number(j.forms[0]?.values.quantity)).toBe(500);
-    expect(typeof j.forms[0]?.values.customerId).toBe('string');
+    expect(j.forms[0]?.values.partId).toBe(part.id);
     expect(await prisma.job.count()).toBe(0);
 
-    const job = await ok<{ id: string }>(save(s, 'create_job', { customerId: j.forms[0]?.values.customerId, productDescription: 'SMPS transformer 12V 2A', quantity: 500, jobDate: new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10) }));
+    const job = await ok<{ id: string }>(save(s, 'create_job', { partId: part.id, quantity: 500, jobDate: new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10) }));
     const b = await say(s, 'Add the BOM for job 1: 22 SWG wire 18.4 grams each, ferrite core E-30 2 each, varnish 5 ml each');
     expect(b.forms[0]?.tool).toBe('set_job_bom');
     const lines = b.forms[0]?.values.lines as { materialId: string; qtyPerPiece: number }[];
@@ -128,6 +129,50 @@ live('the real assistant (needs LIVE_ANTHROPIC_API_KEY)', () => {
     const t = await say(s, 'BOM for job 1: 9.2 kg of wire for this job');
     expect(t.forms).toHaveLength(0); // it asks first: per piece, or for all 500?
     expect(t.said.toLowerCase()).toMatch(/per piece|each|all 500|whole job/);
+  }, 240_000);
+
+  it('parts: adds a part from a sentence, makes a job by part number (no BOM copied), asks for the part when none is named, and lists a PO\'s parts with no rate for the storekeeper', async () => {
+    await resetDb(); await seedSettings();
+    const s = await storekeeper(); const o = await owner();
+    const c = await ok<{ id: string }>(save(s, 'create_party', { name: 'Medha Servo Drives', role: 'CUSTOMER', city: 'Hyderabad' }));
+    const m = await ok<{ id: string }>(save(s, 'create_material', material('Varnish', { uom: 'LTR' })));
+    const a = await say(s, 'Add a part for Medha: 90308200008 TXFR FOR M634VOC');
+    expect(a.forms[0]?.tool).toBe('create_part');
+    expect(String(a.forms[0]?.values.partNumber)).toBe('90308200008');
+    expect(await prisma.part.count()).toBe(0);
+    const p = await ok<{ id: string }>(save(s, 'create_part', { customerId: c.id, partNumber: '90308200008', description: 'TXFR FOR M634VOC' }));
+    const p2 = await ok<{ id: string }>(save(s, 'create_part', { customerId: c.id, partNumber: '90305600201', description: 'TXFR L9 (EXT) FOR M628VCUPS' }));
+    await ok(save(s, 'set_part_bom', { partId: p.id, lines: [{ materialId: m.id, qtyPerPiece: 0.005 }] }));
+
+    const j = await say(s, 'New job for 90308200008, 400 pieces');
+    expect(j.calls).toContain('list_parts');
+    expect(j.forms[0]?.tool).toBe('create_job');
+    expect(j.forms[0]?.values.partId).toBe(p.id);
+    expect(await prisma.job.count()).toBe(0);
+    expect(await prisma.jobBomLine.count()).toBe(0); // the part's usual BOM is offered on the BOM form, never copied by the assistant
+
+    const none = await say(s, 'New job for Medha, same as last time');
+    expect(none.forms.every((f) => f.tool !== 'set_job_bom')).toBe(true);
+    expect(none.said.toLowerCase()).toMatch(/part/);
+
+    const po = await say(s, "Record Medha's PO 5100033466: 492 of 90305600201 and 325 of 90308200008");
+    expect(po.forms[0]?.tool).toBe('create_customer_po');
+    const lines = po.forms[0]?.values.lines as { partId: string; quantity: number; rate?: number }[];
+    expect(lines).toHaveLength(2);
+    expect(lines.find((l) => l.partId === p2.id)?.quantity).toBe(492);
+    expect(lines.every((l) => l.rate === undefined)).toBe(true);
+    expect(await prisma.customerPo.count()).toBe(0);
+    void o;
+  }, 360_000);
+
+  it('parts: the owner asks the margin by part and it is read (material only, said so); the storekeeper is told it is the owner\'s', async () => {
+    await resetDb(); await seedSettings();
+    const s = await storekeeper(); const o = await owner();
+    const r = await say(o, 'What is my margin by part this month?');
+    expect(r.calls).toContain('get_margin_by_part');
+    const t = await say(s, 'What is my margin by part this month?');
+    expect(t.calls).not.toContain('get_margin_by_part');
+    expect(t.said.toLowerCase()).toMatch(/owner/);
   }, 240_000);
 
   it('jobs: "same as last time" is a new job with no copied BOM', async () => {

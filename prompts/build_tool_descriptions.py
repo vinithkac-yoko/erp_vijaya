@@ -82,7 +82,7 @@ tool("update_material", "write", SK_OW, """
 Opens the form to change a material's name, minimum level, HSN code or GST rate. It cannot change the
 unit or stock type — if asked, explain that changing the unit would change the meaning of every past
 quantity. """ + FORM,
-     {"materialId": "The material to change. " + IDS, "name": "New name, only if renaming.",
+     {"materialId": "The material to change. " + IDS, "name": "New name, only if renaming.", "itemCode": "The company's own item code for it.",
       "minimumLevel": "New minimum level in the material's unit.", "hsnCode": "HSN code, as on the supplier's invoice.", "gstRate": "GST rate in %, e.g. 18."})
 
 tool("deactivate_material", "write", SK_OW, """
@@ -162,7 +162,7 @@ new lines are added to it; then offer a new job under it. """ + FORM,
      {"customerName": "The saved customer's exact name from search_parties.", "number": "The customer's PO number as printed on it.",
       "poDate": "The customer PO's date. " + DATE, "lines": "One line per part ordered.",
       "lines[].partId": "The part. " + IDS, "lines[].quantity": "Number of pieces (whole number, more than 0).",
-      "lines[].rate": "Leave empty. The owner types it on the form.", "lines[].dueDate": "Delivery date for that part, if given. " + DATE})
+      "lines[].rate": "What the customer pays for one piece in ₹, ONLY if the user gave it (only the owner has a rate to give; for the storekeeper leave it empty). Otherwise leave empty: the owner types it on the form.", "lines[].dueDate": "Delivery date for that part, if given. " + DATE})
 
 tool("create_job", "write", SK_OW, """
 Opens the form for a new job. EVERYTHING RUNS BY PART NUMBER: a job makes one part (find it with list_parts; if it is

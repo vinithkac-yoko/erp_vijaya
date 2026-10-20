@@ -76,6 +76,7 @@
    "inputs": {
     "materialId": "The material to change. Ids come from earlier read-tool results; never show them to the user.",
     "name": "New name, only if renaming.",
+    "itemCode": "The company's own item code for it.",
     "minimumLevel": "New minimum level in the material's unit.",
     "hsnCode": "HSN code, as on the supplier's invoice.",
     "gstRate": "GST rate in %, e.g. 18."
@@ -242,7 +243,7 @@
     "lines": "One line per part ordered.",
     "lines[].partId": "The part. Ids come from earlier read-tool results; never show them to the user.",
     "lines[].quantity": "Number of pieces (whole number, more than 0).",
-    "lines[].rate": "Leave empty. The owner types it on the form.",
+    "lines[].rate": "What the customer pays for one piece in ₹, ONLY if the user gave it (only the owner has a rate to give; for the storekeeper leave it empty). Otherwise leave empty: the owner types it on the form.",
     "lines[].dueDate": "Delivery date for that part, if given. Date as YYYY-MM-DD (Asia/Kolkata)."
    }
   },

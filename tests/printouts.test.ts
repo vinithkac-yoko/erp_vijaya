@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { runTool } from '@/server/tools';
 import { chromePath, ExportError } from '@/server/artifacts/export';
+import { rupeesInWords } from '@/lib/format';
 import { printoutPdf, renderPrintout } from '@/server/artifacts/printouts';
 import { balance, makeJob, makeMaterial, makeParty, makeCount, addLine, prisma, receive, resetDb, issue, giveBack } from './helpers/db';
 import { fails, ok, owner, save, seedSettings, storekeeper } from './helpers/tools';
@@ -60,14 +61,34 @@ describe('the five printouts are fixed templates (ARTIFACTS §9)', () => {
     expect(t).toContain('Invoice SF/2627/0441');
     expect(t).toContain('Only the accepted quantity goes into stock');
   });
-  it('the issue slip is a pick list with empty Shelf and Done boxes and says printing gives out nothing', () => {
-    const p = renderPrintout({ template: 'issue-slip', company, job: { number: 'JOB-2627-0031', customer: 'Ashok Transformers', customerPo: '', product: 'SMPS transformer', pieces: 500, date: '', due: null, status: 'OPEN', closedAt: null },
-      lines: [{ n: 1, material: '22 SWG Copper Wire', unit: 'KG', required: 9.2, issued: 0, toIssue: 9.2 }] });
+  it('the issue slip is the work order: part number, customer PO, item codes, per piece and balance, three signature lines, and says printing gives out nothing', () => {
+    const p = renderPrintout({ template: 'issue-slip', company, job: { number: 'JOB-2627-0031', customer: 'Medha Servo Drives', customerPo: '5100033466', customerPoDate: '2026-05-08T00:00:00Z', partNumber: '90308200008', product: 'TXFR FOR M634VOC', pieces: 400, date: '2026-10-07T00:00:00Z', due: null, status: 'OPEN', closedAt: null },
+      lines: [{ n: 1, material: '22 SWG Copper Wire', itemCode: 'RM-0042', unit: 'KG', perPiece: 0.0184, required: 7.36, issued: 2, toIssue: 5.36 }] });
     const t = text(p.html);
-    expect(t).toContain('ISSUE SLIP');
-    expect(t).toContain('9.2 kg');
+    expect(t).toContain('WORK ORDER');
+    expect(t).toContain('90308200008');
+    expect(t).toContain('Customer PO 5100033466 of 8 May 2026');
+    expect(t).toContain('RM-0042');
+    expect(t).toContain('18.4 g');      // for one piece, as the shop says it
+    expect(t).toContain('7.36 kg');     // required
+    expect(t).toContain('5.36 kg');     // balance and give now
     expect(t).toContain('Printing this gives out nothing');
-    expect((p.html.match(/class="blank"/g) ?? []).length).toBe(2);
+    for (const w of ['Requested by (planning)', 'Issued by', 'Received by']) expect(t).toContain(w);
+  });
+  it('the purchase order rounds to the whole rupee like their own, says the amount in words in lakhs, and shows the delivery date on each line', () => {
+    const p = renderPrintout(poData({ total: 75319.4, roundOff: -0.4, payable: 75319 }));
+    const t = text(p.html);
+    expect(t).toContain('Round off −₹0.40');
+    expect(t).toContain('Total ₹75,319');
+    expect(t).toContain('INR Seventy Five Thousand Three Hundred Nineteen Only');
+    expect(t).toContain('Due on');
+  });
+  it('amounts in words follow the Indian way a bill writes them (their three purchase orders)', () => {
+    expect(rupeesInWords(54425)).toBe('INR Fifty Four Thousand Four Hundred Twenty Five Only');
+    expect(rupeesInWords(744965)).toBe('INR Seven Lakh Forty Four Thousand Nine Hundred Sixty Five Only');
+    expect(rupeesInWords(196965.6)).toBe('INR One Lakh Ninety Six Thousand Nine Hundred Sixty Five and Sixty paise Only');
+    expect(rupeesInWords(12_50_00_000)).toBe('INR Twelve Crore Fifty Lakh Only');
+    expect(rupeesInWords(0)).toBe('INR Zero Only');
   });
   it('the count sheet shows the System column and an empty Counted column; the opening count has Counted, Rate and Invoice instead', () => {
     const monthly = renderPrintout({ template: 'count-sheet', company, count: { number: 'CNT-2627-0002', date: '2026-10-07T00:00:00Z', opening: false, status: 'DRAFT' }, lines: [{ n: 1, material: 'Bobbin Type-B', unit: 'NOS', system: 652 }] });
