@@ -42,7 +42,8 @@ export function securityHeaders(opts: HeaderOptions): Record<string, string> {
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+    // The microphone is for our own page only (the voice button); no frame, artifact or other site may use it.
+    'Permissions-Policy': 'camera=(), microphone=(self), geolocation=(), payment=(), usb=()',
     'X-DNS-Prefetch-Control': 'off',
     'Cross-Origin-Opener-Policy': 'same-origin',
     ...(opts.hsts ? { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' } : {}),

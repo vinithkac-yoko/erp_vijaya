@@ -4,19 +4,24 @@ import { useState } from 'react';
 import { Download, FileText, Info, LayoutDashboard, Printer, TriangleAlert } from 'lucide-react';
 import type { Card } from '@/lib/cards';
 import { cn } from '@/lib/cn';
+import { TamilButton, useTamil } from '@/components/translate/tamil';
 
 type Of<K extends Card['kind']> = Extract<Card, { kind: K }>;
 
 /** The first card in a new chat. Drawn by the server from read tools; a line with a question has a button that asks it. */
 export function OpeningCard({ card, onAsk, onSheet, onDecisions, onForm, assistantOn }: { card: Of<'opening'>; onAsk: (ask: string, label: string) => void; onSheet: () => void; onDecisions: () => void; onForm: (tool: string, prefill?: Record<string, unknown>) => void; assistantOn: boolean }) {
   const pill = 'inline-flex min-h-11 md:min-h-9 items-center rounded-full border border-line bg-copper-wash px-4 text-base font-medium text-copper-deep enabled:hover:border-copper disabled:cursor-not-allowed disabled:text-ink-faint';
+  const ta = useTamil([card.title, ...card.lines.map((l) => l.text)]);
   return (
     <section aria-label="Welcome" className="rounded-md border border-line border-l-4 border-l-copper bg-surface p-4">
-      <h1 className="font-display text-xl font-bold">{card.title}</h1>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h1 lang={ta.lang(card.title)} className="font-display text-xl font-bold">{ta.show(card.title)}</h1>
+        <TamilButton tamil={ta} />
+      </div>
       <ul className="mt-2 space-y-2">
         {card.lines.map((l) => (
           <li key={l.text} className="flex flex-wrap items-center gap-3">
-            <span className="text-lg">{l.text}</span>
+            <span lang={ta.lang(l.text)} className="text-lg">{ta.show(l.text)}</span>
             {/* the buttons that only open something (the sheet, a form) work with the assistant off; the ones that ask it do not */}
             {l.sheet && l.button && <button type="button" onClick={onSheet} className={pill}>{l.button}</button>}
             {l.decisions && l.button && <button type="button" onClick={onDecisions} className={pill}>{l.button}</button>}
@@ -56,23 +61,42 @@ export function TableCard({ card }: { card: Of<'table'> }) {
   );
 }
 
-export function NoticeCard({ card }: { card: Of<'notice'> }) {
-  const warn = card.tone === 'warn';
+/** An answer from the assistant, with the button that puts it in Tamil. */
+export function AssistantText({ text }: { text: string }) {
+  const ta = useTamil([text]);
   return (
-    <p role="status" className={cn('flex items-start gap-2 rounded-md border px-4 py-3', warn ? 'border-attention bg-copper-wash text-ink' : 'border-line bg-surface text-ink-soft')}>
-      {warn ? <TriangleAlert aria-hidden className="mt-0.5 size-5 shrink-0 text-attention" /> : <Info aria-hidden className="mt-0.5 size-5 shrink-0" />}
-      {card.text}
-    </p>
+    <div>
+      <p lang={ta.lang(text)} className="whitespace-pre-wrap rounded-md border border-line border-l-4 border-l-copper bg-surface px-4 py-3">{ta.show(text)}</p>
+      <TamilButton tamil={ta} className="mt-1" />
+    </div>
   );
 }
 
-/** The rubber stamp. Drawn from the audit row after a save; nothing the assistant said can put one here. */
+export function NoticeCard({ card }: { card: Of<'notice'> }) {
+  const warn = card.tone === 'warn';
+  const ta = useTamil([card.text]);
+  return (
+    <div>
+      <p role="status" lang={ta.lang(card.text)} className={cn('flex items-start gap-2 rounded-md border px-4 py-3', warn ? 'border-attention bg-copper-wash text-ink' : 'border-line bg-surface text-ink-soft')}>
+        {warn ? <TriangleAlert aria-hidden className="mt-0.5 size-5 shrink-0 text-attention" /> : <Info aria-hidden className="mt-0.5 size-5 shrink-0" />}
+        {ta.show(card.text)}
+      </p>
+      <TamilButton tamil={ta} className="mt-1" />
+    </div>
+  );
+}
+
+/** The rubber stamp. Drawn from the audit row after a save; nothing the assistant said can put one here. The stamp itself stays in English. */
 export function SavedCard({ card }: { card: Of<'saved'> }) {
+  const ta = useTamil(card.lines);
   return (
     <section aria-label="Saved" className="rounded-md border border-line bg-surface p-4">
-      <span className="stamp">✓ {card.stamp}</span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="stamp">✓ {card.stamp}</span>
+        <TamilButton tamil={ta} />
+      </div>
       <ul className="mt-3 space-y-0.5">
-        {card.lines.map((l, i) => <li key={i} className={i === 0 ? 'font-medium' : 'text-ink-soft'}>{l}</li>)}
+        {card.lines.map((l, i) => <li key={i} lang={ta.lang(l)} className={i === 0 ? 'font-medium' : 'text-ink-soft'}>{ta.show(l)}</li>)}
       </ul>
     </section>
   );

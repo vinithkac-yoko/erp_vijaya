@@ -5,6 +5,7 @@ import { Check, ChevronDown, ClipboardCopy, MessageCircleQuestion } from 'lucide
 import { answerDecisionAction, listDecisionsAction, setDecisionStatusAction, type DecisionCard, type DecisionList } from '@/server/chat/decision-actions';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
+import { TamilButton, useTamil } from '@/components/translate/tamil';
 
 type Tab = 'OPEN' | 'NEEDS_CLIENT' | 'LATER' | 'ANSWERED';
 const TABS: { id: Tab; label: string }[] = [{ id: 'OPEN', label: 'To answer' }, { id: 'NEEDS_CLIENT', label: 'Waiting for the client' }, { id: 'LATER', label: 'Later' }, { id: 'ANSWERED', label: 'Answered' }];
@@ -24,6 +25,8 @@ function Item({ d, open, onToggle, onChanged, onAsk }: { d: DecisionCard; open: 
   const [copied, setCopied] = useState(false);
   const picked = d.options.find((o) => o.label === choice);
   const freeOnly = d.options.length === 1 && !!d.options[0]?.writeIn;
+  // the words are shown in Tamil on request; what is saved is always the English choice
+  const ta = useTamil([d.question, d.whatWeDid, d.why ?? '', ...d.options.map((o) => o.label)]);
 
   const save = async () => {
     setErr(null); setBusy(true);
@@ -44,15 +47,16 @@ function Item({ d, open, onToggle, onChanged, onAsk }: { d: DecisionCard; open: 
       <button type="button" aria-expanded={open} onClick={onToggle} className="flex min-h-14 w-full items-start gap-3 px-4 py-3 text-left">
         <span className="min-w-0 flex-1">
           <span className="block text-sm text-ink-soft">{d.topic}</span>
-          <span className="block font-medium">{d.question}</span>
+          <span lang={ta.lang(d.question)} className="block font-medium">{ta.show(d.question)}</span>
           {d.status === 'ANSWERED' && <span className="mt-1 flex items-center gap-1 text-confirm"><Check aria-hidden className="size-4" />{d.answer}</span>}
         </span>
         <ChevronDown aria-hidden className={cn('mt-1 size-5 shrink-0 text-ink-soft transition-transform', open && 'rotate-180')} />
       </button>
       {open && (
         <div className="space-y-4 border-t border-line px-4 py-4">
-          {d.whatWeDid && <p><span className="font-medium">What we did: </span>{d.whatWeDid}</p>}
-          {d.why && <p><span className="font-medium">{d.whatWeDid ? 'Why: ' : 'Why it matters: '}</span>{d.why}</p>}
+          <TamilButton tamil={ta} />
+          {d.whatWeDid && <p><span className="font-medium">What we did: </span><span lang={ta.lang(d.whatWeDid)}>{ta.show(d.whatWeDid)}</span></p>}
+          {d.why && <p><span className="font-medium">{d.whatWeDid ? 'Why: ' : 'Why it matters: '}</span><span lang={ta.lang(d.why)}>{ta.show(d.why)}</span></p>}
           {d.agreedByKasi && <p className="rounded-md bg-copper-wash px-3 py-2 text-copper-deep">Kasi has already agreed to this. Please say if you agree too.</p>}
 
           {!freeOnly && (
@@ -62,7 +66,7 @@ function Item({ d, open, onToggle, onChanged, onAsk }: { d: DecisionCard; open: 
                 {d.options.map((o) => (
                   <label key={o.value} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 hover:bg-copper-wash">
                     <input type="radio" name={`ans-${d.id}`} value={o.label} checked={choice === o.label} onChange={() => setChoice(o.label)} className="size-5 accent-[var(--copper)]" />
-                    <span>{o.label}</span>
+                    <span lang={ta.lang(o.label)}>{ta.show(o.label)}</span>
                   </label>
                 ))}
               </div>
@@ -70,7 +74,7 @@ function Item({ d, open, onToggle, onChanged, onAsk }: { d: DecisionCard; open: 
           )}
           {(picked?.writeIn || freeOnly) && (
             <div>
-              <label htmlFor={`note-${d.id}`} className="font-medium">{freeOnly ? d.options[0]?.label : 'Say it in your own words'}</label>
+              <label htmlFor={`note-${d.id}`} className="font-medium">{freeOnly ? ta.show(d.options[0]?.label ?? '') : 'Say it in your own words'}</label>
               <textarea id={`note-${d.id}`} rows={3} value={note} onChange={(e) => setNote(e.target.value)} className={box} />
             </div>
           )}

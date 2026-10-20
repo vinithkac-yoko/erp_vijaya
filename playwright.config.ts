@@ -8,7 +8,8 @@ const PORT = 3100;
 const STUB_PORT = 3199;
 const chromium = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
-const launchOptions = { executablePath: chromium, args: ['--no-sandbox'] };
+// The fake microphone plays a test tone and the permission box is answered "allow", so the voice button can be tried without a person.
+const launchOptions = { executablePath: chromium, args: ['--no-sandbox', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] };
 
 export default defineConfig({
   testDir: 'e2e',
@@ -16,7 +17,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   globalSetup: './e2e/global-setup.ts',
-  use: { baseURL: `http://localhost:${PORT}`, trace: 'retain-on-failure' },
+  use: { baseURL: `http://localhost:${PORT}`, trace: 'retain-on-failure', permissions: ['microphone'] },
   webServer: [
     // A scripted stand-in for the Anthropic API (the app's real SDK talks to it).
     { command: 'tsx tests/stub-server.ts', url: `http://127.0.0.1:${STUB_PORT}/`, reuseExistingServer: false, timeout: 30_000, env: { ...(process.env as Record<string, string>), STUB_PORT: String(STUB_PORT) } },
@@ -28,6 +29,7 @@ export default defineConfig({
       env: {
         ...(process.env as Record<string, string>), NODE_ENV: 'production', APP_URL: `http://localhost:${PORT}`,
         ANTHROPIC_BASE_URL: `http://127.0.0.1:${STUB_PORT}`, ANTHROPIC_API_KEY: 'e2e-not-a-real-key', AGENT_MESSAGES_PER_MINUTE: '500', ANTHROPIC_REFUSAL_FALLBACK: 'true',
+        GEMINI_BASE_URL: 'http://127.0.0.1:3198', GEMINI_API_KEY: 'e2e-not-a-real-key',
         // the demo copy's "start the demo again" works only with this (the real copy never sets it)
         DEMO_MODE: 'true',
       },

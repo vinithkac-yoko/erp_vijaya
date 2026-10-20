@@ -10,8 +10,9 @@ import { redactSecrets } from '@/server/agent/redact'; // pure text function: sa
 import { LauncherRow } from '@/components/shell/launcher';
 import { cn } from '@/lib/cn';
 import { openArtifactFormAction } from '@/server/artifacts/actions';
-import { ArtifactCard, DownloadCard, NoticeCard, OpeningCard, PrintoutCard, SavedCard, TableCard } from './cards';
+import { ArtifactCard, AssistantText, DownloadCard, NoticeCard, OpeningCard, PrintoutCard, SavedCard, TableCard } from './cards';
 import { FormCard } from './form-card';
+import { VoiceButton } from './voice-button';
 
 export interface ChatViewProps {
   initialItems: ChatItem[];
@@ -22,6 +23,8 @@ export interface ChatViewProps {
   badges: { pendingApprovals: number; belowMinimum: number };
   assistantOn: boolean;
   offMessage: string;
+  /** The microphone button shows only when listening is set up on the server. */
+  voiceOn?: boolean;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   /** The shell calls this with a function that opens a form (for Alt+R, the Share button and friends). */
   registerOpenForm: (fn: (tool: string, prefill?: Record<string, unknown>) => void) => void;
@@ -170,7 +173,7 @@ export function ChatView(p: ChatViewProps) {
         <div className="mx-auto w-full max-w-[720px] space-y-4 px-4 py-5 md:py-8">
           {items.map((it) => {
             if (it.role === 'user') return <div key={it.id} className="flex justify-end"><p className="max-w-[85%] whitespace-pre-wrap rounded-md bg-plate px-4 py-2.5 text-plate-ink">{it.text}</p></div>;
-            if (it.role === 'assistant') return <p key={it.id} className="whitespace-pre-wrap rounded-md border border-line border-l-4 border-l-copper bg-surface px-4 py-3">{it.text}</p>;
+            if (it.role === 'assistant') return <AssistantText key={it.id} text={it.text} />;
             const c = it.card;
             if (c.kind === 'opening') return <OpeningCard key={it.id} card={c} assistantOn={p.assistantOn} onAsk={(ask, label) => void send(ask, label)} onSheet={p.onOpenSheet} onDecisions={p.onOpenDecisions} onForm={(tool, prefill) => void openForm(tool, prefill)} />;
             if (c.kind === 'table') return <TableCard key={it.id} card={c} />;
@@ -210,6 +213,8 @@ export function ChatView(p: ChatViewProps) {
               placeholder={composerOff ? p.offMessage : 'Ask a question, or say what you want to do…'}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(text); } }}
               className="min-h-12 flex-1 resize-none rounded-md border border-line bg-surface px-3 py-3 text-base text-ink placeholder:text-ink-soft disabled:cursor-not-allowed" />
+            {/* what is said lands in the box, to be read and changed; it is sent only when the person presses Send */}
+            {p.voiceOn && <VoiceButton disabled={composerOff || busy} onText={(t) => { setText((cur) => (cur.trim() ? `${cur.trim()} ${t}` : t).slice(0, 2000)); p.inputRef.current?.focus(); }} />}
             {busy ? (
               <button type="button" aria-label="Stop" onClick={() => abort.current?.abort()}
                 className="inline-flex size-12 shrink-0 items-center justify-center rounded-md border border-line bg-surface text-ink hover:bg-copper-wash"><Square aria-hidden className="size-5" /></button>

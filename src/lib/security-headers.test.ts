@@ -37,6 +37,8 @@ describe('other security headers', () => {
     expect(h['Referrer-Policy']).toBe('strict-origin-when-cross-origin');
     expect(h['X-DNS-Prefetch-Control']).toBe('off');
     expect(h['Permissions-Policy']).toContain('camera=()');
+    expect(h['Permissions-Policy']).toContain('microphone=(self)'); // the voice button; never a frame or another site
+    expect(h['Permissions-Policy']).not.toMatch(/microphone=\(\*\)|microphone=\*/);
     expect(h['Strict-Transport-Security']).toBeUndefined();
     expect(securityHeaders({ nonce: 'n', hsts: true })['Strict-Transport-Security']).toContain('max-age=');
   });

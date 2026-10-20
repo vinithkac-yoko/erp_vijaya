@@ -6,6 +6,7 @@ import { openingFor } from '@/server/chat/opening';
 import { assistantRuntime } from '@/server/chat/runtime';
 import { ASSISTANT_OFF } from '@/server/agent/config';
 import { conversations, notifications } from '@/server/tools';
+import { voiceAvailable } from '@/server/tools/transcribe';
 import type { ChatItem } from '@/lib/cards';
 import { Shell } from '@/components/shell/shell';
 
@@ -34,7 +35,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
       decisionsCount={opening.decisionsToAnswer}
       chat={{
         initialItems: items, conversationId: existing ? (c ?? null) : null, launcher: state.launcher, formEnabled: state.formEnabled, chipEnabled: state.chipEnabled,
-        badges: opening.badges, assistantOn: on, offMessage: ASSISTANT_OFF,
+        badges: opening.badges, assistantOn: on, offMessage: ASSISTANT_OFF, voiceOn: voiceAvailable(),
       }}
     />
   );

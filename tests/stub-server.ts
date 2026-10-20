@@ -3,6 +3,7 @@
  * a local port, so the app's real SDK client talks to it (ANTHROPIC_BASE_URL). What it says depends on what the person typed.
  */
 import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { say, call, startStub, type StubRequest, type StubReply } from './helpers/anthropic-stub';
 
@@ -44,6 +45,11 @@ function script(r: StubRequest): StubReply {
   const owner = r.body.system?.[1]?.text?.includes('the OWNER') as boolean;
 
   if (/^return_(artifact|edit)$/.test(r.body.tools?.[0]?.name ?? '')) return builder(r);
+  // "தமிழ்": the translator is a separate call; the stub puts a Tamil word in front of each text and keeps the text (so every number survives)
+  if (JSON.stringify(r.body.system ?? '').includes('You translate short messages')) {
+    const texts = JSON.parse(r.userText) as string[];
+    return say(JSON.stringify(texts.map((x) => (x.includes('NOTRANSLATE') ? 'தவறு' : `தமிழில்: ${x}`))));
+  }
   if (t.includes('trigger api down')) return { httpError: 529 };
   if (t.includes('how much') && t.includes('copper')) return answered ? say('There is no 22 SWG Copper Wire in the list yet.') : call('get_material_balance', { materialNames: ['copper wire'] }, 'Let me check.');
   if (t.includes('below its minimum')) return answered ? say('These are below their minimum.') : call('list_reorder_alerts', {});
@@ -95,3 +101,18 @@ function script(r: StubRequest): StubReply {
 }
 
 void startStub(script, PORT).then((s) => console.log(`[stub] listening on ${s.url}`));
+
+// A stand-in for Google's listener (GEMINI_BASE_URL), for the voice button: whatever audio it is given, it "hears" this sentence.
+const GEMINI_PORT = Number(process.env.STUB_GEMINI_PORT ?? 3198);
+createServer((req, res) => {
+  if (req.method === 'GET') { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('stub ok'); return; }
+  const chunks: Buffer[] = [];
+  req.on('data', (c) => chunks.push(c));
+  req.on('end', () => {
+    const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') as { contents?: { parts?: { inlineData?: { data: string } }[] }[] };
+    const audio = body.contents?.[0]?.parts?.find((p) => p.inlineData)?.inlineData?.data ?? '';
+    const heard = req.headers['x-goog-api-key'] === 'e2e-not-a-real-key' && audio.length > 100 ? 'copper wire evlo irukku, how much copper do we have' : '';
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ candidates: [{ content: { parts: [{ text: heard }] } }] }));
+  });
+}).listen(GEMINI_PORT, '127.0.0.1', () => console.log(`[stub] listener on ${GEMINI_PORT}`));

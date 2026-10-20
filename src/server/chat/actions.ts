@@ -7,11 +7,13 @@ import { currentUser } from '../auth/session';
 import { dateText } from '@/lib/format';
 import { conversations, currentCount, pendingActions, registry, runTool } from '../tools';
 import { rateText } from '../tools/purchasing';
+import { translateTexts, TranslateError } from '../tools/translate';
 import type { ToolSession } from '../tools/types';
 import { ensureConversation } from './conversation';
 import { pickerLabel, pickerOptions, type PickerKind } from './pickers';
 import { loadSheet, saveSheetRows, type SheetData, type SheetEdit } from './sheet';
 import { assistantRuntime } from './runtime';
+import { allowTranslate } from './rate-limit';
 import { submitAndFollow, type SubmitResult } from './submit';
 
 const LOGGED_OUT: { ok: false; code: string; message: string; field?: string; details?: unknown } = { ok: false, code: 'LOGGED_OUT', message: 'Please log in again.' };
@@ -160,4 +162,13 @@ export async function previewFormAction(input: { tool: string; input: Record<str
   const p = z.object({ tool: z.string().min(1).max(60), input: z.record(z.unknown()) }).safeParse(input);
   if (!session || !p.success) return null;
   return pendingActions.previewFor(session, p.data.tool, p.data.input);
+}
+
+/** "தமிழ்": the words of an answer, a card or a question, put into Tamil on request. Numbers and names never change; one that would is left out. */
+export async function translateAction(input: { texts: string[]; to?: 'ta' }): Promise<{ ok: true; texts: (string | null)[] } | { ok: false; message: string }> {
+  const session = await who();
+  const p = z.object({ texts: z.array(z.string().max(2000)).min(1).max(24), to: z.literal('ta').optional() }).safeParse(input);
+  if (!session || !p.success) return { ok: false, message: 'Please log in again.' };
+  if (!allowTranslate(session.userId)) return { ok: false, message: 'That is a lot of translating. Please wait a minute.' };
+  try { return { ok: true, texts: await translateTexts(p.data.texts, p.data.to ?? 'ta') }; } catch (e) { return { ok: false, message: e instanceof TranslateError ? e.message : "Couldn't translate that just now. Please try again." }; }
 }

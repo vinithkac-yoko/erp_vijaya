@@ -11,3 +11,16 @@ export function allowMessage(userId: string, limit: number, now = Date.now()): b
   return true;
 }
 export const resetMessageLimits = () => hits.clear();
+
+// Translating and listening cost money: a person may ask for at most 30 of each a minute.
+const other = new Map<string, number[]>();
+function allowOther(kind: string, userId: string, limit = 30, now = Date.now()): boolean {
+  const key = `${kind}:${userId}`;
+  const recent = (other.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
+  if (recent.length >= limit) { other.set(key, recent); return false; }
+  recent.push(now); other.set(key, recent);
+  return true;
+}
+export const allowTranslate = (userId: string) => allowOther('translate', userId);
+export const allowTranscribe = (userId: string) => allowOther('transcribe', userId);
+export const resetOtherLimits = () => other.clear();

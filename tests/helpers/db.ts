@@ -13,7 +13,7 @@ export async function resetDb(client: PrismaClient = prisma) {
   await client.$transaction([
     client.$executeRawUnsafe(`SET LOCAL vijaya.allow_reset = 'on'`),
     client.$executeRawUnsafe(
-      `TRUNCATE users, parties, materials, number_series, settings, attachments, audit_events, stock_movements, artifact_versions CASCADE`,
+      `TRUNCATE users, parties, materials, number_series, settings, attachments, audit_events, stock_movements, artifact_versions, translations CASCADE`,
     ),
   ]);
 }
