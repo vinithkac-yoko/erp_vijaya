@@ -19,9 +19,9 @@ Done
 Not done, on purpose (waiting on answers): amending an open PO after it was sent ("Amended" on their PO); a non-stock charge line on a PO ("Cylinder Charges"); matching their PO numbering (`VE/MW-229/2026-2027`); the delivery challan (needs a dispatch record we do not have); what IGIR is. A picture of lines cannot be read by the assistant (it takes words only).
 
 Proof (run in this session)
-- `pnpm test`: 14 new tests for parts, PO lines, jobs by part, margin and item codes; printouts updated (work order, round-off, amount in words checked against their three POs). Kit tests 200/200 after fixing two tool descriptions.
+- **Final run: `pnpm test` 525 passed (24 live skipped), `pnpm test:kit` 200/200, `pnpm e2e` 200 passed (6 skipped on purpose), lint, typecheck and build clean.** `pnpm test` includes 14 new tests for parts, PO lines, jobs by part, margin and item codes; printouts updated (work order, round-off, amount in words checked against their three POs). Kit tests 200/200 after fixing two tool descriptions.
 - Browser: new part flows (new part, job for a part with the usual BOM, the customer PO with and without a rate box, accessibility in light and dark); older tests changed where the forms changed.
-- Real-model evals, artifact sections (§16, §21, §31, §32, 2 runs each), after the earlier fixes: **73 of 80 cases passed every run** (it was 56). Open: 16.99 and 32.16 (the reply should say it is the owner's), 31.9, 31.10, 31.12 and 31.32 (it answers in the chat instead of making a report), 31.16 ("add this to the menu"). Live checks for the new part flows are written (`tests/live-agent.test.ts`).
+- Real-model evals, artifact sections (§16, §21, §31, §32, 2 runs each), after the earlier fixes: **73 of 80 cases passed every run** (it was 56). Open: 16.99 and 32.16 (the reply should say it is the owner's), 31.9, 31.10, 31.12 and 31.32 (it answers in the chat instead of making a report), 31.16 ("add this to the menu"). **Live checks for the part flows against the real model passed** (it finds the part, opens the right form, asks for the part when none is named, adds no rate for the storekeeper, keeps the margin report to the owner).
 
 ## Milestones 9 and 10 — Reports, printouts, downloads, sharing, the demo copy, hardening — **built; waiting for Kasi's test**
 
