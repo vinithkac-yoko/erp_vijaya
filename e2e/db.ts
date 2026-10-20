@@ -96,6 +96,13 @@ export async function addGrn(supplier: string, lines: { material: string; receiv
   return grn;
 }
 
+/** The owner's questions, imported from the confirmations file as the app does on every start. */
+export async function addDecisions() {
+  const { importDecisions } = await import('../src/server/tools/decisions-import');
+  const { readFileSync } = await import('node:fs');
+  await importDecisions(prisma as never, readFileSync('docs/CLIENT_CONFIRMATIONS.md', 'utf8'));
+}
+
 /** A part (a customer's product, by part number), put straight into the table, with its usual BOM if one is given (quantities per piece). */
 export async function addPart(customer: string, partNumber: string, description: string, bom: { material: string; perPiece: number }[] = []) {
   const c = await prisma.party.findFirstOrThrow({ where: { name: customer } });
