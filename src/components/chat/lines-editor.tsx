@@ -24,8 +24,8 @@ const baseOf = (r: Row) => { const n = parse(r.text); return n === null || Numbe
  * total for the whole job, worked out live and read-only. This is the most important check in the system
  * (BUSINESS_FLOW §8), so the total is always in front of the person before anything is saved.
  */
-export function LinesEditor({ id, value, onChange, jobQuantity, invalid, describedBy }: {
-  id: string; value: BomLineValue[]; onChange: (v: BomLineValue[]) => void; jobQuantity: number | null; invalid?: boolean; describedBy?: string;
+export function LinesEditor({ id, value, onChange, jobQuantity, perPieceOnly, invalid, describedBy }: {
+  id: string; value: BomLineValue[]; onChange: (v: BomLineValue[]) => void; jobQuantity: number | null; /** A part's usual BOM has no job quantity: only the per-piece column. */ perPieceOnly?: boolean; invalid?: boolean; describedBy?: string;
 }) {
   const next = useRef(1);
   const [rows, setRows] = useState<Row[]>(() => (value.length ? value : [{ materialId: '' }]).map((l) => ({
@@ -86,17 +86,19 @@ export function LinesEditor({ id, value, onChange, jobQuantity, invalid, describ
               </div>
             </div>
             <div className="mt-2 flex items-center justify-between gap-2">
-              <p className="text-base" aria-live="polite" data-testid="bom-total">
-                <span className="text-ink-soft">Total needed: </span>
-                <span className="num font-semibold">{total === null ? '–' : `${groupIndian(Number(total.toFixed(4)))} ${unitShort}`}</span>
-              </p>
+              {perPieceOnly ? <span /> : (
+                <p className="text-base" aria-live="polite" data-testid="bom-total">
+                  <span className="text-ink-soft">Total needed: </span>
+                  <span className="num font-semibold">{total === null ? '–' : `${groupIndian(Number(total.toFixed(4)))} ${unitShort}`}</span>
+                </p>
+              )}
               <button type="button" onClick={() => setRows((cur) => { const out = cur.length > 1 ? cur.filter((x) => x.key !== r.key) : [{ key: next.current++, materialId: '', unit: '', text: '', small: false }]; emit(out); return out; })}
                 aria-label={`Remove line ${i + 1}`} className="inline-flex size-11 items-center justify-center rounded-md text-ink-soft hover:bg-copper-wash md:size-9"><Trash2 aria-hidden className="size-4" /></button>
             </div>
           </div>
         );
       })}
-      {jobQuantity === null && <p className="text-sm text-ink-soft">Pick the job to see the total for the whole job.</p>}
+      {jobQuantity === null && !perPieceOnly && <p className="text-sm text-ink-soft">Pick the job to see the total for the whole job.</p>}
       <Button type="button" variant="secondary" size="sm" onClick={() => setRows((cur) => [...cur, { key: next.current++, materialId: '', unit: '', text: '', small: false }])}><Plus aria-hidden className="size-4" />Add a material</Button>
     </div>
   );

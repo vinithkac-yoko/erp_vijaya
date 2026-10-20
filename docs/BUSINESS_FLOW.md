@@ -17,9 +17,10 @@ Vijaya Electronics, Chennai, founded 2009. Transformers and inductor coils: SMPS
 lamination, medical isolation, driver transformers, DC converters, adapters. Customers in
 railways, solar, LED and CCTV.
 
-- **Every job is a one-off design.** About 50 jobs a month; quantities in the hundreds or
-  thousands. Designs never repeat; a returning customer gets a fresh job with a fresh BOM.
-- There is **no product catalogue**. The product is a text description on the job.
+- **Everything runs by part number** (the client's own paperwork, 2026-10-20). Every product a customer buys has a
+  part number, and the factory puts it on the product. About 50 jobs a month; quantities in the hundreds or
+  thousands. A part comes back in later orders, and two customers may use the same number. A **part** belongs to
+  one customer and carries a description and its usual BOM (per piece). Old jobs, from before part numbers, have none.
 - The system tracks **raw materials only**.
 
 ## 2. People and permissions
@@ -130,10 +131,14 @@ Movement types and direction **[DB]**:
 - **Open POs:** the same PO number stays; the customer adds the next item only after the
   previous is delivered; item, quantity and price can differ. Each release is a **new job** under
   the same customer PO. No delivery schedules, no forecasts — don't ask for any.
-- A **job**: customer, optional customer PO, product description (free text), quantity (> 0
-  **[DB]**), job date, optional due date. Numbered `JOB-2627-0031` (Indian financial year
+- A **job**: a part (its customer and description come from it; an old job has free text instead), optional customer PO,
+  quantity (> 0 **[DB]**), job date, optional due date. Numbered `JOB-2627-0031` (Indian financial year
   April–March).
-- A repeat order of an old design is a new job with a new BOM. Never copy a BOM **[AGENT]**.
+- A **customer PO** lists the parts ordered and how many; the rate the customer pays per piece is the owner's number.
+  What is left to plan on a PO line = ordered − pieces in jobs (cancelled jobs and samples do not count).
+- A new job for a part starts from the part's **usual BOM**, shown on the BOM form for the person to check; the job keeps
+  its own copy, so changing the part's BOM never changes an old job. The first BOM made for a part with none becomes its
+  usual one. The assistant never invents or copies a BOM by itself **[AGENT]**.
 - **Samples:** a prototype before a main job is its own job, type SAMPLE, linked to the main job
   **[TOOL]**. It consumes material; its cost is absorbed by the company.
 - Job status: OPEN → MATERIAL_ISSUED → (IN_PRODUCTION) → CLOSED. Also CANCELLED (nothing issued).

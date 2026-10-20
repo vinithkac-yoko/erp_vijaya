@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { SETTINGS } from '../src/lib/settings';
-import { materialNameKey, partyNameKey } from '../src/lib/names';
+import { materialNameKey, partNumberKey, partyNameKey } from '../src/lib/names';
 import { OWNER, STOREKEEPER } from './users';
 
 export const prisma = new PrismaClient();
@@ -94,4 +94,15 @@ export async function addGrn(supplier: string, lines: { material: string; receiv
     if (rejected) await prisma.stockMovement.create({ data: { materialId: m.id, type: 'REJECT_RETURN', direction: 'OUT', quantity: rejected, rate: l.rate, grnLineId: line.id, movementDate: new Date() } });
   }
   return grn;
+}
+
+/** A part (a customer's product, by part number), put straight into the table, with its usual BOM if one is given (quantities per piece). */
+export async function addPart(customer: string, partNumber: string, description: string, bom: { material: string; perPiece: number }[] = []) {
+  const c = await prisma.party.findFirstOrThrow({ where: { name: customer } });
+  const part = await prisma.part.create({ data: { customerId: c.id, partNumber, partKey: partNumberKey(partNumber), description } });
+  for (const b of bom) {
+    const m = await prisma.material.findFirstOrThrow({ where: { name: b.material } });
+    await prisma.partBomLine.create({ data: { partId: part.id, materialId: m.id, qtyPerPiece: b.perPiece } });
+  }
+  return part;
 }

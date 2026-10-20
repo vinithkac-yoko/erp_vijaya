@@ -1,12 +1,13 @@
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import type { Card } from '@/lib/cards';
-import { dateText, groupIndian, qty, UOM_LONG } from '@/lib/format';
+import type { Card, Chip } from '@/lib/cards';
+import { dateText, groupIndian, perPieceText, qty, UOM_LONG } from '@/lib/format';
 import { ToolError } from '../errors';
 import { defineTool } from './define';
-import { flag, opt } from './helpers';
+import { flag, opt, optNum } from './helpers';
 import { jobCost, jobTotals } from './jobcost';
 import { findParty, tidy } from './lookup';
+import { findPart, partBomOf, savePartBom } from './parts';
 import { nextNumber } from './numbers';
 import { todayIST } from './counts';
 import type { Db } from './types';
@@ -31,14 +32,9 @@ const dateReq = (what: string) => z.string({ required_error: `Choose the ${what}
 const istDate = (ymd: string) => new Date(`${ymd}T00:00:00+05:30`);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** A per-piece quantity as people say it: wire in grams, liquids in millilitres, the rest in their own unit. */
-export function perPieceText(q: number, uom: string): string {
-  if (uom === 'KG' && q < 1) return `${Number((q * 1000).toFixed(3))} g`;
-  if (uom === 'LTR' && q < 1) return `${Number((q * 1000).toFixed(3))} ml`;
-  return qty(q, uom);
-}
+export { perPieceText };
 
-const jobInclude = { customer: { select: { name: true } }, customerPo: { select: { number: true } }, parentJob: { select: { number: true } } } as const;
+const jobInclude = { customer: { select: { name: true } }, customerPo: { select: { number: true } }, parentJob: { select: { number: true } }, part: { select: { partNumber: true, description: true } } } as const;
 type JobRow = Prisma.JobGetPayload<{ include: typeof jobInclude }>;
 
 /** The job, by its id, or by how people say it: "JOB-2627-0031" or just "31" (the newest year wins). */
@@ -61,26 +57,43 @@ const jobLabel = (j: Pick<JobRow, 'number' | 'quantity'> & { customer: { name: s
 const findCustomer = (db: Db, input: { customerId?: string; customerName?: string }) => findParty(db, { id: input.customerId, name: input.customerName }, 'CUSTOMER');
 
 // ── create_customer_po ─────────────────────────────────────────────────────────────────────────────
+/** One line of a customer's order: a part, how many, and (the owner only) the rate the customer pays per piece. */
+const poLine = z.object({
+  partId: z.string({ required_error: 'Choose the part.' }).min(1, 'Choose the part.').max(64),
+  quantity: z.preprocess((v) => (typeof v === 'string' && v.trim() !== '' ? Number(v.replace(/,/g, '')) : v),
+    z.number({ required_error: 'How many pieces?', invalid_type_error: 'Type the number of pieces.' }).int('Pieces are whole numbers.').min(1, 'The quantity must be more than zero.').max(100_000_000, 'That is too many pieces.')),
+  rate: optNum('rate', 0, 10_000_000),
+  dueDate: dateOpt,
+});
+
 export const createCustomerPo = defineTool({
   name: 'create_customer_po', kind: 'write', roles: ['STOREKEEPER', 'OWNER'],
   input: z.object({
     customerName: opt(150), customerId: z.preprocess(emptyToUndef, z.string().max(64).optional()),
     number: z.string({ required_error: "Type the customer's PO number." }).trim().min(1, "Type the customer's PO number.").max(60, 'That PO number is too long.'),
     poDate: dateOpt,
+    lines: z.array(poLine).max(60, 'That is a lot of lines.').optional(),
   }),
   form: {
     title: 'Record a customer PO', verb: 'Save PO',
-    intro: 'The purchase order a customer sent us. Not one we send a supplier.',
+    intro: 'The purchase order a customer sent us. Not one we send a supplier. List the parts they ordered and how many.',
     fields: [
       { name: 'customerId', label: 'Customer', type: 'party', partyRole: 'CUSTOMER', required: true },
       { name: 'number', label: "Customer's PO number", type: 'text', required: true, hint: 'As printed on their PO.' },
       { name: 'poDate', label: 'PO date', type: 'date' },
+      { name: 'lines', label: 'Parts ordered', type: 'partLines', dependsOn: 'customerId' },
     ],
   },
-  stamp: 'CUSTOMER PO SAVED', stampUpdate: 'CUSTOMER PO ALREADY SAVED',
-  describe: (a) => [`${a.customer} · PO ${a.number}`, a.existing ? 'This PO was already recorded, so nothing new was added. Each item they release is a new job under it.' : 'Each item they release is its own job.', ...(a.jobs ? [`${a.jobs} job${a.jobs === 1 ? '' : 's'} so far`] : [])],
+  stamp: 'CUSTOMER PO SAVED', stampUpdate: 'CUSTOMER PO UPDATED',
+  describe: (a) => [
+    `${a.customer} · PO ${a.number}`,
+    ...((a.lines as { part: string; description: string; quantity: number }[] | undefined) ?? []).map((l) => `${l.part} · ${l.description} — ${groupIndian(l.quantity)} pieces`),
+    a.existing && !(a.lines as unknown[] | undefined)?.length ? 'This PO was already recorded, so nothing new was added. Each item they release is a new job under it.' : 'Each part they release is a job under it.',
+    ...(a.jobs ? [`${a.jobs} job${a.jobs === 1 ? '' : 's'} so far`] : []),
+  ],
   preview: async (ctx, input) => {
-    const values: Record<string, unknown> = {};
+    // the rate a customer pays is the owner's number: only his form has the box
+    const values: Record<string, unknown> = { ownerRates: ctx.session.role === 'OWNER' };
     const info: string[] = [];
     if (!input.customerId && typeof input.customerName === 'string' && input.customerName.trim()) {
       try { values.customerId = (await findCustomer(ctx.db, { customerName: input.customerName })).id; } catch (e) { info.push(e instanceof ToolError ? e.message : 'Choose the customer.'); }
@@ -90,17 +103,42 @@ export const createCustomerPo = defineTool({
   handler: async (ctx, input) => {
     const customer = await findCustomer(ctx.db, input);
     const number = tidy(input.number);
-    const found = await ctx.db.customerPo.findFirst({ where: { customerId: customer.id, number: { equals: number, mode: 'insensitive' } }, include: { _count: { select: { jobs: true } } } });
-    if (found) {
-      return {
-        data: { id: found.id, customer: customer.name, number: found.number, existing: true },
-        audit: { entityType: 'CustomerPo', entityId: found.id, action: 'REUSE', after: { customer: customer.name, number: found.number, existing: true, jobs: found._count.jobs } },
-      };
+    const wanted = input.lines ?? [];
+    const found = await ctx.db.customerPo.findFirst({ where: { customerId: customer.id, number: { equals: number, mode: 'insensitive' } }, include: { _count: { select: { jobs: true } }, lines: true } });
+
+    // the lines are checked before anything is saved
+    if (wanted.some((l) => l.rate !== undefined) && ctx.session.role !== 'OWNER') {
+      throw new ToolError('FORBIDDEN_ROLE', 'Only the owner types the rate the customer pays. Leave the rate empty.', undefined, 'lines');
     }
-    const po = await ctx.db.customerPo.create({ data: { customerId: customer.id, number, poDate: input.poDate ? istDate(input.poDate) : null } });
+    const parts = wanted.length ? await ctx.db.part.findMany({ where: { id: { in: wanted.map((l) => l.partId) } } }) : [];
+    const seen = new Set<string>();
+    const resolved = wanted.map((l) => {
+      const part = parts.find((p) => p.id === l.partId);
+      if (!part) throw new ToolError('NOT_FOUND', "Couldn't find one of those parts.", undefined, 'lines');
+      if (part.customerId !== customer.id) throw new ToolError('PART_CUSTOMER_MISMATCH', `${part.partNumber} is not one of ${customer.name}'s parts.`, undefined, 'lines');
+      if (seen.has(part.id)) throw new ToolError('DUPLICATE_LINE', `${part.partNumber} is on the list twice. Put it on one line.`, undefined, 'lines');
+      seen.add(part.id);
+      const already = found?.lines.find((x) => x.partId === part.id);
+      if (already) throw new ToolError('LINE_EXISTS', `${part.partNumber} is already on this PO (${groupIndian(already.quantity)} pieces).`, undefined, 'lines');
+      return { part, l };
+    });
+    const lineText = resolved.map(({ part, l }) => ({ part: part.partNumber, description: part.description, quantity: l.quantity }));
+
+    let po = found;
+    const existing = !!found;
+    if (!po) {
+      const made = await ctx.db.customerPo.create({ data: { customerId: customer.id, number, poDate: input.poDate ? istDate(input.poDate) : null }, include: { _count: { select: { jobs: true } }, lines: true } });
+      po = made;
+    }
+    if (resolved.length) {
+      await ctx.db.customerPoLine.createMany({ data: resolved.map(({ part, l }) => ({ customerPoId: (po as { id: string }).id, partId: part.id, quantity: l.quantity, rate: l.rate, dueDate: l.dueDate ? istDate(l.dueDate) : null })) });
+    }
+    const base = { customer: customer.name, number: po.number, existing, jobs: po._count.jobs, lines: lineText };
     return {
-      data: { id: po.id, customer: customer.name, number: po.number, existing: false },
-      audit: { entityType: 'CustomerPo', entityId: po.id, action: 'CREATE', after: { customer: customer.name, number: po.number, existing: false, date: input.poDate ? dateText(istDate(input.poDate)) : null } },
+      data: { id: po.id, customer: customer.name, number: po.number, existing, lines: lineText.length },
+      audit: found
+        ? { entityType: 'CustomerPo', entityId: po.id, action: lineText.length ? 'UPDATE' : 'REUSE', after: base }
+        : { entityType: 'CustomerPo', entityId: po.id, action: 'CREATE', after: { ...base, existing: false, date: input.poDate ? dateText(istDate(input.poDate)) : null } },
     };
   },
   followUps: async (_ctx, input, result) => {
@@ -115,13 +153,50 @@ export const listCustomerPos = defineTool({
   input: z.object({ customerId: z.preprocess(emptyToUndef, z.string().max(64).optional()), customerName: opt(150) }),
   handler: async (ctx, input) => {
     const customer = input.customerId || input.customerName ? await findCustomer(ctx.db, input) : null;
-    const rows = await ctx.db.customerPo.findMany({ where: customer ? { customerId: customer.id } : {}, include: { customer: { select: { name: true } }, _count: { select: { jobs: true } } }, orderBy: { createdAt: 'desc' }, take: MAX_ROWS });
-    return { rows: rows.map((p) => ({ id: p.id, customerId: p.customerId, customer: p.customer.name, number: p.number, date: p.poDate?.toISOString() ?? null, jobs: p._count.jobs })) };
+    const rows = await ctx.db.customerPo.findMany({ where: customer ? { customerId: customer.id } : {}, include: { customer: { select: { name: true } }, _count: { select: { jobs: true } }, lines: { select: { quantity: true } } }, orderBy: { createdAt: 'desc' }, take: MAX_ROWS });
+    return { rows: rows.map((p) => ({ id: p.id, customerId: p.customerId, customer: p.customer.name, number: p.number, date: p.poDate?.toISOString() ?? null, jobs: p._count.jobs, parts: p.lines.length, ordered: p.lines.reduce((n, l) => n + l.quantity, 0) })) };
   },
   view: (d) => [{
-    kind: 'table', columns: [{ key: 'c', label: 'Customer' }, { key: 'n', label: 'PO' }, { key: 'd', label: 'Date' }, { key: 'j', label: 'Jobs', align: 'right' }],
-    rows: d.rows.slice(0, 10).map((r) => ({ c: r.customer, n: r.number, d: r.date ? dateText(new Date(r.date)) : '–', j: String(r.jobs) })),
+    kind: 'table', columns: [{ key: 'c', label: 'Customer' }, { key: 'n', label: 'PO' }, { key: 'd', label: 'Date' }, { key: 'o', label: 'Ordered', align: 'right' }, { key: 'j', label: 'Jobs', align: 'right' }],
+    rows: d.rows.slice(0, 10).map((r) => ({ c: r.customer, n: r.number, d: r.date ? dateText(new Date(r.date)) : '–', o: r.ordered ? `${groupIndian(r.ordered)} pcs` : '–', j: String(r.jobs) })),
     note: d.rows.length === 0 ? 'There are no customer POs yet.' : d.rows.length > 10 ? `Showing 10 of ${d.rows.length}.` : undefined,
+  }],
+});
+
+// ── get_customer_po ────────────────────────────────────────────────────────────────────────────────
+/** One customer PO, line by line: ordered, already put into jobs, and what is left to plan. What the customer pays is the owner's. */
+export const getCustomerPo = defineTool({
+  name: 'get_customer_po', kind: 'read', roles: ['STOREKEEPER', 'OWNER'],
+  input: z.object({ customerPoId: z.string({ required_error: 'Which PO?' }).min(1, 'Which PO?').max(100), customerId: z.preprocess(emptyToUndef, z.string().max(64).optional()), customerName: opt(150) }),
+  handler: async (ctx, input) => {
+    const customer = input.customerId || input.customerName ? await findCustomer(ctx.db, input) : null;
+    const ref = input.customerPoId.trim();
+    const include = { customer: { select: { name: true } }, lines: { include: { part: { select: { id: true, partNumber: true, description: true } } }, orderBy: { createdAt: 'asc' as const } } };
+    let po = UUID.test(ref) ? await ctx.db.customerPo.findUnique({ where: { id: ref }, include }) : null;
+    if (!po) {
+      const hits = await ctx.db.customerPo.findMany({ where: { number: { equals: ref, mode: 'insensitive' }, ...(customer ? { customerId: customer.id } : {}) }, include, take: 3 });
+      if (hits.length > 1) throw new ToolError('PO_AMBIGUOUS', `More than one customer has a PO ${ref}: ${hits.map((h) => h.customer.name).join(', ')}. Say which customer.`, undefined, 'customerPoId');
+      po = hits[0] ?? null;
+    }
+    if (!po) throw new ToolError('NOT_FOUND', "Couldn't find that customer PO. Check the number.", undefined, 'customerPoId');
+    const jobs = await ctx.db.job.findMany({ where: { customerPoId: po.id, status: { not: 'CANCELLED' }, type: 'PRODUCTION' }, select: { partId: true, quantity: true, status: true } });
+    const owner = ctx.session.role === 'OWNER';
+    const rows = po.lines.map((l) => {
+      const mine = jobs.filter((j) => j.partId === l.partId);
+      const planned = mine.reduce((n, j) => n + j.quantity, 0);
+      const made = mine.filter((j) => j.status === 'CLOSED' || j.status === 'COMPLETED').reduce((n, j) => n + j.quantity, 0);
+      return {
+        partNumber: l.part.partNumber, description: l.part.description, ordered: l.quantity, planned, made, left: Math.max(0, l.quantity - planned),
+        dueDate: l.dueDate?.toISOString() ?? null, rate: owner ? num(l.rate) : null, value: owner && l.rate !== null ? Math.round(Number(l.rate) * l.quantity * 100) / 100 : null,
+      };
+    });
+    return { customer: po.customer.name, number: po.number, date: po.poDate?.toISOString() ?? null, rows, totalOrdered: rows.reduce((n, r) => n + r.ordered, 0), totalValue: owner && rows.every((r) => r.value !== null) && rows.length ? Math.round(rows.reduce((n, r) => n + (r.value ?? 0), 0) * 100) / 100 : null };
+  },
+  view: (d) => [{
+    kind: 'table', title: `${d.customer} · PO ${d.number}`,
+    columns: [{ key: 'p', label: 'Part' }, { key: 'o', label: 'Ordered', align: 'right' }, { key: 'j', label: 'In jobs', align: 'right' }, { key: 'l', label: 'Left to plan', align: 'right' }],
+    rows: d.rows.slice(0, 12).map((r) => ({ p: `${r.partNumber} · ${r.description}`, o: groupIndian(r.ordered), j: groupIndian(r.planned), l: groupIndian(r.left) })),
+    note: d.rows.length === 0 ? 'No parts are listed on this PO yet.' : undefined,
   }],
 });
 
@@ -129,9 +204,11 @@ export const listCustomerPos = defineTool({
 export const createJob = defineTool({
   name: 'create_job', kind: 'write', roles: ['STOREKEEPER', 'OWNER'],
   input: z.object({
-    customerId: z.string({ required_error: 'Choose the customer.' }).min(1, 'Choose the customer.').max(64),
+    // with a part, the customer and the description come from it; without one (a job from before part numbers) both are typed
+    customerId: z.preprocess(emptyToUndef, z.string().max(64).optional()),
     customerPoId: z.preprocess(emptyToUndef, z.string().max(64).optional()),
-    productDescription: z.string({ required_error: 'Say what is being made.' }).trim().min(1, 'Say what is being made.').max(200, 'Please keep it short.'),
+    partId: z.preprocess(emptyToUndef, z.string().max(64).optional()),
+    productDescription: opt(200),
     quantity: z.preprocess((v) => (typeof v === 'string' && v.trim() !== '' ? Number(v.replace(/,/g, '')) : v),
       z.number({ required_error: 'How many pieces?', invalid_type_error: 'Type the number of pieces.' }).int('Pieces are whole numbers.').min(1, 'The quantity must be more than zero.').max(100_000_000, 'That is too many pieces.')),
     jobDate: dateReq('job date'),
@@ -146,8 +223,8 @@ export const createJob = defineTool({
       { name: 'type', label: 'What kind of job?', type: 'select', required: true, options: [{ value: 'PRODUCTION', label: 'Production' }, { value: 'SAMPLE', label: 'Sample (before the main order)' }] },
       { name: 'customerId', label: 'Customer', type: 'party', partyRole: 'CUSTOMER', required: true },
       { name: 'customerPoId', label: "Customer's PO (if there is one)", type: 'customerPo', dependsOn: 'customerId', hint: 'Pick the customer first. Record the PO first if it is not in the list.' },
+      { name: 'partId', label: 'Part number', type: 'part', dependsOn: 'customerId', required: true, hint: 'Pick the customer first. Add the part first if it is new.' },
       { name: 'parentJobId', label: 'The main job this sample is for', type: 'job', pickerFilter: 'production', required: true, showWhen: { field: 'type', in: ['SAMPLE'] } },
-      { name: 'productDescription', label: 'What is being made?', type: 'text', required: true, hint: 'In your words, like SMPS transformer 12V 2A.' },
       { name: 'quantity', label: 'Pieces', type: 'number', required: true, unit: 'pcs' },
       { name: 'jobDate', label: 'Job date', type: 'date', required: true },
       { name: 'dueDate', label: 'Due date (if given)', type: 'date' },
@@ -157,6 +234,7 @@ export const createJob = defineTool({
   describe: (a) => [
     `${a.number}${a.type === 'SAMPLE' ? ' (sample)' : ''}`,
     `${a.customer} · ${groupIndian(Number(a.quantity))} pieces`,
+    ...(a.part ? [`Part ${a.part}`] : []),
     String(a.product),
     ...(a.po ? [`Customer PO ${a.po}`] : []),
     ...(a.parent ? [`Sample for ${a.parent}`] : []),
@@ -170,10 +248,33 @@ export const createJob = defineTool({
       if (po) values.customerId = po.customerId;
     }
     if (typeof input.parentJobId === 'string' && !input.type) values.type = 'SAMPLE';
-    return { info: [], values };
+    const info: string[] = [];
+    if (typeof input.partId === 'string' && input.partId) {
+      try {
+        const part = await findPart(ctx.db, input.partId);
+        values.partId = part.id; values.customerId = part.customerId;
+        info.push(`${part.partNumber} · ${part.description}`);
+        const poId = (typeof input.customerPoId === 'string' && input.customerPoId) || undefined;
+        if (poId) {
+          const line = await ctx.db.customerPoLine.findUnique({ where: { customerPoId_partId: { customerPoId: poId, partId: part.id } } });
+          if (line) {
+            const used = await ctx.db.job.aggregate({ _sum: { quantity: true }, where: { customerPoId: poId, partId: part.id, type: 'PRODUCTION', status: { not: 'CANCELLED' } } });
+            const planned = used._sum.quantity ?? 0;
+            info.push(`On the PO: ${groupIndian(line.quantity)} ordered, ${groupIndian(planned)} already in jobs, ${groupIndian(Math.max(0, line.quantity - planned))} left to plan.`);
+            if (!input.quantity) values.quantity = Math.max(0, line.quantity - planned) || undefined;
+          }
+        }
+      } catch (e) { info.push(e instanceof ToolError ? e.message : 'Choose the part.'); }
+    }
+    return { info, values };
   },
   handler: async (ctx, input) => {
-    const customer = await findCustomer(ctx.db, { customerId: input.customerId });
+    const part = input.partId ? await findPart(ctx.db, input.partId, input.customerId) : null;
+    if (part && !part.isActive) throw new ToolError('PART_NOT_MADE', `${part.partNumber} is marked as no longer made.`, undefined, 'partId');
+    if (part && input.customerId && part.customerId !== input.customerId) throw new ToolError('PART_CUSTOMER_MISMATCH', `${part.partNumber} belongs to ${part.customer.name}, not the customer chosen.`, undefined, 'partId');
+    if (!part && !input.customerId) throw new ToolError('PARTY_NOT_FOUND', 'Choose the customer.', undefined, 'customerId');
+    if (!part && !input.productDescription) throw new ToolError('PART_REQUIRED', 'Choose the part number, or say what is being made.', undefined, 'partId');
+    const customer = await findCustomer(ctx.db, { customerId: part?.customerId ?? input.customerId });
     const type = input.type ?? 'PRODUCTION';
     if (input.dueDate && input.dueDate < input.jobDate) throw new ToolError('INVALID_DATE', "The due date can't be before the job date.", undefined, 'dueDate');
 
@@ -200,15 +301,15 @@ export const createJob = defineTool({
     const jobDate = istDate(input.jobDate);
     const job = await ctx.db.job.create({
       data: {
-        number: await nextNumber(ctx.db, 'JOB', jobDate), customerId: customer.id, customerPoId: po?.id, type, parentJobId: parent?.id,
-        productDescription: tidy(input.productDescription), quantity: input.quantity, jobDate, dueDate: input.dueDate ? istDate(input.dueDate) : null,
+        number: await nextNumber(ctx.db, 'JOB', jobDate), customerId: customer.id, customerPoId: po?.id, partId: part?.id, type, parentJobId: parent?.id,
+        productDescription: tidy(input.productDescription ?? part?.description ?? ''), quantity: input.quantity, jobDate, dueDate: input.dueDate ? istDate(input.dueDate) : null,
       },
     });
     return {
       data: { id: job.id, number: job.number, quantity: job.quantity, type },
       audit: {
         entityType: 'Job', entityId: job.id, action: 'CREATE',
-        after: { number: job.number, type, customer: customer.name, product: job.productDescription, quantity: job.quantity, po: po?.number ?? null, parent: parent?.number ?? null, date: dateText(jobDate) },
+        after: { number: job.number, type, customer: customer.name, part: part?.partNumber ?? null, product: job.productDescription, quantity: job.quantity, po: po?.number ?? null, parent: parent?.number ?? null, date: dateText(jobDate) },
       },
     };
   },
@@ -217,7 +318,7 @@ export const createJob = defineTool({
 
 // ── list_jobs ──────────────────────────────────────────────────────────────────────────────────────
 const jobRowOf = (j: JobRow, owner: boolean) => ({
-  id: j.id, number: j.number, customer: j.customer.name, customerPo: j.customerPo?.number ?? null, product: j.productDescription, quantity: j.quantity,
+  id: j.id, number: j.number, customer: j.customer.name, customerPo: j.customerPo?.number ?? null, partNumber: j.part?.partNumber ?? null, product: j.productDescription, quantity: j.quantity,
   type: j.type, typeText: TYPE_TEXT[j.type], status: j.status, statusText: STATUS_TEXT[j.status], jobDate: j.jobDate.toISOString(), dueDate: j.dueDate?.toISOString() ?? null,
   parentJob: j.parentJob?.number ?? null,
   // job cost is the owner's report: the storekeeper's copy has none (BUSINESS_FLOW, TOOL_CATALOG §3)
@@ -242,8 +343,8 @@ export const listJobs = defineTool({
   },
   view: (d) => [{
     kind: 'table',
-    columns: [{ key: 'n', label: 'Job' }, { key: 'c', label: 'Customer' }, { key: 'p', label: 'Product' }, { key: 'q', label: 'Pieces', align: 'right' }, { key: 's', label: 'Status' }],
-    rows: d.rows.slice(0, 10).map((r) => ({ n: r.number + (r.type === 'SAMPLE' ? ' (sample)' : ''), c: r.customer, p: r.product, q: groupIndian(r.quantity), s: r.statusText })),
+    columns: [{ key: 'n', label: 'Job' }, { key: 'c', label: 'Customer' }, { key: 'p', label: 'Part' }, { key: 'q', label: 'Pieces', align: 'right' }, { key: 's', label: 'Status' }],
+    rows: d.rows.slice(0, 10).map((r) => ({ n: r.number + (r.type === 'SAMPLE' ? ' (sample)' : ''), c: r.customer, p: r.partNumber ? `${r.partNumber} · ${r.product}` : r.product, q: groupIndian(r.quantity), s: r.statusText })),
     note: d.rows.length === 0 ? 'There are no jobs yet.' : d.rows.length > 10 ? `Showing 10 of ${d.rows.length}.` : undefined,
   }],
 });
@@ -277,7 +378,7 @@ export const getJob = defineTool({
       kind: 'table', title: `${j.number}${j.type === 'SAMPLE' ? ' (sample)' : ''} · ${j.customer} · ${groupIndian(j.quantity)} pieces · ${j.statusText}`,
       columns: [{ key: 'm', label: 'Material' }, { key: 'p', label: 'Per piece', align: 'right' }, { key: 't', label: 'Total needed', align: 'right' }, { key: 'i', label: 'Issued', align: 'right' }],
       rows: d.bom.slice(0, 12).map((b) => ({ m: b.material, p: b.perPieceText, t: qty(b.required, b.unit), i: qty(b.issued - b.returned, b.unit) })),
-      note: d.bom.length === 0 ? `No bill of materials yet.${j.product ? ` ${j.product}.` : ''}` : j.product,
+      note: d.bom.length === 0 ? `No bill of materials yet.${j.product ? ` ${j.partNumber ? `${j.partNumber} · ` : ''}${j.product}.` : ''}` : `${j.partNumber ? `${j.partNumber} · ` : ''}${j.product}`,
     }];
     return cards;
   },
@@ -368,16 +469,22 @@ export const setJobBom = defineTool({
   describe: (a) => [
     `${a.number} · ${groupIndian(Number(a.quantity))} pieces`,
     ...((a.lines as { material: string; each: string; total: string }[]) ?? []).map((l) => `${l.material} — ${l.each} each → ${l.total}`),
+    ...(a.keptForPart ? [`Kept as the usual bill of materials for part ${a.keptForPart}.`] : []),
   ],
   preview: async (ctx, input) => {
     if (typeof input.jobId !== 'string' || !input.jobId) return { info: [], values: {} };
     try {
       const j = await findJob(ctx.db, input.jobId);
       const values: Record<string, unknown> = { jobId: j.id, jobQuantity: j.quantity };
-      const info = [jobLabel(j), j.productDescription];
+      const info = [jobLabel(j), j.part ? `${j.part.partNumber} · ${j.productDescription}` : j.productDescription];
       if (!input.lines) {
         const now = await bomOf(ctx.db, j.id, j.quantity);
         if (now.length) { values.lines = now.map((b) => ({ materialId: b.materialId, qtyPerPiece: b.qtyPerPiece })); info.push('This job already has a bill of materials. Saving replaces it.'); }
+        else if (j.partId) {
+          // a part that has been made before comes with its usual materials: the person checks them against this job, then saves
+          const usual = await partBomOf(ctx.db, j.partId);
+          if (usual.length) { values.lines = usual.map((b) => ({ materialId: b.materialId, qtyPerPiece: b.qtyPerPiece })); info.push(`These are the usual materials for part ${j.part?.partNumber}. Check them against this job, then save.`); }
+        }
       }
       if (j.status !== 'OPEN') info.push(`The job is ${STATUS_TEXT[j.status].toLowerCase()}, so its bill of materials can't be changed. Extra material is a top-up issue.`);
       return { info, values };
@@ -419,29 +526,43 @@ export const setJobBom = defineTool({
     await ctx.db.jobBomLine.createMany({ data: prepared.map((p) => ({ jobId: job.id, materialId: p.m.id, qtyPerPiece: p.per, requiredQty: p.required })) });
     const lines = prepared.map((p) => ({ material: p.m.name, unit: p.m.uom, each: perPieceText(Number(p.per), p.m.uom), total: qty(Number(p.required), p.m.uom), qtyPerPiece: Number(p.per), required: Number(p.required) }))
       .sort((a, b) => a.material.localeCompare(b.material));
+    // the first bill of materials made for a part becomes its usual one (a later change to it is set_part_bom's)
+    let keptForPart: string | null = null;
+    if (job.partId && !job.parentJobId) {
+      const usual = await ctx.db.partBomLine.count({ where: { partId: job.partId } });
+      if (usual === 0) { await savePartBom(ctx.db, job.partId, prepared.map((p) => ({ materialId: p.m.id, qtyPerPiece: Number(p.per) }))); keptForPart = job.part?.partNumber ?? null; }
+    }
     return {
-      data: { jobId: job.id, number: job.number, quantity: job.quantity, lines },
+      data: { jobId: job.id, number: job.number, quantity: job.quantity, lines, partId: job.partId, keptForPart },
       audit: {
         entityType: 'Job', entityId: job.id, action: before.length ? 'UPDATE' : 'CREATE',
         before: { lines: before.map((b) => ({ material: b.material, each: b.perPieceText, total: qty(b.required, b.unit) })) },
-        after: { number: job.number, quantity: job.quantity, lines },
+        after: { number: job.number, quantity: job.quantity, lines, ...(keptForPart ? { keptForPart } : {}) },
       },
     };
   },
-  followUps: async (ctx, _input, result) => {
+  followUps: async (ctx, input, result) => {
     const r = result as { jobId: string };
     const sh = await ctx.read('check_job_shortage', { jobId: r.jobId });
     if (!sh.ok) return { facts: [], chips: [] };
     const d = sh.data as Shortage;
     const short = d.rows.filter((x) => x.short > 0);
+    const done = result as { partId?: string | null; keptForPart?: string | null; lines?: { material: string; qtyPerPiece: number }[] };
+    const chips: Chip[] = [];
+    if (done.partId && !done.keptForPart) {
+      const usual = await ctx.read('get_part', { partId: done.partId });
+      const u = usual.ok ? (usual.data as { part: { partNumber: string }; bom: { material: string; qtyPerPiece: number }[] }) : null;
+      const same = u && u.bom.length === (done.lines?.length ?? 0) && u.bom.every((b) => done.lines?.some((l) => l.material === b.material && Math.abs(l.qtyPerPiece - b.qtyPerPiece) < 1e-9));
+      if (u && !same) chips.push({ label: `Keep as the usual BOM for ${u.part.partNumber}`, form: 'set_part_bom', prefill: { partId: done.partId, lines: (input as { lines?: unknown }).lines } });
+    }
     return {
       cards: [shortageCard(d)],
       facts: short.length
         ? [`The shortage check ran for ${d.number}: ${short.map((x) => `${x.material} needs ${qty(x.needed, x.unit)}, in stock ${qty(x.inStock, x.unit)}, short ${qty(x.short, x.unit)}`).join('; ')}.`]
         : [`The shortage check ran for ${d.number}: nothing is short.`],
-      chips: short.length
+      chips: [...(short.length
         ? [{ label: 'Raise a PO for the shortfall', form: 'create_purchase_order', prefill: { triggeredByJobId: d.jobId, lines: short.map((x) => ({ materialId: x.materialId, quantity: x.short })) } }]
-        : [{ label: 'Issue material now', form: 'issue_material', prefill: { jobId: d.jobId } }],
+        : [{ label: 'Issue material now', form: 'issue_material', prefill: { jobId: d.jobId } }]), ...chips],
     };
   },
 });

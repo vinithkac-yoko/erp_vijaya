@@ -63,8 +63,10 @@ export const getPrintData = defineTool({
         template: input.template, company: co,
         po: { number: po.number, date: po.poDate.toISOString(), approved: po.status === 'APPROVED' || po.status === 'PARTIALLY_RECEIVED' || po.status === 'RECEIVED', status: po.status, expected: po.expectedDate?.toISOString() ?? null, job: po.triggeredByJob?.number ?? null, approvedAt: po.approvedAt?.toISOString() ?? null },
         supplier: partyOf(supplier), taxMode,
-        lines: po.lines.map((l, i) => ({ n: i + 1, material: l.material.name, hsn: l.hsnCode ?? '', unit: l.material.uom, quantity: Number(l.quantity), rate: Number(l.rate), gstRate: l.gstRate === null ? 0 : Number(l.gstRate), amount: Number(l.amount) })),
+        lines: po.lines.map((l, i) => ({ n: i + 1, material: l.material.name, itemCode: l.material.itemCode ?? '', hsn: l.hsnCode ?? '', unit: l.material.uom, quantity: Number(l.quantity), rate: Number(l.rate), gstRate: l.gstRate === null ? 0 : Number(l.gstRate), amount: Number(l.amount) })),
         subTotal: Number(po.subTotal), gst: Number(po.gstAmount), total: Number(po.totalValue),
+        // the printed total is to the whole rupee (as on their own purchase orders); the saved total is not changed
+        roundOff: round2(Math.round(Number(po.totalValue)) - Number(po.totalValue)), payable: Math.round(Number(po.totalValue)),
       };
     }
 
@@ -82,12 +84,12 @@ export const getPrintData = defineTool({
     if (input.template === 'issue-slip' || input.template === 'job-cost-sheet') {
       if (!input.jobId) throw new ToolError('NOT_FOUND', 'Which job?', undefined, 'jobId');
       const j = await findJob(ctx.db, input.jobId);
-      const head = { number: j.number, customer: j.customer.name, customerPo: j.customerPo?.number ?? '', product: j.productDescription, pieces: j.quantity, date: j.jobDate.toISOString(), due: j.dueDate?.toISOString() ?? null, status: j.status, closedAt: j.closedAt?.toISOString() ?? null };
-      const bom = await ctx.db.jobBomLine.findMany({ where: { jobId: j.id }, include: { material: { select: { name: true, uom: true } } }, orderBy: { material: { name: 'asc' } } });
+      const head = { number: j.number, customer: j.customer.name, customerPo: j.customerPo?.number ?? '', customerPoDate: (await ctx.db.customerPo.findUnique({ where: { id: j.customerPoId ?? '' }, select: { poDate: true } }))?.poDate?.toISOString() ?? null, partNumber: j.part?.partNumber ?? '', product: j.productDescription, pieces: j.quantity, date: j.jobDate.toISOString(), due: j.dueDate?.toISOString() ?? null, status: j.status, closedAt: j.closedAt?.toISOString() ?? null };
+      const bom = await ctx.db.jobBomLine.findMany({ where: { jobId: j.id }, include: { material: { select: { name: true, uom: true, itemCode: true } } }, orderBy: { material: { name: 'asc' } } });
       if (input.template === 'issue-slip') {
         return {
           template: input.template, company: co, job: head,
-          lines: bom.map((l, i) => ({ n: i + 1, material: l.material.name, unit: l.material.uom, required: Number(l.requiredQty), issued: Number(l.issuedQty), toIssue: Math.max(0, round2((Number(l.requiredQty) - Number(l.issuedQty)) * 10_000) / 10_000) })),
+          lines: bom.map((l, i) => ({ n: i + 1, material: l.material.name, itemCode: l.material.itemCode ?? '', unit: l.material.uom, perPiece: Number(l.qtyPerPiece), required: Number(l.requiredQty), issued: Number(l.issuedQty), toIssue: Math.max(0, round2((Number(l.requiredQty) - Number(l.issuedQty)) * 10_000) / 10_000) })),
         };
       }
       const totals = await jobTotals(ctx.db, j.id);

@@ -33,23 +33,23 @@ enum OpenedFrom {
 }
 
 model User {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   name         String
   /// Login name. Stored lowercase (a CHECK enforces it).
-  email        String   @unique
+  email        String    @unique
   phone        String?
   role         UserRole
   /// bcrypt hash. Never plaintext, never returned by any tool.
   passwordHash String
-  isActive     Boolean  @default(true)
+  isActive     Boolean   @default(true)
   /// "light" | "dark" | null (follow the device)
   theme        String?
   /// Last time this person did anything (read at most every 5 minutes). Drives the idle log-out.
   lastActiveAt DateTime?
   /// Goes up when the owner resets this person's password: every session made before that stops working.
-  sessionEpoch Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  sessionEpoch Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   movementsCreated StockMovement[] @relation("MovementActor")
   posApproved      PurchaseOrder[] @relation("PoApprover")
@@ -99,6 +99,7 @@ model Party {
   purchaseOrders PurchaseOrder[]
   goodsReceipts  GoodsReceipt[]
   customerPos    CustomerPo[]
+  parts          Part[]
   jobs           Job[]
   scrapSales     ScrapSale[]
 
@@ -252,6 +253,11 @@ model Material {
   /// material. Computed ONLY by materialNameKey() (src/lib/names.ts).
   nameKey String @unique
 
+  /// The company's own item code for this material, as people type it on paper (the work order's "Product Code"). Optional.
+  /// Unlike `code` above, this one IS shown: it is theirs. `itemCodeKey` is its normalized form (names.ts), unique.
+  itemCode    String?
+  itemCodeKey String? @unique
+
   uom       Uom
   stockType StockType @default(PER_JOB)
 
@@ -268,13 +274,14 @@ model Material {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  balance    StockBalance?
-  movements  StockMovement[]
-  poLines    PurchaseOrderLine[]
-  grnLines   GoodsReceiptLine[]
-  bomLines   JobBomLine[]
-  countLines StockCountLine[]
-  scrapSales ScrapSale[]
+  balance      StockBalance?
+  partBomLines PartBomLine[]
+  movements    StockMovement[]
+  poLines      PurchaseOrderLine[]
+  grnLines     GoodsReceiptLine[]
+  bomLines     JobBomLine[]
+  countLines   StockCountLine[]
+  scrapSales   ScrapSale[]
 
   @@index([name])
   @@index([stockType, isActive])
@@ -378,9 +385,9 @@ model StockMovement {
   @@index([type])
   @@index([createdAt])
   @@index([agentRunId])
-  @@map("stock_movements")
   @@index([scrapSaleId])
   @@index([actorId])
+  @@map("stock_movements")
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -432,10 +439,10 @@ model PurchaseOrder {
 
   @@index([supplierId, poDate])
   @@index([status])
-  @@map("purchase_orders")
   @@index([triggeredByJobId])
   @@index([createdById])
   @@index([approvedById])
+  @@map("purchase_orders")
 }
 
 model PurchaseOrderLine {
@@ -455,8 +462,8 @@ model PurchaseOrderLine {
   grnLines      GoodsReceiptLine[]
 
   @@index([purchaseOrderId])
-  @@map("purchase_order_lines")
   @@index([materialId])
+  @@map("purchase_order_lines")
 }
 
 /// Material arrives with supplier invoice / DC. Storekeeper records it
@@ -482,8 +489,8 @@ model GoodsReceipt {
   lines         GoodsReceiptLine[]
 
   @@index([supplierId, receiptDate])
-  @@map("goods_receipts")
   @@index([purchaseOrderId])
+  @@map("goods_receipts")
 }
 
 model GoodsReceiptLine {
@@ -508,9 +515,9 @@ model GoodsReceiptLine {
   movements         StockMovement[]
 
   @@index([goodsReceiptId])
-  @@map("goods_receipt_lines")
   @@index([purchaseOrderLineId])
   @@index([materialId])
+  @@map("goods_receipt_lines")
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -536,8 +543,9 @@ model CustomerPo {
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
 
-  customer Party @relation(fields: [customerId], references: [id])
+  customer Party            @relation(fields: [customerId], references: [id])
   jobs     Job[]
+  lines    CustomerPoLine[]
 
   @@unique([customerId, number])
   @@map("customer_pos")
@@ -567,6 +575,8 @@ model Job {
   number       String  @unique // JOB-2627-0001
   customerId   String
   customerPoId String?
+  /// The part this job makes. Optional only for jobs made before part numbers existed; new jobs carry one.
+  partId       String?
   type         JobType @default(PRODUCTION)
   /// Sample jobs link to the production job they precede
   parentJobId  String?
@@ -587,6 +597,7 @@ model Job {
 
   customer   Party       @relation(fields: [customerId], references: [id])
   customerPo CustomerPo? @relation(fields: [customerPoId], references: [id])
+  part       Part?       @relation(fields: [partId], references: [id])
   parentJob  Job?        @relation("SampleOf", fields: [parentJobId], references: [id])
   sampleJobs Job[]       @relation("SampleOf")
 
@@ -596,9 +607,10 @@ model Job {
 
   @@index([customerId, jobDate])
   @@index([status])
-  @@map("jobs")
   @@index([parentJobId])
   @@index([customerPoId])
+  @@index([partId])
+  @@map("jobs")
 }
 
 /// THIS REPLACES THE EXCEL SHEET handed to the storekeeper.
@@ -622,8 +634,71 @@ model JobBomLine {
   material Material @relation(fields: [materialId], references: [id])
 
   @@unique([jobId, materialId])
-  @@map("job_bom_lines")
   @@index([materialId])
+  @@map("job_bom_lines")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  PARTS  — everything the factory makes runs by part number
+// ═══════════════════════════════════════════════════════════════════
+
+/// A product a customer buys, by the part number the factory puts on it. The same number may exist under two customers, so
+/// it is unique per customer. `partKey` is the normalized number (names.ts), so "90308200008" and "90308200008 " are one.
+model Part {
+  id          String   @id @default(uuid())
+  customerId  String
+  partNumber  String
+  partKey     String
+  description String
+  hsnCode     String?
+  isActive    Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  customer Party            @relation(fields: [customerId], references: [id])
+  bomLines PartBomLine[]
+  jobs     Job[]
+  poLines  CustomerPoLine[]
+
+  @@unique([customerId, partKey])
+  @@index([partKey])
+  @@map("parts")
+}
+
+/// The usual bill of materials for ONE piece of a part. A new job starts from it (the person checks and saves it onto the job);
+/// the job keeps its own copy, so changing this never changes what an old job cost.
+model PartBomLine {
+  id          String  @id @default(uuid())
+  partId      String
+  materialId  String
+  qtyPerPiece Decimal @db.Decimal(18, 6)
+
+  part     Part     @relation(fields: [partId], references: [id])
+  material Material @relation(fields: [materialId], references: [id])
+
+  @@unique([partId, materialId])
+  @@index([materialId])
+  @@map("part_bom_lines")
+}
+
+/// One line of a customer's order: a part, how many, and (owner only) the rate per piece they agreed.
+model CustomerPoLine {
+  id           String    @id @default(uuid())
+  customerPoId String
+  partId       String
+  quantity     Int
+  /// What the customer pays per piece. The owner's number: the storekeeper never sees or types it.
+  rate         Decimal?  @db.Decimal(18, 2)
+  dueDate      DateTime?
+  createdAt    DateTime  @default(now())
+
+  customerPo CustomerPo @relation(fields: [customerPoId], references: [id])
+  part       Part       @relation(fields: [partId], references: [id])
+
+  @@unique([customerPoId, partId])
+  @@index([partId])
+  @@map("customer_po_lines")
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -668,9 +743,9 @@ model StockCount {
 
   @@index([countDate])
   @@index([status])
-  @@map("stock_counts")
   @@index([countedById])
   @@index([approvedById])
+  @@map("stock_counts")
 }
 
 model StockCountLine {
@@ -707,8 +782,8 @@ model StockCountLine {
   movements  StockMovement[]
 
   @@unique([stockCountId, materialId])
-  @@map("stock_count_lines")
   @@index([materialId])
+  @@map("stock_count_lines")
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -735,9 +810,9 @@ model ScrapSale {
   movements StockMovement[]
 
   @@index([saleDate])
-  @@map("scrap_sales")
   @@index([materialId])
   @@index([buyerId])
+  @@map("scrap_sales")
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -851,8 +926,8 @@ model AgentRun {
   conversation Conversation? @relation(fields: [conversationId], references: [id])
 
   @@index([userId, startedAt])
-  @@map("agent_runs")
   @@index([conversationId])
+  @@map("agent_runs")
 }
 
 enum ArtifactKind {
@@ -889,8 +964,8 @@ model Artifact {
   shares         ArtifactShare[]
 
   @@index([ownerId, status])
-  @@map("artifacts")
   @@index([conversationId])
+  @@map("artifacts")
 }
 
 /// Immutable (trigger): a version is never edited, only superseded.
@@ -929,8 +1004,8 @@ model ArtifactShare {
   sharedBy User            @relation("ShareBy", fields: [sharedById], references: [id])
 
   @@index([toUserId, revokedAt])
-  @@map("artifact_shares")
   @@index([versionId])
   @@index([sharedById])
   @@index([artifactId])
+  @@map("artifact_shares")
 }

@@ -2,13 +2,14 @@ import { db } from '../db';
 import { listPendingApprovals } from './approvals';
 import { listReorderAlerts } from './alerts';
 import { approveStockCount, openCount, listCountLines, listCounts, rejectStockCount, saveCountSheet, startStockCount, submitCountLine, submitStockCount } from './counts';
-import { cancelJob, checkJobShortage, createCustomerPo, createJob, getJob, getJobBomVariance, listCustomerPos, listJobs, setJobBom } from './jobs';
+import { cancelJob, checkJobShortage, createCustomerPo, createJob, getCustomerPo, getJob, getJobBomVariance, listCustomerPos, listJobs, setJobBom } from './jobs';
 import { approvePurchaseOrder, cancelPurchaseOrder, createPurchaseOrder, getPurchaseOrder, getPurchasePriceHistory, listPurchaseOrders, rejectPurchaseOrder } from './purchasing';
 import { listGoodsReceipts, recordGoodsReceipt } from './receipts';
 import { getMovementHistory, reverseMovement } from './corrections';
 import { getScrapSummary, recordScrapIn, recordScrapSale } from './scrap';
 import { closeJob, issueMaterial, returnMaterial } from './stockmoves';
 import { createMaterial, deactivateMaterial, getMaterialBalance, searchMaterials, updateMaterial } from './materials';
+import { createPart, getPart, listParts, setPartBom, updatePart } from './parts';
 import { createParty, deactivateParty, searchParties, updateParty } from './parties';
 import { createPendingService } from './pending';
 import { assistantSettingOn, listSettings, updateSetting } from './settings';
@@ -17,7 +18,7 @@ import { getStockValue } from './stock';
 import { getPrintData } from './printdata';
 import { shareArtifact, unshareArtifact } from './artifactshare';
 import { resetDemoData } from './demo';
-import { estimateJobCost, getActivity, getCountHistory, getJobCostReport, getLeakReport } from './reports';
+import { estimateJobCost, getActivity, getMarginByPart, getCountHistory, getJobCostReport, getLeakReport } from './reports';
 import { Registry } from './registry';
 import { createRunTool } from './run-tool';
 import type { RunOptions, ToolOutcome, ToolSession } from './types';
@@ -32,10 +33,10 @@ export const registry = new Registry([
   listSettings, updateSetting,
   listUsers, createUser, resetUserPassword, deactivateUser,
   listReorderAlerts, listPendingApprovals, getStockValue,
-  listCustomerPos, listJobs, getJob, checkJobShortage, getJobBomVariance, createCustomerPo, createJob, setJobBom, cancelJob,
+  createPart, updatePart, setPartBom, listParts, getPart, listCustomerPos, getCustomerPo, listJobs, getJob, checkJobShortage, getJobBomVariance, createCustomerPo, createJob, setJobBom, cancelJob,
   listPurchaseOrders, getPurchaseOrder, getPurchasePriceHistory, createPurchaseOrder, cancelPurchaseOrder, approvePurchaseOrder, rejectPurchaseOrder, listGoodsReceipts, recordGoodsReceipt,
   issueMaterial, returnMaterial, closeJob, recordScrapIn, recordScrapSale, getScrapSummary, getMovementHistory, reverseMovement,
-  getPrintData, resetDemoData, shareArtifact, unshareArtifact, getLeakReport, getCountHistory, getJobCostReport, estimateJobCost, getActivity,
+  getPrintData, resetDemoData, shareArtifact, unshareArtifact, getLeakReport, getCountHistory, getJobCostReport, getMarginByPart, estimateJobCost, getActivity,
   listCounts, listCountLines, startStockCount, submitCountLine, saveCountSheet, submitStockCount, approveStockCount, rejectStockCount,
 ]);
 

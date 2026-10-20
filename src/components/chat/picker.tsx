@@ -65,7 +65,7 @@ export function Picker({ kind, value, onChange, onOption, partyRole, forId, filt
     <div className="relative">
       <input id={id} role="combobox" aria-expanded={open} aria-controls={listId} aria-autocomplete="list" aria-invalid={invalid || undefined} aria-describedby={describedBy}
         aria-activedescendant={open && options[active] ? `${listId}-${active}` : undefined} autoComplete="off" autoFocus={autoFocus}
-        placeholder={waitFor ? waitFor : kind === 'material' || kind === 'countLine' ? 'Start typing the material…' : kind === 'job' ? 'Start typing the job number or customer…' : kind === 'customerPo' ? 'Pick the PO, or leave it empty…' : 'Start typing the name…'}
+        placeholder={waitFor ? waitFor : kind === 'material' || kind === 'countLine' ? 'Start typing the material…' : kind === 'job' ? 'Start typing the job number or customer…' : kind === 'part' ? 'Start typing the part number…' : kind === 'customerPo' ? 'Pick the PO, or leave it empty…' : 'Start typing the name…'}
         aria-label={label}
         value={query} className={inputClass}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); }}

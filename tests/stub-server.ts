@@ -81,6 +81,11 @@ function script(r: StubRequest): StubReply {
   if (t.includes('this as pdf')) return answered ? say('Tap the button for the file.') : call('download_data', { format: 'pdf' });
   if (t.includes('this as word')) return answered ? say('Tap the button for the file.') : call('download_data', { format: 'docx' });
   if (t.includes('start the demo again')) return owner ? call('reset_demo_data', {}, 'This clears the demo and fills it in again.') : say('Only the owner can start the demo again.');
+  if (t.includes('add the part')) return call('create_part', { customerName: 'Medha Servo Drives', partNumber: '90308200008', description: 'TXFR FOR M634VOC' }, 'Check the part number and what it is.');
+  if (t.includes('new job for part')) return call('create_job', { partId: '90308200008', quantity: 400 }, 'Check the part and how many.');
+  if (t.includes('record the medha po')) return call('create_customer_po', { customerName: 'Medha Servo Drives', number: '5100033466', lines: [{ partId: '90305600201', quantity: 492 }] }, 'Check the parts and how many of each.');
+  if (t.includes('left on the medha po')) return answered ? say('Here is what is left to plan.') : call('get_customer_po', { customerPoId: '5100033466', customerName: 'Medha Servo Drives' });
+  if (t.includes('margin by part')) return owner ? (answered ? say('Here is the margin by part, material only.') : call('get_margin_by_part', {})) : say('The margin is the owner\'s.');
   if (t.includes('collected scrap')) return call('record_scrap_in', {}, 'Check the scrap and the quantity.');
   if (t.includes('sold scrap')) return call('record_scrap_sale', {}, 'Check the buyer, the quantity and the rate.');
   if (t.includes('reverse an entry')) return owner ? call('reverse_movement', {}, 'Choose the entry and say why.') : say('Only the owner can reverse an entry.');

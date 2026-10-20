@@ -1,5 +1,5 @@
 import { chromium } from 'playwright-core';
-import { dateText, groupIndian, inr, qty } from '@/lib/format';
+import { dateText, groupIndian, inr, perPieceText, qty, rupeesInWords } from '@/lib/format';
 import { CHROME_ARGS, chromePath, ExportError } from './export';
 
 /**
@@ -58,8 +58,9 @@ export function renderPrintout(d: any): Printed {
     const tax = d.taxMode === 'CGST_SGST' ? `<tr><td>CGST</td><td class="n">${esc(inr(d.gst / 2))}</td></tr><tr><td>SGST</td><td class="n">${esc(inr(d.gst / 2))}</td></tr>` : d.taxMode === 'IGST' ? `<tr><td>IGST</td><td class="n">${esc(inr(d.gst))}</td></tr>` : '';
     const body = letterhead(co, 'PURCHASE ORDER', d.po.number, dt(d.po.date), stamp) +
       `<div class="cols">${party('To (supplier)', d.supplier)}${party('Bill to', { name: co.name, address: co.address, state: co.state, gstin: co.gstin, phone: co.phone })}</div>` +
-      `<table>${head(['#', 'Material', 'HSN', 'Quantity', 'Unit', 'Rate', 'GST', 'Amount'], [0, 3, 5, 6, 7])}${d.lines.map((l: any) => row([l.n, l.material, l.hsn, num(l.quantity), unit(l.unit), inr(l.rate), l.gstRate ? `${l.gstRate}%` : '', inr(l.amount)], [0, 3, 5, 6, 7])).join('')}</table>` +
-      `<table class="totals"><tr><td>Sub-total</td><td class="n">${esc(inr(d.subTotal))}</td></tr>${tax}<tr class="grand"><td>Total</td><td class="n">${esc(inr(d.total))}</td></tr></table>` +
+      `<table>${head(['#', 'Material', 'HSN', 'Due on', 'Quantity', 'Unit', 'Rate', 'GST', 'Amount'], [0, 4, 6, 7, 8])}${d.lines.map((l: any) => row([l.n, l.itemCode ? `${l.material} (${l.itemCode})` : l.material, l.hsn, dt(d.po.expected), num(l.quantity), unit(l.unit), inr(l.rate), l.gstRate ? `${l.gstRate}%` : '', inr(l.amount)], [0, 4, 6, 7, 8])).join('')}</table>` +
+      `<table class="totals"><tr><td>Sub-total</td><td class="n">${esc(inr(d.subTotal))}</td></tr>${tax}${d.roundOff ? `<tr><td>Round off</td><td class="n">${esc(`${d.roundOff < 0 ? '−' : '+'}${inr(Math.abs(d.roundOff))}`)}</td></tr>` : ''}<tr class="grand"><td>Total</td><td class="n">${esc(inr(d.payable ?? d.total))}</td></tr></table>` +
+      `<div class="note"><strong>${esc(rupeesInWords(d.payable ?? d.total))}</strong></div>` +
       (d.po.expected ? `<div class="note">Please deliver by ${esc(dt(d.po.expected))}.</div>` : '') +
       `<div class="sign"><div>Prepared by</div><div>Authorised signatory, ${esc(co.name)}</div></div>`;
     return { title: `Purchase order ${d.po.number}`, html: doc(`Purchase order ${d.po.number}`, body), filename: `purchase-order-${slug(d.po.number)}` };
@@ -72,10 +73,13 @@ export function renderPrintout(d: any): Printed {
     return { title: `Goods receipt note ${d.grn.number}`, html: doc(`Goods receipt note ${d.grn.number}`, body), filename: `goods-receipt-note-${slug(d.grn.number)}` };
   }
   if (d.template === 'issue-slip') {
-    const body = letterhead(co, 'ISSUE SLIP · PICK LIST', d.job.number, dt(new Date().toISOString())) +
-      `<div class="cols"><div class="box"><h2>Job</h2><strong>${esc(d.job.customer)}</strong>${d.job.customerPo ? ` · PO ${esc(d.job.customerPo)}` : ''}<br>${esc(d.job.product)}<br>${esc(groupIndian(d.job.pieces))} pieces${d.job.due ? ` · due ${esc(dt(d.job.due))}` : ''}</div></div>` +
-      `<table>${head(['#', 'Material', 'Needed for the job', 'Given out already', 'Give now', 'Shelf', 'Done'], [0, 2, 3, 4])}${d.lines.map((l: any) => `<tr>${[l.n, l.material, qty(l.required, l.unit), l.issued ? qty(l.issued, l.unit) : '–', qty(l.toIssue, l.unit)].map((c, i) => `<td${[0, 2, 3, 4].includes(i) ? ' class="n"' : ''}>${esc(c)}</td>`).join('')}<td class="blank"></td><td class="blank"></td></tr>`).join('')}</table>` +
-      `<div class="note">Weigh or count out exactly what is written. Printing this gives out nothing: record it in the app before you leave the shelf.</div><div class="sign"><div>Given by</div><div>Received by</div></div>`;
+    // The work order: what the job makes (by part number), whose order it is, and what to give out for it (milestone 11).
+    const body = letterhead(co, 'WORK ORDER · ISSUE SLIP', d.job.number, dt(d.job.date)) +
+      `<div class="cols"><div class="box"><h2>Part</h2><strong>${esc(d.job.partNumber || 'No part number')}</strong><br>${esc(d.job.product)}<br>${esc(groupIndian(d.job.pieces))} pieces${d.job.due ? ` · due ${esc(dt(d.job.due))}` : ''}</div>` +
+      `<div class="box"><h2>Customer</h2><strong>${esc(d.job.customer)}</strong>${d.job.customerPo ? `<br>Customer PO ${esc(d.job.customerPo)}${d.job.customerPoDate ? ` of ${esc(dt(d.job.customerPoDate))}` : ''}` : ''}</div></div>` +
+      `<table>${head(['#', 'Item code', 'Material', 'Unit', 'For one piece', 'Required', 'Given out', 'Balance', 'Give now'], [0, 4, 5, 6, 7, 8])}${d.lines.map((l: any) => `<tr>${[l.n, l.itemCode, l.material, unit(l.unit), perPieceText(l.perPiece, l.unit), qty(l.required, l.unit), l.issued ? qty(l.issued, l.unit) : '–', qty(Math.max(0, l.required - l.issued), l.unit), qty(l.toIssue, l.unit)].map((c, i) => `<td${[0, 4, 5, 6, 7, 8].includes(i) ? ' class="n"' : ''}>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>` +
+      `<div class="note">Weigh or count out exactly what is written. Printing this gives out nothing: record it in the app before you leave the shelf.</div>` +
+      `<div class="sign"><div>Requested by (planning) · date</div><div>Issued by · date</div><div>Received by · date</div></div>`;
     return { title: `Issue slip ${d.job.number}`, html: doc(`Issue slip ${d.job.number}`, body), filename: `issue-slip-${slug(d.job.number)}` };
   }
   if (d.template === 'count-sheet') {
@@ -92,7 +96,7 @@ export function renderPrintout(d: any): Printed {
   // job-cost-sheet (owner only)
   const closed = d.job.status === 'CLOSED';
   const body = letterhead(co, 'JOB COST SHEET', d.job.number, closed ? `Closed ${dt(d.job.closedAt)}` : 'Cost so far') +
-    `<div class="cols"><div class="box"><h2>Job</h2><strong>${esc(d.job.customer)}</strong>${d.job.customerPo ? ` · PO ${esc(d.job.customerPo)}` : ''}<br>${esc(d.job.product)}<br>${esc(groupIndian(d.job.pieces))} pieces</div></div>` +
+    `<div class="cols"><div class="box"><h2>Job</h2><strong>${esc(d.job.customer)}</strong>${d.job.customerPo ? ` · PO ${esc(d.job.customerPo)}` : ''}<br>${d.job.partNumber ? `${esc(d.job.partNumber)} · ` : ''}${esc(d.job.product)}<br>${esc(groupIndian(d.job.pieces))} pieces</div></div>` +
     `<table>${head(['Material', 'Given out', 'Came back', 'Used', 'Value'], [1, 2, 3, 4])}${d.lines.map((l: any) => row([l.material, qty(l.issued, l.unit), l.returned ? qty(l.returned, l.unit) : '–', qty(l.net, l.unit), inr(l.value)], [1, 2, 3, 4])).join('')}</table>` +
     `<table class="totals"><tr><td>Material cost</td><td class="n">${esc(inr(d.cost))}</td></tr>${d.perPiece !== null ? `<tr class="grand"><td>Per piece</td><td class="n">${esc(inr(d.perPiece))}</td></tr>` : ''}</table>` +
     `<div class="foot">For the owner only. Value is quantity at the average price when it went out or came back.</div>`;

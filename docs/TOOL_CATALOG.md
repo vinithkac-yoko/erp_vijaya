@@ -44,6 +44,8 @@ and role in its context).
 **update_material** — `UNIT_LOCKED` explains why unit/stock type can't change.
 **deactivate_material** — `MATERIAL_HAS_STOCK`.
 
+**As built (milestone 11):** a material may have the company's own **item code** (the work order's "Product Code"). `create_material` and `update_material` take `itemCode` (unique in any spacing or case: `ITEM_CODE_EXISTS`); `search_materials` finds a material by it and shows it. It is theirs, so it is shown (unlike the internal `MAT-…` code, which never is).
+
 ## 2. Suppliers and customers
 
 | Tool | Kind | Roles | Purpose |
@@ -82,6 +84,22 @@ until the user ticks "different business"; bad GSTIN → `INVALID_GSTIN`.
 - After a BOM is saved the **server** draws the shortage table and offers the purchase order for the shortfall (rate left out) or "Issue material now". `list_customer_pos` is new (read): the forms use it to offer only that customer's POs.
 - `cancel_job` only with nothing issued and no sample job still under it. Job cost fields stay owner-only.
 - `get_job_bom_variance` marks top-ups when issue and top-up arrive (milestone 7).
+
+### Parts, customer PO lines and margin (milestone 11)
+
+Everything runs by part number (`docs/CLIENT_TEMPLATES.md`, BUSINESS_FLOW §1). A **part** belongs to one customer; the same number may exist for two customers (unique per customer, by its normalized key: letters and digits only).
+
+| Tool | Kind | Roles | Purpose |
+|---|---|---|---|
+| `list_parts` | R | SK OW | Parts by number, a piece of one (3+ characters), a pasted "number-description", or words from the description; optional customer. Number, description, customer, whether it has a usual BOM, jobs so far |
+| `get_part` | R | SK OW | One part: its usual BOM per piece (with item codes), recent jobs, the customer PO lines that ordered it (the customer's rate is the owner's: null for the storekeeper). A number used by two customers is asked about (`PART_AMBIGUOUS`), never guessed |
+| `create_part` | W | SK OW | Customer (picked), part number, description, HSN. Same number for the same customer → `PART_EXISTS`. Follow-ups: "Add its BOM", "Create a job for it" |
+| `update_part` | W | SK OW | Fix a typing mistake in the number (not a clash), the description, the HSN, or mark it no longer made (`PART_NOT_MADE` on a new job). Jobs already made keep what they had |
+| `set_part_bom` | W | SK OW | The part's USUAL bill of materials per piece. Replaces it. A new job's BOM form starts from it; each job keeps its own copy |
+| `get_customer_po` | R | SK OW | One customer PO by line: ordered, in jobs (production jobs under the PO, not cancelled), left to plan; rate and value for the owner only |
+| `get_margin_by_part` | R | **OW** | Closed production jobs by part in a period: pieces, material cost a piece, the rate a piece from the PO line, margin and %. Material only (no labour). A part with no rate on its PO line shows cost and says so |
+
+**Changed:** `create_customer_po` takes `lines` (part, pieces, owner-only rate, due date); the same PO again adds new parts to it (`LINE_EXISTS` if the part is already there; `PART_CUSTOMER_MISMATCH`, `DUPLICATE_LINE`; a storekeeper's rate → `FORBIDDEN_ROLE`). `create_job` takes `partId`: customer and description come from it (the form shows "ordered, in jobs, left to plan" for the PO line and offers the left-over as the quantity); `customerId` + `productDescription` still work for jobs with no part, and one of the two is required (`PART_REQUIRED`). `set_job_bom` opens with the part's usual BOM when the job has none; the **first** BOM made for a part with none becomes its usual one (said on the saved card); otherwise a chip offers "Keep as the usual BOM for …". `list_jobs` / `get_job` / `list_customer_pos` show part numbers, parts and pieces ordered.
 
 **create_customer_po** — unknown customer → `PARTY_NOT_FOUND` with suggestions; supplier-only
 party → `PARTY_WRONG_ROLE`. *Follow-ups:* offer "Create a job for this PO".
@@ -294,7 +312,7 @@ business data only through the R tools above, **as the viewer**, via `vijaya.rea
 | `open_artifact` | — | SK OW | Open a saved, recent or shared artifact in the panel (re-runs it with live data) |
 | `make_artifact` | — | SK OW | Build an artifact from a plain-words request. Input `request` and optional `kind` (`page` \| `document`; left out, the builder picks: reports, memos, SOPs, diagrams, explainers → `document`; interactive what-if or filters → `page`). Only when the person asked for a report, memo, SOP, diagram, chart, dashboard, comparison, what-if or long list. The builder returns `kind`, `title` and `source` (page HTML or VDoc text); runs `checkArtifact` or `checkDoc` (3 repairs). Opens the result |
 | `edit_artifact` | — | SK OW (own artifacts) | Change an artifact (page or document) via validated patches whose `old` text must match exactly once in the current `source`; new version, live at once, same kind. Shared copies are unchanged |
-| `open_printout` | — | SK OW (`job-cost-sheet`: OW) | Open a printout: `purchase-order`, `goods-receipt-note`, `issue-slip`, `count-sheet`, `job-cost-sheet`. Fixed templates; the model never writes them |
+| `open_printout` | — | SK OW (`job-cost-sheet`: OW) | Open a printout: `purchase-order`, `goods-receipt-note`, `issue-slip` (the work order: part number, customer PO, item codes, signatures), `count-sheet`, `job-cost-sheet`. Fixed templates; the model never writes them. The purchase order prints round-off to the whole rupee and the amount in words |
 | `share_artifact` | W | **OW** | Share one frozen version with the storekeeper. Form shows the title, the version and who gets it. **Refused** if the artifact uses an owner-only tool |
 | `unshare_artifact` | W | **OW** | Stop sharing; it disappears from the storekeeper's Saved |
 | `download_data` | — | SK OW | A file of a table or of an artifact. Formats: for a `document` artifact **pdf, docx, xlsx, csv, png, md**; for a `page` **pdf, png, xlsx, csv**; for a table in the chat xlsx or csv. Made on the server; re-reads the data with the **downloader's** role (a storekeeper cannot download owner data). Offered as a button (Download ▾); the agent offers the format the person names |

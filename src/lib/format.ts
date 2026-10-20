@@ -52,3 +52,32 @@ export function dateText(d: Date): string {
 export function timeText(d: Date): string {
   return new Intl.DateTimeFormat('en-GB', { timeZone: IST, hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
 }
+
+/** A per-piece quantity as people say it: wire in grams, liquids in millilitres, the rest in their own unit. */
+export function perPieceText(q: number, uom: string): string {
+  if (uom === 'KG' && q < 1) return `${Number((q * 1000).toFixed(3))} g`;
+  if (uom === 'LTR' && q < 1) return `${Number((q * 1000).toFixed(3))} ml`;
+  return qty(q, uom);
+}
+
+const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+const below100 = (n: number) => (n < 20 ? ONES[n] : `${TENS[Math.floor(n / 10)]}${n % 10 ? ` ${ONES[n % 10]}` : ''}`) as string;
+const below1000 = (n: number) => `${n >= 100 ? `${ONES[Math.floor(n / 100)]} Hundred${n % 100 ? ' ' : ''}` : ''}${n % 100 ? below100(n % 100) : ''}`;
+
+/** An amount in rupees the way a bill writes it, in lakhs and crores: "INR Seven Lakh Forty Four Thousand Nine Hundred Sixty Five and Sixty paise Only". */
+export function rupeesInWords(amount: number): string {
+  const paise = Math.round(Math.abs(amount) * 100);
+  let r = Math.floor(paise / 100);
+  const ps = paise % 100;
+  const parts: string[] = [];
+  const crore = Math.floor(r / 10_000_000); r %= 10_000_000;
+  const lakh = Math.floor(r / 100_000); r %= 100_000;
+  const thousand = Math.floor(r / 1000); r %= 1000;
+  if (crore) parts.push(`${below1000(crore)} Crore`);
+  if (lakh) parts.push(`${below100(lakh)} Lakh`);
+  if (thousand) parts.push(`${below100(thousand)} Thousand`);
+  if (r) parts.push(below1000(r));
+  const rupees = parts.join(' ') || 'Zero';
+  return `INR ${rupees}${ps ? ` and ${below100(ps)} paise` : ''} Only`;
+}

@@ -5,7 +5,7 @@ import type { ToolSession } from '../tools/types';
  * Demo data (docs/VIJAYA prompt §7): a realistic month, built through the same tools the people use, so the ledger, the
  * audit trail and every rule are the real ones. Nothing here writes a table by hand. It runs only when DEMO_MODE is on.
  *
- * The story: the opening count; 12 jobs for four customers (a customer's open PO with three releases, and a sample);
+ * The story: the opening count; 11 parts by part number; 12 jobs for four customers (a customer's open PO with three releases, and a sample);
  * purchase orders including one over the limit that waits for the owner; receipts with one rejection and one rate jump;
  * issues, returns and a top-up; scrap in and out; and a monthly count with a few differences nobody could explain, so the
  * leak report has something to say.
@@ -77,27 +77,40 @@ export async function seedDemo({ owner, storekeeper: sk }: People): Promise<void
   await act(sk, 'record_goods_receipt', { supplierId: supplier('Ravi Insulation Traders'), receiptDate: ist(), lines: [{ materialId: bobbin, receivedQty: 1012, rate: 9 }] });
   await act(sk, 'record_goods_receipt', { supplierId: supplier('Sundaram Ferrites'), receiptDate: ist(), supplierInvoiceNo: 'SF/2627/0455', lines: [{ materialId: core, receivedQty: 2500, rate: 65 }] });
 
+  // ── parts: everything runs by part number ──
+  const PARTS = {
+    smps: ['Ashok Transformers', '90301030002', 'SMPS TXFR 12V 2A'], led: ['Brightline LED', '90302100101', 'LED DRIVER TXFR'], toroid: ['Ashok Transformers', '90302200415', 'TOROIDAL INDUCTOR'],
+    relay1: ['Southern Railway', '90306700245', 'RELAY TXFR L8'], relay2: ['Southern Railway', '90306700244', 'RELAY TXFR L4 (NEW DESIGN)'], relay3: ['Southern Railway', '90306401921', 'RELAY TXFR L3'],
+    ballast: ['Ashok Transformers', '90305601208', 'BALLAST TXFR L3'], led24: ['Brightline LED', '90308000101', 'LED DRIVER TXFR 24V'], signal: ['Southern Railway', '90316200017', 'SIGNAL TXFR L3'],
+    inductor: ['Ashok Transformers', '90308200008', 'INDUCTOR NEW DESIGN'], choke: ['Brightline LED', '90308000201', 'DRIVER CHOKE'],
+  } as const;
+  const partId = {} as Record<keyof typeof PARTS, string>;
+  for (const [k, [customer, partNumber, description]] of Object.entries(PARTS) as [keyof typeof PARTS, readonly [string, string, string]][]) {
+    partId[k] = String((await act(sk, 'create_part', { customerId: supplier(customer), partNumber, description })).id);
+  }
+
   // ── jobs (twelve, four customers) ──
-  const job = async (customer: string, qty: number, product: string, bom: { m: string; per: number }[] | null, days: number, extra: Data = {}) => {
-    const j = await act(sk, 'create_job', { customerId: supplier(customer), productDescription: product, quantity: qty, jobDate: ist(days), ...extra });
+  const job = async (part: keyof typeof PARTS, qty: number, bom: { m: string; per: number }[] | null, days: number, extra: Data = {}) => {
+    const j = await act(sk, 'create_job', { partId: partId[part], quantity: qty, jobDate: ist(days), ...extra });
     if (bom) await act(sk, 'set_job_bom', { jobId: String(j.id), lines: bom.map((b) => ({ materialId: id[b.m]!, qtyPerPiece: b.per })) });
     return String(j.id);
   };
   const W = '22 SWG Copper Wire', C = 'Ferrite Core E-30', B = 'Bobbin Type-B', T = 'Insulation Tape', V = 'Varnish';
   const smps = [{ m: W, per: 0.0184 }, { m: C, per: 2 }, { m: B, per: 1 }, { m: T, per: 0.3 }, { m: V, per: 0.005 }];
-  const j1 = await job('Ashok Transformers', 500, 'SMPS transformer 12V 2A', smps, 26);
-  const j2 = await job('Brightline LED', 1200, 'LED driver transformer', [{ m: W, per: 0.008 }, { m: T, per: 0.2 }], 24);
-  const j3 = await job('Ashok Transformers', 300, 'Toroidal inductor', [{ m: W, per: 0.012 }, { m: T, per: 0.25 }], 22);
-  const railPo = await act(sk, 'create_customer_po', { customerName: 'Southern Railway', number: 'SRSW-OP-44' });
-  const j4 = await job('Southern Railway', 200, 'Relay transformer', [{ m: W, per: 0.025 }, { m: C, per: 1 }, { m: T, per: 0.1 }], 20, { customerPoId: String(railPo.id) });
-  const j5 = await job('Southern Railway', 150, 'Relay transformer, new design', [{ m: W, per: 0.03 }, { m: B, per: 1 }], 12, { customerPoId: String(railPo.id) });
-  const j6 = await job('Southern Railway', 100, 'Relay transformer, third release', [{ m: W, per: 0.02 }, { m: T, per: 0.15 }], 4, { customerPoId: String(railPo.id) });
-  const sample = await job('Brightline LED', 5, 'LED driver sample', [{ m: W, per: 0.01 }, { m: T, per: 0.2 }], 25, { type: 'SAMPLE', parentJobId: j2 });
-  const j8 = await job('Ashok Transformers', 800, 'Ballast transformer', [{ m: W, per: 0.014 }, { m: B, per: 1 }, { m: V, per: 0.004 }], 10);
-  const j9 = await job('Brightline LED', 600, 'LED driver transformer, 24V', [{ m: W, per: 0.009 }, { m: T, per: 0.2 }], 6);
-  await job('Southern Railway', 250, 'Signal transformer', [{ m: W, per: 0.02 }, { m: C, per: 2 }], 3);
-  await job('Ashok Transformers', 400, 'Inductor, new design', null, 2);
-  await job('Brightline LED', 150, 'Driver choke', [{ m: W, per: 0.006 }], 1);
+  const j1 = await job('smps', 500, smps, 26);
+  const j2 = await job('led', 1200, [{ m: W, per: 0.008 }, { m: T, per: 0.2 }], 24);
+  const j3 = await job('toroid', 300, [{ m: W, per: 0.012 }, { m: T, per: 0.25 }], 22);
+  // the railway's open PO lists the three parts; the owner types the rate they pay (the storekeeper never sees it)
+  const railPo = await act(owner, 'create_customer_po', { customerName: 'Southern Railway', number: 'SRSW-OP-44', lines: [{ partId: partId.relay1, quantity: 450, rate: 96 }, { partId: partId.relay2, quantity: 150, rate: 112 }, { partId: partId.relay3, quantity: 100, rate: 84 }] });
+  const j4 = await job('relay1', 200, [{ m: W, per: 0.025 }, { m: C, per: 1 }, { m: T, per: 0.1 }], 20, { customerPoId: String(railPo.id) });
+  const j5 = await job('relay2', 150, [{ m: W, per: 0.03 }, { m: B, per: 1 }], 12, { customerPoId: String(railPo.id) });
+  const j6 = await job('relay3', 100, [{ m: W, per: 0.02 }, { m: T, per: 0.15 }], 4, { customerPoId: String(railPo.id) });
+  const sample = await job('led', 5, [{ m: W, per: 0.01 }, { m: T, per: 0.2 }], 25, { type: 'SAMPLE', parentJobId: j2 });
+  const j8 = await job('ballast', 800, [{ m: W, per: 0.014 }, { m: B, per: 1 }, { m: V, per: 0.004 }], 10);
+  const j9 = await job('led24', 600, [{ m: W, per: 0.009 }, { m: T, per: 0.2 }], 6);
+  await job('signal', 250, [{ m: W, per: 0.02 }, { m: C, per: 2 }], 3);
+  await job('inductor', 400, null, 2);
+  await job('choke', 150, [{ m: W, per: 0.006 }], 1);
 
   // ── the floor: give out, take back, a top-up, close ──
   for (const j of [j1, j2, j3, sample]) await act(sk, 'issue_material', { jobId: j });

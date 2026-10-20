@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { addMaterials, addParties, addStock, prisma, resetData } from './db';
+import { addMaterials, addParties, addPart, addStock, prisma, resetData } from './db';
 import { login } from './helpers';
 import { OWNER, STOREKEEPER } from './users';
 
@@ -19,6 +19,8 @@ async function seed() {
     { name: '22 SWG Copper Wire', uom: 'KG' }, { name: 'Ferrite Core E-30' }, { name: 'Bobbin Type-B' }, { name: 'Insulation Tape', uom: 'MTR' }, { name: 'Varnish', uom: 'LTR' },
   ]);
   await addStock('Ferrite Core E-30', 18, 65);
+  await addPart('Ashok Transformers', '90301030002', 'SMPS transformer 12V 2A');
+  await addPart('Brightline LED', '90302100101', 'LED driver transformer');
 }
 
 /** New job sits behind More: the four most used forms take the row. */
@@ -37,13 +39,14 @@ async function pick(page: Page, label: string | RegExp, typed: string, option: s
   await page.getByRole('option', { name: option }).first().click();
 }
 
-async function newJob(page: Page, over: { customer?: string; po?: string; product?: string; pieces?: string; type?: 'Sample' } = {}) {
+async function newJob(page: Page, over: { customer?: string; po?: string; part?: string; pieces?: string; type?: 'Sample' } = {}) {
   await openNewJob(page);
   const f = form(page, 'New job');
   if (over.type) await f.getByLabel('What kind of job?').selectOption({ label: 'Sample (before the main order)' });
   await pick(f, 'Customer', (over.customer ?? 'Ashok').slice(0, 5), new RegExp(over.customer ?? 'Ashok Transformers'));
   if (over.po) await pick(f, /Customer's PO/, over.po.slice(0, 4), over.po);
-  await f.getByLabel('What is being made?').fill(over.product ?? 'SMPS transformer 12V 2A');
+  // everything runs by part number: the parts offered are this customer's
+  await pick(f, 'Part number', (over.part ?? (over.customer === 'Brightline LED' ? '90302' : '90301')).slice(0, 5), new RegExp(over.part ?? (over.customer === 'Brightline LED' ? '90302100101' : '90301030002')));
   await f.getByLabel('Pieces').fill(over.pieces ?? '500');
   return f;
 }

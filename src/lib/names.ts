@@ -25,3 +25,11 @@ export function partyNameKey(name: string): string {
 export function normalizeGstin(g: string): string {
   return g.replace(/\s+/g, '').toUpperCase();
 }
+
+/** "90308200008", "90308200008 " and "9030-8200008" are one part number: letters and digits only, lowercase. */
+export function partNumberKey(partNumber: string): string {
+  return clean(partNumber).replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+/** A material's own item code, keyed the same way. */
+export const itemCodeKey = partNumberKey;

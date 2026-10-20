@@ -36,7 +36,7 @@ export const rateText = (rate: number, uom: string) => `₹${rate.toLocaleString
 
 const poInclude = {
   supplier: { select: { id: true, name: true } }, triggeredByJob: { select: { id: true, number: true } },
-  lines: { include: { material: { select: { name: true, uom: true } } }, orderBy: { material: { name: 'asc' } } },
+  lines: { include: { material: { select: { name: true, uom: true, itemCode: true } } }, orderBy: { material: { name: 'asc' } } },
 } as const;
 export type PoRow = Prisma.PurchaseOrderGetPayload<{ include: typeof poInclude }>;
 

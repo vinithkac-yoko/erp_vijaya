@@ -270,3 +270,48 @@ export const getActivity = defineTool({
     note: d.rows.length === 0 ? 'Nothing was done in that time.' : d.rows.length > MAX_IN_CHAT || d.more ? `Showing ${MAX_IN_CHAT} of ${d.more ? `more than ${MAX_ROWS}` : d.rows.length}, newest first.` : undefined,
   }],
 });
+
+// ── get_margin_by_part ─────────────────────────────────────────────────────────────────────────────
+/**
+ * What each part earned over the material it used (milestone 11): closed jobs by part in a period, the cost stored when each
+ * closed, and the rate per piece the customer agreed on the PO line (the owner's number). Material only: no labour, no overhead.
+ * A part whose jobs have no rate on a PO line shows its cost and says the rate is missing.
+ */
+export const getMarginByPart = defineTool({
+  name: 'get_margin_by_part', kind: 'read', roles: ['OWNER'],
+  input: z.object({ from: dateIn, to: dateIn, customerId: idOpt, partNumber: z.preprocess(emptyToUndef, z.string().max(40).optional()) }),
+  handler: async (ctx, input) => {
+    const jobs = await ctx.db.job.findMany({
+      where: { status: 'CLOSED', type: 'PRODUCTION', partId: { not: null }, ...(input.customerId ? { customerId: input.customerId } : {}), ...(range(input.from, input.to) ? { closedAt: range(input.from, input.to) } : {}) },
+      include: { part: { select: { id: true, partNumber: true, partKey: true, description: true } }, customer: { select: { name: true } } }, orderBy: { closedAt: 'desc' }, take: 1000,
+    });
+    const wantKey = input.partNumber ? materialNameKey(input.partNumber) : null;
+    const lines = await ctx.db.customerPoLine.findMany({ where: { partId: { in: [...new Set(jobs.map((j) => j.partId as string))] } }, select: { customerPoId: true, partId: true, rate: true } });
+    const byPart = new Map<string, { partNumber: string; description: string; customer: string; jobs: number; pieces: number; cost: number; revenue: number; ratedPieces: number }>();
+    for (const j of jobs) {
+      if (!j.part || (wantKey && !j.part.partKey.includes(wantKey))) continue;
+      const cost = j.materialCost !== null ? Number(j.materialCost) : 0;
+      const rate = lines.find((l) => l.partId === j.partId && l.customerPoId === j.customerPoId)?.rate;
+      const g = byPart.get(j.part.id) ?? { partNumber: j.part.partNumber, description: j.part.description, customer: j.customer.name, jobs: 0, pieces: 0, cost: 0, revenue: 0, ratedPieces: 0 };
+      g.jobs += 1; g.pieces += j.quantity; g.cost += cost;
+      if (rate !== null && rate !== undefined) { g.revenue += Number(rate) * j.quantity; g.ratedPieces += j.quantity; }
+      byPart.set(j.part.id, g);
+    }
+    const rows = [...byPart.values()].map((g) => {
+      const rated = g.ratedPieces === g.pieces && g.pieces > 0;
+      const margin = rated ? round2(g.revenue - g.cost) : null;
+      return {
+        partNumber: g.partNumber, description: g.description, customer: g.customer, jobs: g.jobs, pieces: g.pieces, materialCost: round2(g.cost), costPerPiece: g.pieces ? round2(g.cost / g.pieces) : null,
+        ratePerPiece: rated ? round2(g.revenue / g.pieces) : null, margin, marginPerPiece: margin !== null ? round2(margin / g.pieces) : null, marginPct: margin !== null && g.revenue > 0 ? round2((margin / g.revenue) * 100) : null,
+        rateMissing: !rated,
+      };
+    }).sort((a, b) => (b.margin ?? -Infinity) - (a.margin ?? -Infinity) || a.partNumber.localeCompare(b.partNumber));
+    return { rows: rows.slice(0, MAX_ROWS), more: rows.length > MAX_ROWS, note: 'Material only: the cost of labour and running the factory is not in it.' };
+  },
+  view: (d) => [{
+    kind: 'table', title: 'Margin by part (material only)',
+    columns: [{ key: 'p', label: 'Part' }, { key: 'q', label: 'Pieces', align: 'right' }, { key: 'c', label: 'Cost a piece', align: 'right' }, { key: 'r', label: 'Rate a piece', align: 'right' }, { key: 'm', label: 'Margin', align: 'right' }],
+    rows: d.rows.slice(0, MAX_IN_CHAT).map((r) => ({ p: `${r.partNumber} · ${r.description}`, q: groupIndian(r.pieces), c: r.costPerPiece === null ? '–' : inr(r.costPerPiece), r: r.ratePerPiece === null ? 'no rate on the PO' : inr(r.ratePerPiece), m: r.margin === null ? '–' : `${inr(r.margin)} (${r.marginPct ?? 0}%)` })),
+    note: d.rows.length === 0 ? 'No job with a part number was closed in that time.' : d.rows.length > MAX_IN_CHAT ? `Showing ${MAX_IN_CHAT} of ${d.rows.length}. ${d.note}` : d.note,
+  }],
+});

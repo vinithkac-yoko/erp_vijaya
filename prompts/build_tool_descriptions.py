@@ -38,10 +38,11 @@ SK = ["STOREKEEPER"]
 tool("search_materials", "read", SK_OW, """
 Find materials by part of their name. Matching ignores case, spaces and hyphens, so "ferrite core e30"
 finds "Ferrite Core E-30" and "22swg wire" finds "22 SWG Copper Wire". Returns each material's name,
-unit, stock type (STANDING or PER_JOB), quantity on hand and minimum level. Use it before creating a
+item code (the company's own code for it, if it has one), unit, stock type (STANDING or PER_JOB), quantity on hand and
+minimum level. An item code finds its material too. Use it before creating a
 material (to catch duplicates), to resolve what the user typed into an exact name, and before opening
 any form that needs a material. An empty query lists all active materials.""",
-     {"query": "Part of the material's name, as the user typed it. Empty = all active materials.",
+     {"query": "Part of the material's name or its item code, as the user typed it. Empty = all active materials.",
       "stockType": "Optional filter: STANDING (kept in stock, has a minimum) or PER_JOB (bought for a job).",
       "includeInactive": "true to include deactivated materials. Default false."})
 
@@ -69,6 +70,7 @@ duplicate materials are the fastest way the stock goes wrong. A material has exa
 for buying and issuing, and the unit and stock type can never change later, so get them right.
 STANDING materials need a minimum level. """ + FORM,
      {"name": "The material's name as the business writes it, e.g. \"22 SWG Copper Wire\". No supplier or city in the name.",
+      "itemCode": "The company's own item code for it (the work order's Product Code), if the user gives one. Leave empty otherwise.",
       "uom": "The one unit: NOS (pieces), KG, MTR (metres), LTR (litres), ROLL or SET.",
       "stockType": "STANDING (kept in stock, needs a minimum) or PER_JOB (bought only for a job).",
       "minimumLevel": "Reorder level in the material's unit. Required for STANDING; leave empty for PER_JOB.",
@@ -152,21 +154,76 @@ percentage; top-up issues are marked. Use when the owner asks whether a job used
 
 tool("create_customer_po", "write", SK_OW, """
 Opens the form to record a purchase order a CUSTOMER sent us (not one we send a supplier — if "PO" is
-ambiguous, ask which). The customer must already be saved. If the same customer and PO number exist
-(an open PO released item by item), the existing one is reused and you should offer a new job under
-it. """ + FORM,
+ambiguous, ask which). The customer must already be saved. The lines are PARTS (by part number) and how many of
+each: find each with list_parts first, and if a part is not saved yet offer create_part before this. Pass the lines
+you can work out. NEVER type or pre-fill a rate: what the customer pays per piece is the owner's to type on the form.
+If the same customer and PO number exist (an open PO released item by item), the existing one is reused and the
+new lines are added to it; then offer a new job under it. """ + FORM,
      {"customerName": "The saved customer's exact name from search_parties.", "number": "The customer's PO number as printed on it.",
-      "poDate": "The customer PO's date. " + DATE})
+      "poDate": "The customer PO's date. " + DATE, "lines": "One line per part ordered.",
+      "lines[].partId": "The part. " + IDS, "lines[].quantity": "Number of pieces (whole number, more than 0).",
+      "lines[].rate": "Leave empty. The owner types it on the form.", "lines[].dueDate": "Delivery date for that part, if given. " + DATE})
 
 tool("create_job", "write", SK_OW, """
-Opens the form for a new job. Every job is a one-off design: even "same as last time" is a new job
-that needs its own BOM — never copy one. A sample/prototype is its own job of type SAMPLE linked to the
-main job. After it's saved, offer to add the BOM. """ + FORM,
-     {"customerId": "The customer. " + IDS, "customerPoId": "The customer PO it belongs to, if any. " + IDS,
-      "productDescription": "What is being made, in the user's words, e.g. \"230V/12V 50VA transformer\".",
+Opens the form for a new job. EVERYTHING RUNS BY PART NUMBER: a job makes one part (find it with list_parts; if it is
+not saved yet, offer create_part first). A part that was made before has its usual bill of materials, which the BOM
+form starts from for the person to check; you never invent or copy a BOM yourself. A sample/prototype is its own job of
+type SAMPLE linked to the main job. Pass the part and the customer comes from it. After it's saved, offer to add the
+BOM. """ + FORM,
+     {"partId": "The part. " + IDS, "customerId": "The customer (not needed when a part is given). " + IDS, "customerPoId": "The customer PO it belongs to, if any. " + IDS,
+      "productDescription": "Only for an old job with no part number: what is being made, in the user's words.",
       "quantity": "Number of pieces (whole number, more than 0).", "jobDate": "Job date. " + DATE,
       "dueDate": "Due date, if given. " + DATE, "type": "PRODUCTION (default) or SAMPLE.",
       "parentJobId": "For a SAMPLE: the main job. " + IDS})
+
+tool("list_parts", "read", SK_OW, """
+Find parts by part number (or a piece of one, at least three digits) or by words from the description. A part is a
+product a customer buys, by the part number the factory puts on it; the same number can exist for two customers. Returns
+the number, what it is, the customer and whether it has a usual bill of materials. Use it before creating a job or a
+customer PO line, and to resolve what the user typed ("90308200008", "the M634 one") into the exact part.""",
+     {"query": "Part number or words, as typed. Empty = all active parts.", "customerId": "Only this customer's parts. " + IDS,
+      "customerName": "Only this customer's parts, by name.", "includeInactive": "true to include parts no longer made."})
+
+tool("get_part", "read", SK_OW, """
+One part: its customer, its usual bill of materials for ONE piece (each material with its item code if it has one), its
+recent jobs and the customer PO lines that ordered it. Use it to answer "what goes into 90308200008" or "when did we last
+make it". Quantities are per piece.""",
+     {"partId": "The part number as typed, or its id from list_parts.", "customerId": "The customer, when two customers use the same number. " + IDS,
+      "customerName": "The customer's name, when two customers use the same number."})
+
+tool("create_part", "write", SK_OW, """
+Opens the form to add a part: a product a customer buys, by its part number. ALWAYS call list_parts first: if it
+exists, say so and use it. The same number may exist for a DIFFERENT customer; that is fine. After it is saved offer its
+bill of materials or a job. """ + FORM,
+     {"customerName": "The saved customer's exact name from search_parties.", "partNumber": "The part number exactly as the customer writes it (digits and letters, no description).",
+      "description": "What it is, like TXFR FOR M634VOC.", "hsnCode": "HSN code, if the user gives it."})
+
+tool("update_part", "write", SK_OW, """
+Opens the form to change a part's description or HSN code, to correct a typing mistake in its number, or to mark it
+no longer made. Jobs already made keep the number they had. """ + FORM,
+     {"partId": "The part. " + IDS, "partNumber": "The corrected number, only to fix a typing mistake.", "description": "The new description.",
+      "hsnCode": "The HSN code.", "noLongerMade": "true to mark the part as no longer made."})
+
+tool("set_part_bom", "write", SK_OW, """
+Opens the form to set a part's USUAL bill of materials, per ONE piece (same rules as set_job_bom: if a number sounds like
+a total, ask whether it is per piece first; wire per piece is usually grams). A new job for the part starts from this
+list; each job keeps its own copy, so changing it never changes an old job. Replaces the whole list. """ + FORM,
+     {"partId": "The part. " + IDS, "lines": "One line per material.", "lines[].materialId": "The material. " + IDS,
+      "lines[].qtyPerPiece": "Quantity PER PIECE in the material's own unit (kg, not grams)."})
+
+tool("get_customer_po", "read", SK_OW, """
+One customer PO line by line: for each part, how many were ordered, how many are already in jobs, and how many are left
+to plan. Use it for "what is left on Medha's order" or before creating a job from a PO. It never shows what the customer
+pays unless the person asking is the owner.""",
+     {"customerPoId": "The PO number as the customer wrote it, or its id from list_customer_pos.", "customerId": "The customer, when two customers use the same PO number. " + IDS,
+      "customerName": "The customer's name, when two customers use the same PO number."})
+
+tool("get_margin_by_part", "read", OW, """
+OWNER ONLY. What each part earned over the material it used: for closed jobs that have a part number, the pieces made, the
+material cost a piece, the rate a piece the customer agreed on the PO and the margin. Material only: labour and running
+costs are not in it, say so. A part whose PO line has no rate shows its cost only. Not for the storekeeper.""",
+     {"from": "Jobs closed on or after this date. " + DATE, "to": "Jobs closed on or before this date. " + DATE,
+      "customerId": "Only this customer. " + IDS, "partNumber": "Only parts whose number contains this."})
 
 tool("set_job_bom", "write", SK_OW, """
 Opens the form to set a job's bill of materials. Quantities are ALWAYS PER PIECE; the form shows the
@@ -484,7 +541,7 @@ not change. Never make a new artifact for a change to an existing one.""",
 tool("open_printout", "app", SK_OW, """
 Opens a printable document with the Vijaya letterhead, ready to print or save as PDF: purchase-order
 (to send the supplier; only approved POs print without a "not approved" mark), goods-receipt-note,
-issue-slip (the pick list for a job; printing issues nothing), count-sheet (with an empty Counted
+issue-slip (the work order for a job, with its part number: the pick list; printing issues nothing), count-sheet (with an empty Counted
 column) and job-cost-sheet (owner only). These are the only printouts. There is no tax invoice, delivery
 challan or quotation: say invoicing and dispatch aren't set up.""",
      {"template": "purchase-order, goods-receipt-note, issue-slip, count-sheet or job-cost-sheet.",
