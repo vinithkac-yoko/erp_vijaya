@@ -15,8 +15,16 @@ Non-negotiables (details in the prompt):
   never accept rows or files from the browser. The launcher is top-used per user, role filter first.
 - Tool descriptions come from `prompts/tool-descriptions.json`; edit `prompts/build_tool_descriptions.py`
   and regenerate. Printouts are fixed templates, never generated.
+- Tamil is shown on request only and a translation that changes a number is dropped; what is saved is always the English value. The microphone only puts text in the message box (never sends); the recording is never stored, and `Permissions-Policy` allows `microphone=(self)` and nothing wider.
 - The count sheet shows the System column (owner dropped blind counting).
 - No generic table access, no internal codes or ids shown to users, no raw database errors shown.
 - `docs/BUSINESS_FLOW.md` wins on any business question. If a rule is missing, ask Kasi.
 - Keep `docs/TOOL_CATALOG.md` and `docs/AGENT_PROMPT.md` in sync with the code in the same commit.
 - Stop at the end of each milestone and report to Kasi in plain words.
+
+## Commands
+- `pnpm dev` · `pnpm build` · `pnpm lint` · `pnpm typecheck`
+- `pnpm test` (Vitest, needs Postgres; uses `.env.test`) · `pnpm e2e` (Playwright, run `pnpm build` first)
+- `pnpm test:kit` (the kit's sandbox/export tests; needs Chromium via `CHROMIUM_PATH`, and `pandoc`)
+- `pnpm eval` (agent evals, real model, costs money, never in CI; needs `LIVE_ANTHROPIC_API_KEY` set inline, never in a file; `EVAL_RUNS`, `EVAL_ONLY`, `EVAL_SEED_ONLY=1`; see `evals/README.md`)
+- Local database: `postgresql://vijaya:vijaya@localhost:5432/vijaya` (dev) and `vijaya_test` (tests). See `.env.example`.
