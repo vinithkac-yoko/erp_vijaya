@@ -2,6 +2,27 @@
 
 Read this at the start of every session (CLAUDE.md). Newest on top.
 
+## Milestone 11 — Part numbers (from the client's own paperwork) — **built; waiting for Kasi's test and the client's answers**
+
+Kasi sent five of the client's files (three purchase orders, a tax invoice, the factory's work-order form) and a picture of four part lines, and said: everything runs by part number; the same part comes back; two customers may share a number; a job is a work order; materials have codes; design the work order ourselves; round-off, amount in words and due dates are fine; margin by part is wanted. Notes on the files are in `docs/CLIENT_TEMPLATES.md`; the questions and what was done about each answer are in section M of `docs/CLIENT_CONFIRMATIONS.md`.
+
+Done
+- **Parts:** a part is a customer's product by its part number, with a description and HSN; unique per customer (so two customers can share a number; "9030-8200008" and "90308200008" are one). Tools: `list_parts`, `get_part`, `create_part`, `update_part`. The assistant finds a part by number, a piece of one, a pasted "number-description" or words, and asks which customer when a number has two.
+- **A part's usual BOM** (`set_part_bom`, per piece). A new job for the part opens its BOM form with those materials, to check; the job keeps its own copy, so changing the part never changes an old job. The first BOM made for a part with none becomes its usual one (said on the saved card); otherwise a chip offers to keep a changed one. **The rule "designs never repeat, never copy a BOM" is replaced** in BUSINESS_FLOW, PRODUCT, the assistant's prompt and acceptance test 4.9 (which now expects it to ask for the part number).
+- **Jobs by part:** `create_job` takes the part; customer and description come from it; the form shows "492 ordered, 200 already in jobs, 292 left to plan" for the PO line and offers the rest as the quantity. Jobs made before part numbers still work. The New job form now picks a part (it no longer asks "what is being made?").
+- **Customer PO lines:** parts, pieces, an optional delivery date, and **the rate the customer pays per piece, which only the owner sees or types** (the storekeeper's form has no box; the tool refuses it). The same PO again adds the next part (open POs). `get_customer_po` shows ordered, in jobs and left to plan per part.
+- **Materials have an optional item code** (their "Product Code"): typed, shown, found by search, unique in any spacing or case.
+- **`get_margin_by_part` (owner only):** closed jobs by part: cost a piece, the rate on the PO line, margin and %. Material only, and said so; a part with no rate on its PO shows its cost and says the rate is missing.
+- **Printouts:** the issue slip is now the **work order** in our own design (part number, customer PO and date, item code, one-piece quantity, required, given out, balance, signature lines for planning, issuer and receiver). The purchase order now prints **round-off to the whole rupee**, the **amount in words** in lakhs and crores, and a "Due on" on every line, and the item code beside a material.
+- Demo copy: 11 parts, the railway's open PO with three lines and rates (so the margin report has something to say).
+
+Not done, on purpose (waiting on answers): amending an open PO after it was sent ("Amended" on their PO); a non-stock charge line on a PO ("Cylinder Charges"); matching their PO numbering (`VE/MW-229/2026-2027`); the delivery challan (needs a dispatch record we do not have); what IGIR is. A picture of lines cannot be read by the assistant (it takes words only).
+
+Proof (run in this session)
+- `pnpm test`: 14 new tests for parts, PO lines, jobs by part, margin and item codes; printouts updated (work order, round-off, amount in words checked against their three POs). Kit tests 200/200 after fixing two tool descriptions.
+- Browser: new part flows (new part, job for a part with the usual BOM, the customer PO with and without a rate box, accessibility in light and dark); older tests changed where the forms changed.
+- Real-model evals, artifact sections (§16, §21, §31, §32, 2 runs each), after the earlier fixes: **73 of 80 cases passed every run** (it was 56). Open: 16.99 and 32.16 (the reply should say it is the owner's), 31.9, 31.10, 31.12 and 31.32 (it answers in the chat instead of making a report), 31.16 ("add this to the menu"). Live checks for the new part flows are written (`tests/live-agent.test.ts`).
+
 ## Milestones 9 and 10 — Reports, printouts, downloads, sharing, the demo copy, hardening — **built; waiting for Kasi's test**
 
 Kasi's instruction after milestone 8: "start milestone 9 and 10 and finish it before testing". Everything below is built and tested together.

@@ -39,7 +39,7 @@ export async function submitAndFollow(session: ToolSession, pendingId: string, v
   if (!tool || tool.kind !== 'write' || !audit) return { ok: true, items, chips };
 
   const after = (audit.afterJson ?? {}) as Record<string, unknown>;
-  const stamp = audit.action !== 'CREATE' && tool.stampUpdate ? tool.stampUpdate : tool.stamp;
+  const stamp = audit.action !== 'CREATE' && tool.stampUpdate ? (typeof tool.stampUpdate === 'function' ? tool.stampUpdate(after) : tool.stampUpdate) : tool.stamp;
   const card: Card = { kind: 'saved', stamp, lines: tool.describe(after), auditId: audit.id };
   const convId = form?.conversationId ?? undefined;
   if (convId) {

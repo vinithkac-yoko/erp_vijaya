@@ -114,11 +114,11 @@ export const createMaterial = defineTool({
     title: 'Add a material', verb: 'Add material',
     fields: [
       { name: 'name', label: 'Material name', type: 'text', required: true, hint: 'As the notebook writes it, like 22 SWG Copper Wire. No supplier or city.' },
-      { name: 'itemCode', label: 'Item code', type: 'text', hint: 'Your own code for it, if you use one.' },
       { name: 'uom', label: 'Unit', type: 'select', required: true, options: UOM_CHOICES, hint: "One unit for buying and giving out. It can't be changed later." },
       { name: 'stockType', label: 'How is it bought?', type: 'select', required: true,
         options: [{ value: 'STANDING', label: 'Kept in stock (has a minimum level)' }, { value: 'PER_JOB', label: 'Bought for each job' }] },
       { name: 'minimumLevel', label: 'Minimum level', type: 'number', required: true, showWhen: { field: 'stockType', in: ['STANDING'] }, hint: 'You are told when stock goes below this.' },
+      { name: 'itemCode', label: 'Item code', type: 'text', hint: 'Your own code for it, if you use one.' },
       { name: 'hsnCode', label: 'HSN code', type: 'text', hint: 'If you have it.' },
       { name: 'gstRate', label: 'GST rate', type: 'number', unit: '%', hint: 'If you have it, like 18.' },
       { name: 'isScrap', label: 'This is scrap we collect and sell', type: 'checkbox' },

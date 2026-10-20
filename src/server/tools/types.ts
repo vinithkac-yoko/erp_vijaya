@@ -66,7 +66,7 @@ export interface WriteTool<I extends z.ZodTypeAny = z.ZodTypeAny, O = unknown> e
   /** The rubber stamp on the "Saved" card, e.g. "MATERIAL ADDED". Drawn by the server from the audit row. */
   stamp: string;
   /** If the save turned out to be a change to something that already existed (create_party adding a role), this stamp is used instead. */
-  stampUpdate?: string;
+  stampUpdate?: string | ((after: Record<string, unknown>) => string);
   /** The lines under the stamp, from the audit row's `after` (names and numbers people use, never ids). */
   describe: (after: Record<string, unknown>) => string[];
   /** After a successful save: facts from read-only checks (a shortage, a rate change) and chips for what to do next. */

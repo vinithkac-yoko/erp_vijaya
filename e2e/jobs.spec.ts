@@ -135,7 +135,7 @@ test.describe('a job and its BOM, as the storekeeper does it (ACCEPTANCE 4.1–4
     await login(page, STOREKEEPER);
     await openNewJob(page);
     const f = form(page, 'New job');
-    await expect(f.getByPlaceholder('Pick the customer first')).toBeVisible();
+    await expect(f.getByPlaceholder('Pick the customer first')).toHaveCount(2);   // the PO and the part both wait for the customer
     await pick(f, 'Customer', 'Ashok', /Ashok Transformers/);
     await f.getByLabel(/Customer's PO/).fill('');
     await f.getByLabel(/Customer's PO/).click();

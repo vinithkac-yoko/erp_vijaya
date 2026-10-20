@@ -84,7 +84,7 @@ export const createCustomerPo = defineTool({
       { name: 'lines', label: 'Parts ordered', type: 'partLines', dependsOn: 'customerId' },
     ],
   },
-  stamp: 'CUSTOMER PO SAVED', stampUpdate: 'CUSTOMER PO UPDATED',
+  stamp: 'CUSTOMER PO SAVED', stampUpdate: (a) => ((a.lines as unknown[] | undefined)?.length ? 'CUSTOMER PO UPDATED' : 'CUSTOMER PO ALREADY SAVED'),
   describe: (a) => [
     `${a.customer} · PO ${a.number}`,
     ...((a.lines as { part: string; description: string; quantity: number }[] | undefined) ?? []).map((l) => `${l.part} · ${l.description} — ${groupIndian(l.quantity)} pieces`),
@@ -98,6 +98,15 @@ export const createCustomerPo = defineTool({
     if (!input.customerId && typeof input.customerName === 'string' && input.customerName.trim()) {
       try { values.customerId = (await findCustomer(ctx.db, { customerName: input.customerName })).id; } catch (e) { info.push(e instanceof ToolError ? e.message : 'Choose the customer.'); }
     }
+    // the assistant may name a part by its number: the form holds the part itself
+    if (Array.isArray(input.lines)) {
+      const customerId = (typeof input.customerId === 'string' && input.customerId) || (values.customerId as string | undefined);
+      const lines: unknown[] = [];
+      for (const l of input.lines as { partId?: unknown }[]) {
+        try { lines.push({ ...l, partId: (await findPart(ctx.db, String(l.partId ?? ''), customerId)).id }); } catch (e) { info.push(e instanceof ToolError ? e.message : 'Check the part.'); lines.push(l); }
+      }
+      return { info, values, decorate: { lines } };   // decorate wins over what was asked for, so the picker gets the part's id
+    }
     return { info, values };
   },
   handler: async (ctx, input) => {
@@ -110,11 +119,12 @@ export const createCustomerPo = defineTool({
     if (wanted.some((l) => l.rate !== undefined) && ctx.session.role !== 'OWNER') {
       throw new ToolError('FORBIDDEN_ROLE', 'Only the owner types the rate the customer pays. Leave the rate empty.', undefined, 'lines');
     }
-    const parts = wanted.length ? await ctx.db.part.findMany({ where: { id: { in: wanted.map((l) => l.partId) } } }) : [];
+    // a line names its part by the id a picker holds, or by the part number as typed (the assistant may send either)
+    const parts: Awaited<ReturnType<typeof findPart>>[] = [];
+    for (const l of wanted) parts.push(await findPart(ctx.db, l.partId, customer.id).catch((e) => { throw e instanceof ToolError && e.code === 'NOT_FOUND' ? new ToolError('NOT_FOUND', `Couldn't find the part ${l.partId} for ${customer.name}. Add it first.`, undefined, 'lines') : e; }));
     const seen = new Set<string>();
-    const resolved = wanted.map((l) => {
-      const part = parts.find((p) => p.id === l.partId);
-      if (!part) throw new ToolError('NOT_FOUND', "Couldn't find one of those parts.", undefined, 'lines');
+    const resolved = wanted.map((l, i) => {
+      const part = parts[i]!;
       if (part.customerId !== customer.id) throw new ToolError('PART_CUSTOMER_MISMATCH', `${part.partNumber} is not one of ${customer.name}'s parts.`, undefined, 'lines');
       if (seen.has(part.id)) throw new ToolError('DUPLICATE_LINE', `${part.partNumber} is on the list twice. Put it on one line.`, undefined, 'lines');
       seen.add(part.id);

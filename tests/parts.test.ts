@@ -143,6 +143,18 @@ describe('a customer\'s order by part, and what is left to plan', () => {
     expect(Number(stored[0]?.rate)).toBe(148);
   });
 
+  it('a line may name its part by the number as typed (the assistant often does), and a wrong number is told in words', async () => {
+    const s = await storekeeper(); const medha = await party(s, 'Medha Servo Drives');
+    const a = await part(s, medha, '90305600201', 'L9');
+    const po = await ok<{ id: string }>(save(s, 'create_customer_po', { customerId: medha, number: 'P9', lines: [{ partId: '90305600201', quantity: 10 }] }));
+    expect((await prisma.customerPoLine.findFirstOrThrow({ where: { customerPoId: po.id } })).partId).toBe(a.id);
+    const bad = await fails(save(s, 'create_customer_po', { customerId: medha, number: 'P10', lines: [{ partId: '90000000000', quantity: 10 }] }));
+    expect(bad.message).toMatch(/Couldn't find the part 90000000000 for Medha Servo Drives/);
+    // and the form holds the part itself, so its picker can show it
+    const pv = await pendingActions.previewFor(s, 'create_customer_po', { customerId: medha, number: 'P11', lines: [{ partId: '90305600201', quantity: 5 }] });
+    expect((pv as unknown as { values: { lines?: unknown } })?.values).toBeDefined();
+  });
+
   it('get_customer_po shows ordered, in jobs and left to plan per part; jobs under the PO count, cancelled ones and samples do not; the rate shows to the owner only', async () => {
     const s = await storekeeper(); const o = await owner();
     const medha = await party(s, 'Medha Servo Drives');

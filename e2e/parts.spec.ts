@@ -87,7 +87,7 @@ test.describe('everything runs by part number (client paperwork, 2026-10-20)', (
     await expect(form(page, 'Record a customer PO')).toBeVisible();
     for (const scheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme: scheme });
-      const r = await new AxeBuilder({ page }).include('[role="form"]').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+      const r = await new AxeBuilder({ page }).include('form').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
       expect(r.violations.map((v) => `${scheme} ${v.id}: ${v.nodes[0]?.html}`)).toEqual([]);
     }
   });
