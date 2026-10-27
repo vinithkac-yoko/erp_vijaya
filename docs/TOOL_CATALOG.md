@@ -40,9 +40,11 @@ and role in its context).
 | `deactivate_material` | W | SK OW | Only with zero stock |
 
 **create_material** — errors: `SIMILAR_MATERIAL_EXISTS` (returns the matches; the form offers
-"this is a different material"), `MATERIAL_EXISTS`, `MINIMUM_REQUIRED`.
+"this is a different material", which sets `confirmNotDuplicate`), `MATERIAL_EXISTS`, `MINIMUM_REQUIRED`.
 **update_material** — `UNIT_LOCKED` explains why unit/stock type can't change.
 **deactivate_material** — `MATERIAL_HAS_STOCK`.
+
+**As built (milestone 11):** a material may have the company's own **item code** (the work order's "Product Code"). `create_material` and `update_material` take `itemCode` (unique in any spacing or case: `ITEM_CODE_EXISTS`); `search_materials` finds a material by it and shows it. It is theirs, so it is shown (unlike the internal `MAT-…` code, which never is).
 
 ## 2. Suppliers and customers
 
@@ -64,6 +66,7 @@ until the user ticks "different business"; bad GSTIN → `INVALID_GSTIN`.
 
 | Tool | Kind | Roles | Purpose |
 |---|---|---|---|
+| `list_customer_pos` | R | SK OW | The customer POs, by customer: number, date, how many jobs run under each. Added in milestone 5, so the forms can pick "that customer's PO" and the assistant can check whether one is already recorded |
 | `list_jobs` | R | SK OW | Filter by status, customer, customer PO, date. Number, customer, product, qty, status, cost (closed) |
 | `get_job` | R | SK OW | Customer, PO, product, qty, status, BOM lines (per piece, total, issued, returned), cost so far |
 | `check_job_shortage` | R | SK OW | Per BOM line: needed (still to issue), in stock, short |
@@ -72,6 +75,32 @@ until the user ticks "different business"; bad GSTIN → `INVALID_GSTIN`.
 | `create_job` | W | SK OW | Customer, optional customer PO, product description, qty > 0, job date, due date, type PRODUCTION / SAMPLE (+ parent job) |
 | `set_job_bom` | W | SK OW | Lines: material + **qty per piece**. Replaces the BOM. Only while status OPEN |
 | `cancel_job` | W | SK OW | Only with nothing issued; reason required |
+
+**As built (milestone 5):**
+- `create_customer_po` takes the customer by `customerName` (as the assistant sends it) or `customerId` (as the form's picker sends it). The same customer and PO number, in any case or spacing, returns the existing PO and says so (an open PO releases item by item).
+- `get_job`, `check_job_shortage` and `get_job_bom_variance` accept the job's id, its full number, or just the end of it ("31").
+- A job's quantity is a whole number; over 1,00,000 pieces the form asks "is that right?" once. A BOM line under 0.0001 per piece asks once; under 0.000001 is refused (it cannot be kept) with "did you mean a different unit?". Pieces and sets are whole numbers per piece.
+- A BOM is edited by replacing it, only while the job is OPEN. Its form opens on the job with the BOM it already has. The saved card lists every line as *name — per piece → total* (wire in grams, liquids in millilitres, totals in kg and litres).
+- After a BOM is saved the **server** draws the shortage table and offers the purchase order for the shortfall (rate left out) or "Issue material now". `list_customer_pos` is new (read): the forms use it to offer only that customer's POs.
+- `cancel_job` only with nothing issued and no sample job still under it. Job cost fields stay owner-only.
+- `get_job_bom_variance` marks top-ups when issue and top-up arrive (milestone 7).
+
+### Parts, customer PO lines and margin (milestone 11)
+
+Everything runs by part number (`docs/CLIENT_TEMPLATES.md`, BUSINESS_FLOW §1). A **part** belongs to one customer; the same number may exist for two customers (unique per customer, by its normalized key: letters and digits only).
+
+| Tool | Kind | Roles | Purpose |
+|---|---|---|---|
+| `list_parts` | R | SK OW | Parts by number, a piece of one (3+ characters), a pasted "number-description", or words from the description; optional customer. Number, description, customer, whether it has a usual BOM, jobs so far |
+| `get_part` | R | SK OW | One part: its usual BOM per piece (with item codes), recent jobs, the customer PO lines that ordered it (the customer's rate is the owner's: null for the storekeeper). A number used by two customers is asked about (`PART_AMBIGUOUS`), never guessed |
+| `create_part` | W | SK OW | Customer (picked), part number, description, HSN. Same number for the same customer → `PART_EXISTS`. Follow-ups: "Add its BOM", "Create a job for it" |
+| `update_part` | W | SK OW | Fix a typing mistake in the number (not a clash), the description, the HSN, or mark it no longer made (`PART_NOT_MADE` on a new job). Jobs already made keep what they had |
+| `set_part_bom` | W | SK OW | The part's USUAL bill of materials per piece. Replaces it. A new job's BOM form starts from it; each job keeps its own copy |
+| `update_customer_po_line` | W | SK OW | One line of a customer PO: more or fewer pieces, a new delivery date, or the rate they pay now (the rate is the owner's: a storekeeper's rate → `FORBIDDEN_ROLE`). A part the customer PO does not have → `NOT_FOUND`. Never below the pieces already in jobs (`BELOW_PLANNED`); nothing to change → `NOTHING_TO_CHANGE`. Nothing is rounded. Costs are not stored on a part: they use today's average purchase price whenever a report is asked |
+| `get_customer_po` | R | SK OW | One customer PO by line: ordered, in jobs (production jobs under the PO, not cancelled), left to plan; rate and value for the owner only |
+| `get_margin_by_part` | R | **OW** | Closed production jobs by part in a period: pieces, material cost a piece, the rate a piece from the PO line, margin and %. Material only (no labour). A part with no rate on its PO line shows cost and says so |
+
+**Changed:** `create_customer_po` takes `lines` (part, pieces, owner-only rate, due date); the same PO again adds new parts to it (`LINE_EXISTS` if the part is already there; `PART_CUSTOMER_MISMATCH`, `DUPLICATE_LINE`; a storekeeper's rate → `FORBIDDEN_ROLE`). `create_job` takes `partId`: customer and description come from it (the form shows "ordered, in jobs, left to plan" for the PO line and offers the left-over as the quantity); `customerId` + `productDescription` still work for jobs with no part, and one of the two is required (`PART_REQUIRED`). `set_job_bom` opens with the part's usual BOM when the job has none; the **first** BOM made for a part with none becomes its usual one (said on the saved card); otherwise a chip offers "Keep as the usual BOM for …". `list_jobs` / `get_job` / `list_customer_pos` show part numbers, parts and pieces ordered.
 
 **create_customer_po** — unknown customer → `PARTY_NOT_FOUND` with suggestions; supplier-only
 party → `PARTY_WRONG_ROLE`. *Follow-ups:* offer "Create a job for this PO".
@@ -102,6 +131,14 @@ APPROVED → "Approved; can be sent to the supplier."
 **approve / reject** — `NOT_PENDING`. Confirmation shows supplier, lines, total, triggering job.
 *Follow-ups (must):* notify the storekeeper (approved, or rejected with the reason).
 
+**As built (milestone 6):**
+- The approval limit is read from Settings on every `create_purchase_order`; a missing limit is the error `SETTING_MISSING`, never a default. The **total including GST** is compared: above → `PENDING_APPROVAL` (the owner is told, in the app and by email if email is set up), at or below → `APPROVED` at once. Approving or rejecting needs the owner; the storekeeper is told either way (rejection with the owner's reason).
+- A rate is only ever typed by a person. The form shows "Last paid ₹812/kg · Chennai Copper Wires · 12 Sep" under the rate box with a "Use ₹812" button (pressing it is the person typing it). Under half or over double the last rate paid → `CONFIRM_UNUSUAL_RATE`: asked once, with a tick. Pieces and sets are ordered whole; a material is on a PO once.
+- `create_purchase_order` takes the supplier by `supplierName` (the assistant) or `supplierId` (the picker). The total and the limit are shown live on the form ("Above ₹50,000: it goes to the owner to approve").
+- `cancel_purchase_order` only while nothing has been received (`PO_HAS_RECEIPTS`). There is no tool to edit a PO.
+- `approve_purchase_order` / `reject_purchase_order` forms open on the PO named, or on the oldest one waiting, and show the supplier, every line, the total and the job (why). "Reject" on the approval card opens the reject form for the same PO, with quick picks.
+- `get_purchase_order` and the picker accept the PO number or the end of it ("15"). `get_purchase_price_history` gives each receipt rate, the move from the one before (any supplier) and the lead time (PO date to receipt).
+
 There is no PO line editing after approval. Changes = cancel and raise again.
 
 ## 5. Goods receipt
@@ -119,6 +156,8 @@ beside the empty rate field — **never filled in**; the rate comes from the sup
 *Follow-ups (must):* compare each rate with the previous receipt of that material — over 5% →
 say it and notify the owner. Rejections → say what goes back. If the PO's job now has no
 shortfall → offer "Issue material to JOB-…".
+
+**As built (milestone 6):** the receipt form is "what arrived" and "sent back": accepted = arrived − sent back is worked out and shown read-only. `receivedQty` and `rejectedQty` are checked against `acceptedQty` (`GRN_SPLIT_MISMATCH` names the material and the numbers). **The ledger shows both movements: a RECEIPT for everything that arrived and a REJECT_RETURN for what went back** (kit assumption B, BUSINESS_FLOW §20 item 6; to confirm). The PO line's received quantity follows the *accepted* quantity; the PO becomes `PARTIALLY_RECEIVED` and then `RECEIVED`. A receipt can be dated today or earlier but not before the first day of this month (`RECEIPT_TOO_OLD`); never in the future. Receiving against a PO still waiting for the owner needs a tick (`CONFIRM_PO_NOT_APPROVED`); the PO then stays waiting for him and he is told that material has arrived. The rate on the form is empty with the PO's rate as a hint. A rate that moved more than **5%** from the last receipt of that material is said aloud and the owner is told (in the app, and by email if set up). A receipt that leaves the PO's job with nothing short offers "Issue material to JOB-…".
 
 ## 6. Issue, return, close
 
@@ -140,6 +179,13 @@ balance, rate empty).
 *Follow-ups (must):* owner: state cost and cost per piece; storekeeper: say the job is closed (job cost is owner-only); any material > 5% over BOM → list it and notify
 the owner.
 
+**As built (milestone 7):**
+- `issue_material` with no lines gives out everything the BOM still needs (required less already given out), once: a second time is `NOTHING_TO_ISSUE`. With lines: part of it (more than the BOM still needs is `OVER_BOM` unless the line is ticked **extra, for rework**); a material not on the BOM goes out only as marked rework (`NOT_ON_BOM`). Marked rework is a movement with `reasonCode = TOP_UP`, which `get_job_bom_variance` shows as "extra". The first issue makes the job `MATERIAL_ISSUED`. A job with no BOM, or closed, cancelled or completed, refuses (`NO_BOM`, `JOB_NOT_ISSUABLE`).
+- The rate of an issue and of a return is the current average, set by the database; nobody types it. Negative stock is allowed: the owner is told (`NEGATIVE_STOCK_WARNING`), and the sentence says it once. A standing material that falls below its minimum with this issue tells the owner and the other storekeepers (`MIN_LEVEL_BREACH`) and offers "Raise a PO for …" (the shortfall, no rate).
+- `return_material`: only what is out with that job (issued less returned, from the ledger): `NOT_ISSUED_TO_JOB`, `RETURN_EXCEEDS_ISSUE` (also when it has all come back). Not on a closed job (`JOB_CLOSED`).
+- `close_job`: refused if nothing was ever given out (`JOB_NOTHING_ISSUED`: cancel it instead). If material went out and none came back, the form must say so (`nothingReturned`, otherwise `RETURN_ANSWER_REQUIRED`). The cost is the value out less the value back from the ledger, to the paisa, stored on the job; only the owner is shown it (the saved card has `showCost`). Any material used more than 5% over its BOM is said and the owner is told (`JOB_VARIANCE`).
+- `get_job` costs come from the same ledger totals (`src/server/tools/jobcost.ts`), including reversals.
+
 ## 7. Scrap
 
 | Tool | Kind | Roles | Purpose |
@@ -150,6 +196,8 @@ the owner.
 
 **record_scrap_in** — `NOT_SCRAP_MATERIAL`. **record_scrap_sale** — selling more than on hand is
 allowed and flagged. *Follow-ups:* scrap left in stock; flag over-sale.
+
+**As built (milestone 7):** `record_scrap_in` and `record_scrap_sale` only take a material marked as scrap (`NOT_SCRAP_MATERIAL`). Scrap comes in at no value; a sale needs a customer as buyer, a typed rate above zero and a date that is not in the future. Selling more than is on hand is recorded and flagged (`overBy`). `get_scrap_summary` (owner) counts collected, sold, on hand and sale value per scrap material, by job where known; a reversed entry no longer counts.
 
 ## 8. Stock counts
 
@@ -164,6 +212,7 @@ allowed and flagged. *Follow-ups:* scrap left in stock; flag over-sale.
 | `approve_stock_count` | W | **OW** | Normal: COUNT_ADJUSTMENT per difference at current average. Opening: OPENING per material with stock at its rate |
 | `reject_stock_count` | W | **OW** | Send back with a note |
 | `get_leak_report` | R | OW | `v_material_leak` (opening excluded), filter by period/material, ranked by value |
+| `get_count_history` | R | SK OW | Every count of a material, newest first: system quantity then, counted, difference, reason, who counted, which count. Nothing overwritten |
 
 Rules (full detail in BUSINESS_FLOW §11):
 - **Counts show the system quantity** (the owner chose that): `list_count_lines` returns
@@ -182,6 +231,21 @@ Rules (full detail in BUSINESS_FLOW §11):
   Status flips to APPROVED **before** movements are inserted, in the same transaction (the guard
   trigger checks it).
 
+**As built (milestone 4):**
+- **One count is open at a time** (in progress, sent back, or with the owner). A normal count is refused until the opening count is approved
+  (`OPENING_NOT_DONE`) and while another count is open (`COUNT_IN_PROGRESS`).
+- `stockCountId` is optional on `list_count_lines`, `submit_stock_count`, `approve_stock_count` and `reject_stock_count`: it defaults to the one open
+  count (the one waiting, for approve and reject), so the assistant does not need an extra lookup. The forms carry it as a hidden value.
+- `save_count_sheet` is the count sheet saving a row as it is typed. It goes through the gateway like every write (a PendingAction opened and
+  submitted in one go by the sheet), and the assistant is never offered it.
+- Counted quantity of pieces, rolls and sets must be whole numbers. A reason sent for the opening count is ignored. A count line can be edited only
+  while the count is with the storekeeper (in progress or sent back).
+- A material added while the opening count is still with the storekeeper joins that count.
+- Approval writes status APPROVED first, then one OPENING movement per material with stock (the rate is the line's), or one COUNT_ADJUSTMENT per difference
+  (at the current average rate). The owner and the person who counted are told (in-app notices on the opening card).
+- `list_pending_approvals` returns each count's id, a one-line summary and (opening) its total value.
+- `get_stock_value` (owner) is built here: total and per material, from the running balances.
+
 *Follow-ups:*
 - `start_stock_count` → offer "Open the count sheet". Opening: explain quantity + rate from the
   last invoice, invoice number optional, can take several days.
@@ -196,6 +260,8 @@ Rules (full detail in BUSINESS_FLOW §11):
 | Tool | Kind | Roles | Purpose |
 |---|---|---|---|
 | `reverse_movement` | W | **OW** | Opposite movement, reason required. Confirmation shows material, qty, job, original date, balance after |
+
+**As built (milestone 7):** `get_movement_history` is built (newest first, 50 at a time, `@today-7d` style dates work). `reverse_movement` is the owner's; the form shows the entry, the balance now and the balance after. Reversible: an issue, a return, scrap in, a scrap sale, and a whole receipt (the PO line and its status follow). Not reversible (`NOT_REVERSIBLE`): opening stock, count adjustments, a reversal, goods sent back, and a receipt that had part sent back. Once only (`ALREADY_REVERSED`). Not on a closed job (`JOB_CLOSED`). The reversal has the same job, material and quantity in the opposite direction (the database checks it); an entry that took stock out comes back at the rate it went out. A fully reversed issue puts the job back to open (the BOM can be changed again). The person who made the entry is told, with the owner's reason (`MOVEMENT_REVERSED`).
 
 `ALREADY_REVERSED`; reversing an OPENING or COUNT_ADJUSTMENT → `NOT_REVERSIBLE` (counts are
 corrected by a later count). *Follow-ups:* new balance; notify the storekeeper.
@@ -213,6 +279,14 @@ corrected by a later count). *Follow-ups:* new balance; notify the storekeeper.
 | `get_job_cost_report` | R | OW | `v_job_material_cost` for a period: per job cost, per piece, issued vs returned |
 | `get_activity` | R | OW | Audit events: who, what, when, from chat (agent), a button or an artifact. Filter by user, tool, date |
 
+**As built (milestone 8):** all owner reports and `get_count_history` are built. Dates may also be `@today`, `@today-7d` (days back) and `@month` (the first of this month).
+- `get_leak_report`: approved monthly counts only (the opening count never counts, a count still with the owner does not yet), optional period (`from`, `to`) and `materialNames`. Per material: differed X of Y counts, total short, worth at today's average rate (same arithmetic as `v_material_leak`), differences nobody explained (no reason or "Don't know"), and the reasons given. Ranked by value. Names no person.
+- `get_count_history`: both roles. Counted-by is the person who entered that line (the sheet's save counts too); the opening count shows what was counted with no difference.
+- `get_job_cost_report`: closed jobs by the day they closed, using the cost stored at close; `includeOpen` adds open jobs (cost so far) and `customerPoId` limits to one customer PO, so each job under a PO is costed separately. Cancelled jobs are never in it. The "issued vs returned" split is not in the rows (cost is value out less value back).
+- `estimate_job_cost`: jobs not yet closed; each material priced at today's average rate on the BOM quantity (or more, if more has gone out), against the same with the named materials at `newRate`. Saves nothing. A material with no rate yet counts as nothing and is said.
+- `get_activity`: newest first, 50; `jobId` gives every change to one job. "How" is the chat assistant, a form, a button or a page.
+- `get_stock_value` takes `materialNames` for one material's value.
+
 ## 11. Settings and users
 
 | Tool | Kind | Roles | Purpose |
@@ -221,9 +295,25 @@ corrected by a later count). *Follow-ups:* new balance; notify the storekeeper.
 | `update_setting` | W | **OW** | Known keys only, validated by type |
 | `list_users` | R | OW | Name, role, active |
 | `create_user` | W | **OW** | Name, email or username, role, initial password |
+| `reset_user_password` | W | **OW** | A new password for someone who forgot theirs (min 10 characters). The owner types it in the form |
 | `deactivate_user` | W | **OW** | Never the last active owner |
 
+**As built (milestone 9):** the settings list now holds the company letterhead used on printouts: `company.name`, `company.address`, `company.gstin`, `company.state`, `company.phone` (type `text`). The state decides CGST+SGST (same state as the supplier) or IGST on the purchase order printout. Resetting a password also signs that person out everywhere (`sessionEpoch`).
+
 Tools that need a setting read it server-side; they never take it from the caller.
+
+## 12. The owner's questions (milestone 12)
+
+The questions in `docs/CLIENT_CONFIRMATIONS.md` live in the app for the owner to answer (the Questions panel, the top-bar button, the opening card). Only the owner sees or answers them; the keys in that file ("A1", "M11") are never shown. `pnpm decisions:import` (and every start) reads the file's question tables: new questions are added, the wording of known ones is brought up to date, **answers are never touched**.
+
+| Tool | Kind | Roles | Purpose |
+|---|---|---|---|
+| `list_decisions` | R | **OW** | The questions, with topic, what we did meanwhile, why we ask, where each stands (to answer / waiting for the client / later / answered) and the answer. Filters: status, topic, words, "the first ones" |
+| `get_decision` | R | **OW** | One question in full, found by its words (a piece of the question, never a code). Ambiguous words → asks which |
+| `answer_decision` | W | **OW** | The chosen answer (must be one of that question's choices), a note (required when the choice says "write it yourself"). Changing an answer is allowed; every answer is an audit row. Emails Kasi when `DECISIONS_NOTIFY_EMAIL` and `SMTP_URL` are set |
+| `set_decision_status` | W | **OW** | Put a question aside for later, mark it "waiting for the client" with who he will ask, or bring it back to "to answer" |
+
+Errors: `NOT_FOUND`, `DECISION_AMBIGUOUS`, `INVALID_CHOICE`, `NOTE_REQUIRED`. The panel's buttons make a PendingAction (origin LAUNCHER) and run the same tools, so the rules above hold for the panel and the assistant alike; the assistant only opens the "Your answer" form, the owner presses its button.
 
 ## A. Artifact, printout and download tools (see `docs/ARTIFACTS.md`)
 
@@ -236,10 +326,13 @@ business data only through the R tools above, **as the viewer**, via `vijaya.rea
 | `open_artifact` | — | SK OW | Open a saved, recent or shared artifact in the panel (re-runs it with live data) |
 | `make_artifact` | — | SK OW | Build an artifact from a plain-words request. Input `request` and optional `kind` (`page` \| `document`; left out, the builder picks: reports, memos, SOPs, diagrams, explainers → `document`; interactive what-if or filters → `page`). Only when the person asked for a report, memo, SOP, diagram, chart, dashboard, comparison, what-if or long list. The builder returns `kind`, `title` and `source` (page HTML or VDoc text); runs `checkArtifact` or `checkDoc` (3 repairs). Opens the result |
 | `edit_artifact` | — | SK OW (own artifacts) | Change an artifact (page or document) via validated patches whose `old` text must match exactly once in the current `source`; new version, live at once, same kind. Shared copies are unchanged |
-| `open_printout` | — | SK OW (`job-cost-sheet`: OW) | Open a printout: `purchase-order`, `goods-receipt-note`, `issue-slip`, `count-sheet`, `job-cost-sheet`. Fixed templates; the model never writes them |
+| `open_printout` | — | SK OW (`job-cost-sheet`: OW) | Open a printout: `purchase-order`, `goods-receipt-note`, `issue-slip` (the work order: part number, customer PO, item codes, signatures), `count-sheet`, `job-cost-sheet`. Fixed templates; the model never writes them. The purchase order prints the amount in words (not rounded) and the delivery date on each line |
 | `share_artifact` | W | **OW** | Share one frozen version with the storekeeper. Form shows the title, the version and who gets it. **Refused** if the artifact uses an owner-only tool |
 | `unshare_artifact` | W | **OW** | Stop sharing; it disappears from the storekeeper's Saved |
 | `download_data` | — | SK OW | A file of a table or of an artifact. Formats: for a `document` artifact **pdf, docx, xlsx, csv, png, md**; for a `page` **pdf, png, xlsx, csv**; for a table in the chat xlsx or csv. Made on the server; re-reads the data with the **downloader's** role (a storekeeper cannot download owner data). Offered as a button (Download ▾); the agent offers the format the person names |
+
+| `get_print_data` | R, **internal** | SK OW | The facts one printout needs (company letterhead, the document, its lines), read as the person printing. Never offered to the assistant or to artifacts (`internal: true` keeps it out of `readToolsFor`); only the printout route calls it |
+| `reset_demo_data` | W | **OW**, demo copy only (`DEMO_MODE=true`) | "Start the demo again": clears every business table and rebuilds a month of sample activity through the tools. Keeps users, settings and chats. Refused when `DEMO_MODE` is not set, so the real copy can never run it. The reseed runs after the commit (`afterCommit`) |
 
 Save (★), Delete (archive) and Restore-version are **UI actions** by the person (Server Actions on their
 own artifacts, audited), not agent tools.
@@ -261,3 +354,10 @@ The buttons above the chat input (INTERFACE §3, `reference/artifacts/launcher.t
 `create_job` with **no prefill** (origin LAUNCHER). They work when the assistant is off. Which of them are visible
 (top 4, the rest behind More) is the person's own use, counted from the `AuditEvent` rows with `openedFrom: LAUNCHER`,
 after the role filter.
+
+## C. Not tools: Tamil and the microphone (milestone 12)
+
+Neither touches business data, so neither is in the registry or the catalog.
+
+- **Tamil on request** (`translateAction`, a server action; both roles). A "தமிழ்" button under assistant answers, notices, saved cards, the opening card and the owner's questions sends the **English texts of the screen** (never rows, ids or tool output the person cannot already see) to Claude with a fixed system prompt that says the texts are content, not instructions, and that numbers, units, names, part numbers and codes stay as they are. A translation in which any number of the English is missing is **thrown away** and the English stays. Results are kept in `translations` (SHA-256 of the English + language), so the same words are translated once. At most 24 texts of 2,000 characters a call and 30 calls a person a minute. What is saved by a form or an answer is always the English value.
+- **Speaking** (`POST /api/speech/transcribe`; both roles, logged in only). A recording of at most 60 seconds (3 MB; webm, ogg, mp4, mpeg, wav or aac) is sent to Google's Gemini (`GEMINI_API_KEY`) and comes back as text in the message box (Tamil in Tamil script, English as English, numbers in digits). The person reads it and presses Send. Nothing is stored or logged; 30 recordings a person a minute; with no key the button is not drawn. The words then go through the same assistant, tools and forms as typed ones.

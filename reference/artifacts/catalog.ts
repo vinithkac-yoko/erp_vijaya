@@ -23,6 +23,8 @@ export interface ToolMeta {
   outputs?: string[];
   /** Fields of the returned row that may be bound ($row) but never displayed. */
   bindOnly?: string[];
+  /** Used by the app itself (the printouts). Never offered to the assistant, an artifact or the builder. */
+  internal?: boolean;
 }
 
 const t = (m: ToolMeta) => m;
@@ -31,31 +33,50 @@ export const TOOLS: Record<string, ToolMeta> = Object.fromEntries(
   [
     // ── materials ──
     t({ name: 'search_materials', kind: 'read', roles: BOTH, inputs: { query: {}, stockType: {}, includeInactive: {} },
-        outputs: ['name', 'unit', 'stockType', 'onHand', 'minimumLevel', 'isScrap'], bindOnly: ['id'] }),
+        outputs: ['name', 'itemCode', 'unit', 'stockType', 'onHand', 'minimumLevel', 'isScrap'], bindOnly: ['id'] }),
     t({ name: 'get_material_balance', kind: 'read', roles: BOTH, inputs: { materialIds: {}, materialNames: {} },
         outputs: ['material', 'unit', 'quantity', 'averageRate', 'value', 'minimumLevel', 'stockType', 'isNegative', 'belowMinimum'], bindOnly: ['materialId'] }),
     t({ name: 'get_movement_history', kind: 'read', roles: BOTH, inputs: { materialId: {}, materialNames: {}, jobId: {}, from: {}, to: {} },
         outputs: ['date', 'type', 'material', 'unit', 'quantity', 'rate', 'value', 'document', 'job', 'by', 'source', 'balanceAfter'], bindOnly: ['id', 'materialId', 'jobId'] }),
-    t({ name: 'create_material', kind: 'write', roles: BOTH, inputs: { name: { required: true }, uom: { required: true }, stockType: { required: true }, minimumLevel: {}, hsnCode: {}, gstRate: {}, isScrap: {} } }),
-    t({ name: 'update_material', kind: 'write', roles: BOTH, inputs: { materialId: { required: true }, name: {}, minimumLevel: {}, hsnCode: {}, gstRate: {} } }),
+    t({ name: 'create_material', kind: 'write', roles: BOTH, inputs: { name: { required: true }, itemCode: {}, uom: { required: true }, stockType: { required: true }, minimumLevel: {}, hsnCode: {}, gstRate: {}, isScrap: {}, confirmNotDuplicate: {} } }),
+    t({ name: 'update_material', kind: 'write', roles: BOTH, inputs: { materialId: { required: true }, name: {}, itemCode: {}, minimumLevel: {}, hsnCode: {}, gstRate: {} } }),
     t({ name: 'deactivate_material', kind: 'write', roles: BOTH, inputs: { materialId: { required: true }, reason: {} } }),
+    // ── decisions (the owner's questions) ──
+    t({ name: 'list_decisions', kind: 'read', roles: OWNER, inputs: { status: {}, topic: {}, query: {}, firstPassOnly: {} },
+        outputs: ['topic', 'question', 'whatWeDid', 'why', 'statusText', 'answer', 'note', 'answeredAt'], bindOnly: ['id'] }),
+    t({ name: 'get_decision', kind: 'read', roles: OWNER, inputs: { decisionId: { required: true } },
+        outputs: ['topic', 'question', 'whatWeDid', 'why', 'statusText', 'answer', 'note', 'answeredAt'], bindOnly: ['id'] }),
+    t({ name: 'answer_decision', kind: 'write', roles: OWNER, inputs: { decisionId: { required: true }, choice: { required: true }, note: {} } }),
+    t({ name: 'set_decision_status', kind: 'write', roles: OWNER, inputs: { decisionId: { required: true }, status: { required: true }, note: {} } }),
     // ── parties ──
     t({ name: 'search_parties', kind: 'read', roles: BOTH, inputs: { query: {}, role: {} },
         outputs: ['name', 'type', 'city', 'gstin', 'phone'], bindOnly: ['id'] }),
     t({ name: 'create_party', kind: 'write', roles: BOTH, inputs: { name: { required: true }, role: { required: true }, gstin: {}, city: {}, state: {}, addressLine: {}, pincode: {}, phone: {}, email: {}, confirmNotDuplicate: {} } }),
     t({ name: 'update_party', kind: 'write', roles: BOTH, inputs: { partyId: { required: true }, name: {}, gstin: {}, city: {}, state: {}, addressLine: {}, pincode: {}, phone: {}, email: {}, addRole: {} } }),
     // ── jobs ──
+    t({ name: 'list_parts', kind: 'read', roles: BOTH, inputs: { query: {}, customerId: {}, customerName: {}, includeInactive: {} },
+        outputs: ['partNumber', 'description', 'customer', 'hsnCode', 'bomLines', 'jobs'], bindOnly: ['id', 'customerId'] }),
+    t({ name: 'get_part', kind: 'read', roles: BOTH, inputs: { partId: { required: true }, customerId: {}, customerName: {} },
+        outputs: ['partNumber', 'description', 'customer', 'material', 'itemCode', 'unit', 'perPieceText', 'number', 'quantity'], bindOnly: ['id', 'materialId'] }),
+    t({ name: 'create_part', kind: 'write', roles: BOTH, inputs: { customerName: { required: true }, partNumber: { required: true }, description: { required: true }, hsnCode: {} } }),
+    t({ name: 'update_part', kind: 'write', roles: BOTH, inputs: { partId: { required: true }, partNumber: {}, description: {}, hsnCode: {}, noLongerMade: {} } }),
+    t({ name: 'set_part_bom', kind: 'write', roles: BOTH, inputs: { partId: { required: true }, lines: { required: true }, 'lines[].materialId': { required: true }, 'lines[].qtyPerPiece': { required: true } } }),
+    t({ name: 'list_customer_pos', kind: 'read', roles: BOTH, inputs: { customerId: {}, customerName: {} },
+        outputs: ['number', 'customer', 'date', 'jobs', 'parts', 'ordered'], bindOnly: ['id', 'customerId'] }),
+    t({ name: 'update_customer_po_line', kind: 'write', roles: BOTH, inputs: { customerPoId: { required: true }, customerId: {}, customerName: {}, partId: { required: true }, quantity: {}, rate: { rate: true }, dueDate: {} } }),
+    t({ name: 'get_customer_po', kind: 'read', roles: BOTH, inputs: { customerPoId: { required: true }, customerId: {}, customerName: {} },
+        outputs: ['partNumber', 'description', 'ordered', 'planned', 'made', 'left', 'dueDate'] }),
     t({ name: 'list_jobs', kind: 'read', roles: BOTH, inputs: { status: {}, customerId: {}, customerPoId: {}, from: {}, to: {} },
-        outputs: ['number', 'customer', 'product', 'quantity', 'status', 'jobDate', 'dueDate', 'materialCost', 'costPerPiece'], bindOnly: ['id', 'customerId'] }),
+        outputs: ['number', 'customer', 'partNumber', 'product', 'quantity', 'status', 'jobDate', 'dueDate', 'materialCost', 'costPerPiece'], bindOnly: ['id', 'customerId'] }),
     t({ name: 'get_job', kind: 'read', roles: BOTH, inputs: { jobId: { required: true } },
-        outputs: ['number', 'customer', 'customerPo', 'product', 'quantity', 'status', 'materialCost',
+        outputs: ['number', 'customer', 'customerPo', 'partNumber', 'product', 'quantity', 'status', 'materialCost',
                   'material', 'unit', 'perPiece', 'required', 'issued', 'returned'], bindOnly: ['id', 'materialId'] }),
     t({ name: 'check_job_shortage', kind: 'read', roles: BOTH, inputs: { jobId: { required: true } },
         outputs: ['material', 'unit', 'needed', 'inStock', 'short'], bindOnly: ['materialId'] }),
     t({ name: 'get_job_bom_variance', kind: 'read', roles: BOTH, inputs: { jobId: { required: true } },
         outputs: ['material', 'unit', 'planned', 'used', 'difference', 'differencePct', 'topUp'], bindOnly: ['materialId'] }),
-    t({ name: 'create_customer_po', kind: 'write', roles: BOTH, inputs: { customerName: { required: true }, number: { required: true }, poDate: {} } }),
-    t({ name: 'create_job', kind: 'write', roles: BOTH, inputs: { customerId: { required: true }, customerPoId: {}, productDescription: { required: true }, quantity: { required: true }, jobDate: { required: true }, dueDate: {}, type: {}, parentJobId: {} } }),
+    t({ name: 'create_customer_po', kind: 'write', roles: BOTH, inputs: { customerName: { required: true }, number: { required: true }, poDate: {}, lines: {}, 'lines[].partId': { required: true }, 'lines[].quantity': { required: true }, 'lines[].rate': { rate: true }, 'lines[].dueDate': {} } }),
+    t({ name: 'create_job', kind: 'write', roles: BOTH, inputs: { customerId: {}, customerPoId: {}, partId: {}, productDescription: {}, quantity: { required: true }, jobDate: { required: true }, dueDate: {}, type: {}, parentJobId: {} } }),
     t({ name: 'set_job_bom', kind: 'write', roles: BOTH, inputs: { jobId: { required: true }, lines: { required: true }, 'lines[].materialId': { required: true }, 'lines[].qtyPerPiece': { required: true } } }),
     t({ name: 'cancel_job', kind: 'write', roles: BOTH, inputs: { jobId: { required: true }, reason: { required: true } } }),
     // ── purchasing ──
@@ -100,23 +121,29 @@ export const TOOLS: Record<string, ToolMeta> = Object.fromEntries(
     t({ name: 'approve_stock_count', kind: 'write', roles: OWNER, inputs: { stockCountId: { required: true } } }),
     t({ name: 'reject_stock_count', kind: 'write', roles: OWNER, inputs: { stockCountId: { required: true }, rejectionNote: { required: true } } }),
     t({ name: 'get_leak_report', kind: 'read', roles: OWNER, inputs: { from: {}, to: {}, materialNames: {} },
-        outputs: ['material', 'unit', 'timesCounted', 'timesMismatched', 'netDifference', 'totalShortage', 'varianceValue', 'unexplainedCount', 'lastCounted'], bindOnly: ['materialId'] }),
+        outputs: ['material', 'unit', 'timesCounted', 'timesMismatched', 'netDifference', 'totalShortage', 'varianceValue', 'unexplainedCount', 'reasons', 'lastCounted'], bindOnly: ['materialId'] }),
+    t({ name: 'get_count_history', kind: 'read', roles: BOTH, inputs: { materialId: {}, materialNames: {} },
+        outputs: ['count', 'date', 'kind', 'statusText', 'material', 'unit', 'systemQty', 'countedQty', 'difference', 'reason', 'by', 'note'] }),
     // ── corrections, approvals, reports ──
     t({ name: 'reverse_movement', kind: 'write', roles: OWNER, inputs: { movementId: { required: true }, reason: { required: true } } }),
     t({ name: 'list_pending_approvals', kind: 'read', roles: OWNER, inputs: {},
         outputs: ['kind', 'number', 'summary', 'amount', 'waitingSince'], bindOnly: ['id'] }),
     t({ name: 'list_reorder_alerts', kind: 'read', roles: BOTH, inputs: {},
         outputs: ['material', 'unit', 'onHand', 'minimumLevel', 'shortfall'], bindOnly: ['materialId'] }),
-    t({ name: 'get_stock_value', kind: 'read', roles: OWNER, inputs: {},
+    t({ name: 'get_stock_value', kind: 'read', roles: OWNER, inputs: { materialNames: {} },
         outputs: ['material', 'unit', 'quantity', 'averageRate', 'value', 'total'], bindOnly: ['materialId'] }),
     // What-if: same costing as get_job_cost_report for OPEN jobs, with some material rates replaced.
     // The rates here are inputs to a calculation, not prices written anywhere.
     t({ name: 'estimate_job_cost', kind: 'read', roles: OWNER, inputs: { jobIds: {}, materialNames: {}, newRate: {} },
         outputs: ['job', 'customer', 'product', 'quantity', 'currentCost', 'estimatedCost', 'change', 'changePct', 'costPerPiece'], bindOnly: ['jobId'] }),
-    t({ name: 'get_job_cost_report', kind: 'read', roles: OWNER, inputs: { from: {}, to: {}, customerId: {} },
-        outputs: ['job', 'customer', 'product', 'quantity', 'issuedValue', 'returnedValue', 'materialCost', 'costPerPiece', 'closedAt'], bindOnly: ['jobId'] }),
-    t({ name: 'get_activity', kind: 'read', roles: OWNER, inputs: { userId: {}, from: {}, to: {}, tool: {} },
-        outputs: ['when', 'who', 'what', 'document', 'source'], bindOnly: ['id'] }),
+    t({ name: 'get_margin_by_part', kind: 'read', roles: OWNER, inputs: { from: {}, to: {}, customerId: {}, partNumber: {} },
+        outputs: ['partNumber', 'description', 'customer', 'jobs', 'pieces', 'materialCost', 'costPerPiece', 'ratePerPiece', 'margin', 'marginPerPiece', 'marginPct'] }),
+    t({ name: 'get_job_cost_report', kind: 'read', roles: OWNER, inputs: { from: {}, to: {}, customerId: {}, customerPoId: {}, includeOpen: {} },
+        outputs: ['job', 'customer', 'customerPo', 'product', 'quantity', 'statusText', 'materialCost', 'costPerPiece', 'closedAt'], bindOnly: ['jobId'] }),
+    t({ name: 'get_activity', kind: 'read', roles: OWNER, inputs: { userId: {}, from: {}, to: {}, tool: {}, jobId: {} },
+        outputs: ['when', 'who', 'what', 'document', 'source', 'reason'], bindOnly: ['id'] }),
+    t({ name: 'get_print_data', kind: 'read', roles: BOTH, internal: true, inputs: { template: { required: true }, purchaseOrderId: {}, receiptId: {}, jobId: {}, countId: {} } }),
+    t({ name: 'reset_demo_data', kind: 'write', roles: OWNER, inputs: { confirm: { required: true } } }),
     t({ name: 'share_artifact', kind: 'write', roles: OWNER, inputs: { artifactId: { required: true }, version: {} } }),
     t({ name: 'unshare_artifact', kind: 'write', roles: OWNER, inputs: { artifactId: { required: true } } }),
     t({ name: 'deactivate_party', kind: 'write', roles: BOTH, inputs: { partyId: { required: true }, reason: {} } }),
@@ -125,6 +152,7 @@ export const TOOLS: Record<string, ToolMeta> = Object.fromEntries(
     t({ name: 'mark_notifications_read', kind: 'write', roles: BOTH, inputs: { notificationIds: { required: true } } }),
     t({ name: 'list_users', kind: 'read', roles: OWNER, inputs: {}, outputs: ['name', 'role', 'active'], bindOnly: ['id'] }),
     t({ name: 'create_user', kind: 'write', roles: OWNER, inputs: { name: { required: true }, login: { required: true }, role: { required: true } } }),
+    t({ name: 'reset_user_password', kind: 'write', roles: OWNER, inputs: { userId: { required: true } } }),
     t({ name: 'deactivate_user', kind: 'write', roles: OWNER, inputs: { userId: { required: true } } }),
     t({ name: 'list_settings', kind: 'read', roles: BOTH, inputs: {}, outputs: ['setting', 'value'] }),
     t({ name: 'update_setting', kind: 'write', roles: OWNER, inputs: { key: { required: true }, value: { required: true } } }),
@@ -140,7 +168,7 @@ export interface PrintTemplate { roles: Role[]; with: string[]; title: string }
 export const PRINT_TEMPLATES: Record<string, PrintTemplate> = {
   'purchase-order':     { roles: BOTH,  with: ['purchaseOrder'], title: 'Purchase order (to send to the supplier)' },
   'goods-receipt-note': { roles: BOTH,  with: ['receipt'],       title: 'Goods receipt note' },
-  'issue-slip':         { roles: BOTH,  with: ['job'],           title: 'Issue slip / pick list for a job' },
+  'issue-slip':         { roles: BOTH,  with: ['job'],           title: 'Work order / issue slip for a job' },
   'count-sheet':        { roles: BOTH,  with: ['count'],         title: 'Count sheet (paper, with an empty Counted column)' },
   'job-cost-sheet':     { roles: OWNER, with: ['job'],           title: 'Job cost sheet' },
 };
@@ -158,6 +186,6 @@ export const ARTIFACT_OPENABLE_FORMS = new Set([
 /** Never displayed anywhere, whatever a tool returns. */
 export const FORBIDDEN_DISPLAY = /^(id|code|passwordHash|.*Id)$/;
 
-export const readToolsFor = (role: Role) => Object.values(TOOLS).filter((t) => t.kind === 'read' && t.roles.includes(role)).map((t) => t.name);
+export const readToolsFor = (role: Role) => Object.values(TOOLS).filter((t) => t.kind === 'read' && !t.internal && t.roles.includes(role)).map((t) => t.name);
 export const artifactFormsFor = (role: Role) => writeToolsFor(role).filter((n) => ARTIFACT_OPENABLE_FORMS.has(n));
 export const writeToolsFor = (role: Role) => Object.values(TOOLS).filter((t) => t.kind === 'write' && t.roles.includes(role)).map((t) => t.name);

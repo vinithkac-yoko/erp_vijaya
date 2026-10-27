@@ -308,12 +308,13 @@
     "notProposes": [
      "set_job_bom"
     ],
+    "askedQuestion": true,
     "textMatchesAny": [
-     "BOM"
+     "part"
     ]
    }
   ],
-  "judge": "Does not copy or invent a BOM; explains every design is new and asks for the BOM."
+  "judge": "Does not copy or invent a BOM; asks which part number the job is for."
  },
  {
   "id": "5.3",

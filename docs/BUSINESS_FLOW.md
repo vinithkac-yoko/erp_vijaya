@@ -17,9 +17,10 @@ Vijaya Electronics, Chennai, founded 2009. Transformers and inductor coils: SMPS
 lamination, medical isolation, driver transformers, DC converters, adapters. Customers in
 railways, solar, LED and CCTV.
 
-- **Every job is a one-off design.** About 50 jobs a month; quantities in the hundreds or
-  thousands. Designs never repeat; a returning customer gets a fresh job with a fresh BOM.
-- There is **no product catalogue**. The product is a text description on the job.
+- **Everything runs by part number** (the client's own paperwork, 2026-10-20). Every product a customer buys has a
+  part number, and the factory puts it on the product. About 50 jobs a month; quantities in the hundreds or
+  thousands. A part comes back in later orders, and two customers may use the same number. A **part** belongs to
+  one customer and carries a description and its usual BOM (per piece). Old jobs, from before part numbers, have none.
 - The system tracks **raw materials only**.
 
 ## 2. People and permissions
@@ -130,10 +131,14 @@ Movement types and direction **[DB]**:
 - **Open POs:** the same PO number stays; the customer adds the next item only after the
   previous is delivered; item, quantity and price can differ. Each release is a **new job** under
   the same customer PO. No delivery schedules, no forecasts — don't ask for any.
-- A **job**: customer, optional customer PO, product description (free text), quantity (> 0
-  **[DB]**), job date, optional due date. Numbered `JOB-2627-0031` (Indian financial year
+- A **job**: a part (its customer and description come from it; an old job has free text instead), optional customer PO,
+  quantity (> 0 **[DB]**), job date, optional due date. Numbered `JOB-2627-0031` (Indian financial year
   April–March).
-- A repeat order of an old design is a new job with a new BOM. Never copy a BOM **[AGENT]**.
+- A **customer PO** lists the parts ordered and how many; the rate the customer pays per piece is the owner's number.
+  What is left to plan on a PO line = ordered − pieces in jobs (cancelled jobs and samples do not count).
+- A new job for a part starts from the part's **usual BOM**, shown on the BOM form for the person to check; the job keeps
+  its own copy, so changing the part's BOM never changes an old job. The first BOM made for a part with none becomes its
+  usual one. The assistant never invents or copies a BOM by itself **[AGENT]**.
 - **Samples:** a prototype before a main job is its own job, type SAMPLE, linked to the main job
   **[TOOL]**. It consumes material; its cost is absorbed by the company.
 - Job status: OPEN → MATERIAL_ISSUED → (IN_PRODUCTION) → CLOSED. Also CANCELLED (nothing issued).
@@ -347,4 +352,13 @@ Decided provisionally in the kit; confirm or change before the milestone that bu
 3. **Printouts** (ARTIFACTS: the five fixed printouts): purchase order, goods receipt note, issue slip /
    pick list, count sheet, job cost sheet. Anything else that leaves the building on paper?
 4. **PO paper:** should the printed purchase order carry payment/delivery terms? What standard text?
-
+5. **A receipt after stock went negative** (§14). The formula "(old value + incoming value) ÷ (old quantity + incoming
+   quantity)" gives nonsense when the old quantity is below zero: if 5 kg is given out before the first receipt is
+   written down, then 10 kg arrives at ₹100, the formula makes the average ₹200. Milestone 2 provisionally does this:
+   **when stock on hand was zero or negative, the new average is simply the rate that came in** (₹100). If stock is
+   still negative afterwards, the average does not change. Confirm or change.
+6. **How a rejected quantity shows in the ledger** (§10, built in the purchasing milestone). §10 says only the accepted
+   quantity becomes stock *and* that "both movements are recorded". Two ways to do that: (a) post a RECEIPT for the
+   **accepted** quantity only, and show the rejection on the receipt line (stock is right, the ledger has one row); or
+   (b) post a RECEIPT for **everything received** and a REJECT_RETURN for the rejected part (the ledger shows both,
+   stock ends up the same). Kit assumption: **(b)**, because the owner wants the ledger to show what happened. Confirm.

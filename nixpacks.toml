@@ -1,0 +1,3 @@
+# Railway builds with Nixpacks. Downloads and printouts need a browser (to draw PDFs and pictures) and pandoc (for Word).
+[phases.setup]
+nixPkgs = ["...", "chromium", "pandoc"]
