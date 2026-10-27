@@ -14,7 +14,8 @@ export const AUDIO_TYPE = /^audio\/(webm|ogg|mp4|mpeg|wav|x-wav|aac|x-m4a)(;.*)?
 export interface VoiceConfig { apiKey?: string; model: string; baseURL: string }
 export function voiceConfig(env: Record<string, string | undefined> = process.env): VoiceConfig {
   return {
-    apiKey: env.GEMINI_API_KEY || undefined,
+    // a space, a new line or quotes pasted around the key in the hosting page are a common cause of "key not valid"
+    apiKey: env.GEMINI_API_KEY?.trim().replace(/^["']+|["']+$/g, '').trim() || undefined,
     // the '-latest' name always means Google's current fast model, so it does not go stale
     model: env.GEMINI_MODEL || 'gemini-flash-latest',
     baseURL: (env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com').replace(/\/+$/, ''),
@@ -36,6 +37,7 @@ export async function transcribe(audio: Uint8Array, mimeType: string, env: Recor
   const c = voiceConfig(env);
   if (!c.apiKey) throw new TranscribeError('Voice is not set up here.');
   if (!audio.byteLength) return '';
+  const generic = "Couldn't listen just now. Please try again, or type it.";
   let res: Response;
   try {
     res = await fetch(`${c.baseURL}/v1beta/models/${encodeURIComponent(c.model)}:generateContent`, {
@@ -44,10 +46,18 @@ export async function transcribe(audio: Uint8Array, mimeType: string, env: Recor
       body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: PROMPT }, { inlineData: { mimeType: mimeType.split(';')[0]!.trim(), data: Buffer.from(audio).toString('base64') } }] }] }),
       signal: AbortSignal.timeout(30_000),
     });
-  } catch {
-    throw new TranscribeError("Couldn't listen just now. Please try again, or type it.");
+  } catch (e) {
+    console.error('[voice] could not reach the listener:', e instanceof Error ? e.name : 'unknown');
+    throw new TranscribeError(generic);
   }
-  if (!res.ok) throw new TranscribeError("Couldn't listen just now. Please try again, or type it.");
+  if (!res.ok) {
+    // What Google said goes to the server log (never the key, never the audio) so the owner of the deployment can fix it; the person gets a plain sentence.
+    const said = (await res.json().catch(() => null)) as { error?: { message?: string; status?: string } } | null;
+    console.error(`[voice] the listener answered ${res.status} (model ${c.model}):`, `${said?.error?.status ?? ''} ${said?.error?.message ?? ''}`.trim().slice(0, 300));
+    if (res.status === 429) throw new TranscribeError('The listener is busy right now. Please wait a minute and try again, or type it.');
+    if (res.status >= 400 && res.status < 500) throw new TranscribeError("Voice isn't set up right yet. Please type it for now, and tell Kasi.");
+    throw new TranscribeError(generic);
+  }
   const body = (await res.json().catch(() => null)) as { candidates?: { content?: { parts?: { text?: string }[] } }[] } | null;
   const text = (body?.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('').trim();
   return text.replace(/^["“]+|["”]+$/g, '').trim().slice(0, 2000);

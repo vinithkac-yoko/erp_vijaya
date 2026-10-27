@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AUDIO_TYPE, MAX_AUDIO_BYTES, TranscribeError, transcribe, voiceAvailable, voiceConfig } from '@/server/tools/transcribe';
 
 let server: Server | undefined;
@@ -30,6 +30,10 @@ describe('voice settings', () => {
     expect(voiceAvailable({})).toBe(false);
     expect(voiceAvailable({ GEMINI_API_KEY: 'x' })).toBe(true);
     expect(voiceConfig({})).toMatchObject({ model: 'gemini-flash-latest', baseURL: 'https://generativelanguage.googleapis.com' });
+  });
+  it('a key pasted with spaces, a new line or quotes still works', () => {
+    expect(voiceConfig({ GEMINI_API_KEY: '  "AIzaXYZ"\n' }).apiKey).toBe('AIzaXYZ');
+    expect(voiceAvailable({ GEMINI_API_KEY: '   ' })).toBe(false);
   });
   it('accepts what phones and browsers record, and nothing else', () => {
     for (const t of ['audio/webm', 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/mpeg', 'audio/wav']) expect(AUDIO_TYPE.test(t)).toBe(true);
@@ -61,6 +65,21 @@ describe('transcribe', () => {
     expect(err).toBeInstanceOf(TranscribeError);
     expect((err as Error).message).toBe("Couldn't listen just now. Please try again, or type it.");
     expect((err as Error).message).not.toMatch(/quota|k-test|500/);
+  });
+
+  it('says what kind of failure it was, in plain words, and logs what Google said (never the key)', async () => {
+    const logged: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => { logged.push(a.join(' ')); });
+    try {
+      const refused = await listener(() => ({ status: 403, json: { error: { status: 'PERMISSION_DENIED', message: 'API key not valid.' } } }));
+      await expect(transcribe(new Uint8Array([1]), 'audio/webm', refused.env)).rejects.toThrow(/isn't set up right/);
+      await new Promise<void>((ok) => server!.close(() => ok())); server = undefined;
+      const busy = await listener(() => ({ status: 429, json: { error: { status: 'RESOURCE_EXHAUSTED', message: 'Quota exceeded.' } } }));
+      await expect(transcribe(new Uint8Array([1]), 'audio/webm', busy.env)).rejects.toThrow(/busy/);
+    } finally { spy.mockRestore(); }
+    expect(logged.join('\n')).toMatch(/answered 403.*PERMISSION_DENIED API key not valid/);
+    expect(logged.join('\n')).toMatch(/answered 429.*RESOURCE_EXHAUSTED/);
+    expect(logged.join('\n')).not.toContain('k-test');
   });
 
   it('refuses without a key', async () => {

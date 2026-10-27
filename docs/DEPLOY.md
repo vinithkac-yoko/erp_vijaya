@@ -78,6 +78,8 @@ The address the email goes to is the **Owner notification email** the owner sets
 | `GEMINI_MODEL` | optional, default `gemini-flash-latest` | Which Google model listens |
 | `DECISIONS_NOTIFY_EMAIL` | optional, Kasi's email | With `SMTP_URL` set, an email arrives each time the owner answers a question in the Questions panel |
 
+If the microphone shows a red message, open the service's **Deploy Logs** and look for a line starting `[voice]`: it says what Google answered (for example `403 PERMISSION_DENIED`, `400 API key not valid`, `429 RESOURCE_EXHAUSTED`). The key and the recording are never in the log.
+
 What is said is sent to Google for the moment it takes to turn it into text, and is not kept by the app. Say so to the owner and the storekeeper before they use it. Browsers ask for the microphone the first time; on a phone the page must be opened over https (Railway's address is).
 
 **Reports, downloads and printouts (milestone 9).** They need a browser (to draw PDFs and pictures) and a program called pandoc (for Word files).
