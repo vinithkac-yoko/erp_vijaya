@@ -18,7 +18,7 @@ Not done, on purpose
 - No upload button in the app. See the answer to "is it agentic enough" in the report: a button needs the same review step, and is the next piece if a sheet like this will come again.
 
 Proof (run in this session)
-- RESULTS_PLACEHOLDER
+- **Final run: `pnpm test` 573 passed (25 live skipped), `pnpm e2e` 230 passed (6 skipped on purpose), lint, typecheck and build clean.** `pnpm test:kit` ran 159 of 200 (41 skipped because this container has no `pandoc`, which the Word and Markdown export tests need; they passed with it in the earlier milestones). New: 19 tests for the loader (units, quantities, the owner's rules, shared part numbers, merging, re-running, an approved count) and 6 for rack, shelf and kind. Two things the new container exposed and that are fixed: the browser tests' accessibility scans caught buttons halfway through their fade after a theme switch (they now wait for it; the same four tests failed identically on the last green commit), and one test could be refused by the downloads-per-minute limit in a full run (the limit is unchanged for people, raised only in the browser tests).
 
 ## Milestone 12 — The owner's questions in the app, Tamil, the microphone, changing a PO line — **built; waiting for Kasi's test and answers**
 
