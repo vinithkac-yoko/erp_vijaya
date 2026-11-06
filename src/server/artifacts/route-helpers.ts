@@ -12,7 +12,8 @@ export async function sessionOr401(): Promise<{ me: ToolSession } | { res: Respo
 }
 
 /** Files are made with a headless browser: at most 10 a minute per person. */
-export const exportAllowed = (userId: string) => allowMessage(`export:${userId}`, 10);
+/** At most this many files a person may ask for in a minute (EXPORTS_PER_MINUTE, default 10; the browser tests raise it so one test's downloads cannot starve the next). */
+export const exportAllowed = (userId: string) => allowMessage(`export:${userId}`, Number(process.env.EXPORTS_PER_MINUTE) > 0 ? Number(process.env.EXPORTS_PER_MINUTE) : 10);
 
 export function fileResponse(r: ExportResult, inline = false): Response {
   return new Response(new Uint8Array(r.bytes), {

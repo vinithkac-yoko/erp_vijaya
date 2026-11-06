@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { addApprovedCount, addJob, addMaterials, addParties, addStock, prisma, resetData } from './db';
-import { login } from './helpers';
+import { login, settle } from './helpers';
 import { OWNER, STOREKEEPER } from './users';
 
 test.beforeEach(async () => { await resetData(); });
@@ -94,6 +94,7 @@ test.describe('the owner\'s questions (ACCEPTANCE 12, 13)', () => {
     await expect(table(page)).toBeVisible();
     for (const scheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme: scheme });
+      await settle(page);
       const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
       expect(r.violations.map((v) => `${scheme} ${v.id}: ${v.nodes[0]?.html}`)).toEqual([]);
     }

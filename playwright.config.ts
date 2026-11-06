@@ -28,7 +28,7 @@ export default defineConfig({
       timeout: 60_000,
       env: {
         ...(process.env as Record<string, string>), NODE_ENV: 'production', APP_URL: `http://localhost:${PORT}`,
-        ANTHROPIC_BASE_URL: `http://127.0.0.1:${STUB_PORT}`, ANTHROPIC_API_KEY: 'e2e-not-a-real-key', AGENT_MESSAGES_PER_MINUTE: '500', ANTHROPIC_REFUSAL_FALLBACK: 'true',
+        ANTHROPIC_BASE_URL: `http://127.0.0.1:${STUB_PORT}`, ANTHROPIC_API_KEY: 'e2e-not-a-real-key', AGENT_MESSAGES_PER_MINUTE: '500', EXPORTS_PER_MINUTE: '500', ANTHROPIC_REFUSAL_FALLBACK: 'true',
         GEMINI_BASE_URL: 'http://127.0.0.1:3198', GEMINI_API_KEY: 'e2e-not-a-real-key',
         // the demo copy's "start the demo again" works only with this (the real copy never sets it)
         DEMO_MODE: 'true',

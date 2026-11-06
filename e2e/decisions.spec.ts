@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { addDecisions, prisma, resetData } from './db';
-import { login } from './helpers';
+import { login, settle } from './helpers';
 import { OWNER, STOREKEEPER } from './users';
 
 test.beforeEach(async () => { await resetData(); await addDecisions(); });
@@ -95,6 +95,7 @@ test.describe('the owner\'s questions (Decisions)', () => {
     await panel(page).getByRole('button', { expanded: false }).first().click();
     for (const scheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme: scheme });
+      await settle(page);
       const r = await new AxeBuilder({ page }).include('[data-testid="panel"]').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
       expect(r.violations.map((v) => `${scheme} ${v.id}: ${v.nodes[0]?.html}`)).toEqual([]);
     }

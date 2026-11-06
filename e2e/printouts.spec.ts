@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { addGrn, addJob, addMaterials, addParties, addPo, addStock, prisma, resetData } from './db';
-import { login } from './helpers';
+import { login, settle } from './helpers';
 import { OWNER, STOREKEEPER } from './users';
 
 test.beforeEach(async () => { await resetData(); });
@@ -117,6 +117,7 @@ test.describe('the five printouts (ARTIFACTS §9)', () => {
     await expect(page.frameLocator('iframe[title="Purchase order PO-2627-0001"]').locator('body')).toContainText('Vijaya Electronics');
     for (const scheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme: scheme });
+      await settle(page);
       const r = await new AxeBuilder({ page }).include('[data-testid="printout-panel"]').exclude('iframe').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
       expect(r.violations.map((v) => `${scheme} ${v.id}: ${v.nodes[0]?.html}`)).toEqual([]);
     }

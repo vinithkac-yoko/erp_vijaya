@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { addMaterials, prisma, resetData } from './db';
-import { login } from './helpers';
+import { login, settle } from './helpers';
 import { OWNER, STOREKEEPER } from './users';
 
 test.beforeEach(async () => { await resetData(); });
@@ -235,6 +235,7 @@ test.describe('the sheet at its limits', () => {
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(info.project.name === 'phone' ? 44 : 36);
     for (const theme of ['light', 'dark']) {
       await page.emulateMedia({ colorScheme: theme as 'light' | 'dark' });
+      await settle(page);
       const r = await new AxeBuilder({ page }).include('[data-testid="count-sheet"]').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
       expect(r.violations.map((v) => `${v.id}: ${v.nodes[0]?.html}`), theme).toEqual([]);
     }

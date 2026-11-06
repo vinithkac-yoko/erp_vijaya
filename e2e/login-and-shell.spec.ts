@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { OWNER, STOREKEEPER } from './users';
-import { login } from './helpers';
+import { login, settle } from './helpers';
 
 test.describe('login', () => {
   test('a visitor who is not logged in is sent to the login page', async ({ page }) => {
@@ -72,6 +72,7 @@ test.describe('the shell, by role', () => {
     await login(page, STOREKEEPER);
     for (const scheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme: scheme });
+      await settle(page);
       const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
       expect(r.violations.map((v) => `${scheme} ${v.id}: ${v.nodes[0]?.html}`)).toEqual([]);
     }

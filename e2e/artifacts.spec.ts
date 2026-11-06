@@ -4,7 +4,7 @@ import ExcelJS from 'exceljs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { addGrn, addMaterials, addParties, addPo, addStock, prisma, resetData } from './db';
-import { login } from './helpers';
+import { login, settle } from './helpers';
 import { OWNER, STOREKEEPER } from './users';
 
 test.beforeEach(async () => { await resetData(); });
@@ -181,6 +181,7 @@ test('the report and the saved-reports menu pass the accessibility scan in light
   await page.frameLocator('iframe[title="Below minimum"]').locator('#app').getByText('Ferrite Core E-30').waitFor();
   for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme });
+    await settle(page);
     const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
     expect(r.violations.map((v) => `${scheme} ${v.id}: ${v.nodes[0]?.html}`)).toEqual([]);
   }
