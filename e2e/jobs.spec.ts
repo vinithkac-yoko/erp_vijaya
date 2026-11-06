@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { addMaterials, addParties, addPart, addStock, prisma, resetData } from './db';
-import { login } from './helpers';
+import { login, settle } from './helpers';
 import { OWNER, STOREKEEPER } from './users';
 
 test.beforeEach(async () => { await resetData(); });
@@ -196,6 +196,7 @@ test.describe('the forms hold up', () => {
     const f = await newJob(page);
     for (const theme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme: theme });
+      await settle(page);
       const r = await new AxeBuilder({ page }).include('form[aria-label="New job"]').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
       expect(r.violations.map((v) => `${v.id}: ${v.nodes[0]?.html}`), theme).toEqual([]);
     }
@@ -206,6 +207,7 @@ test.describe('the forms hold up', () => {
     await b.getByLabel('Quantity for one piece, line 1').fill('18.4');
     for (const theme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme: theme });
+      await settle(page);
       const r = await new AxeBuilder({ page }).include('form[aria-label="Bill of materials"]').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
       expect(r.violations.map((v) => `${v.id}: ${v.nodes[0]?.html}`), theme).toEqual([]);
     }
