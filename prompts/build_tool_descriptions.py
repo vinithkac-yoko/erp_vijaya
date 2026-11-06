@@ -38,11 +38,12 @@ SK = ["STOREKEEPER"]
 tool("search_materials", "read", SK_OW, """
 Find materials by part of their name. Matching ignores case, spaces and hyphens, so "ferrite core e30"
 finds "Ferrite Core E-30" and "22swg wire" finds "22 SWG Copper Wire". Returns each material's name,
-item code (the company's own code for it, if it has one), unit, stock type (STANDING or PER_JOB), quantity on hand and
-minimum level. An item code finds its material too. Use it before creating a
+item code (the company's own code for it, if it has one), unit, stock type (STANDING or PER_JOB), quantity on hand,
+minimum level, and where it is kept (rack and shelf) and its kind (CORE, BOBBIN, WIRE, SLEEVE and so on), when known. An item code finds its
+material too, "R-12" lists what is on that rack, and a kind such as "bobbin" lists that kind. Use it for "where is X". Use it before creating a
 material (to catch duplicates), to resolve what the user typed into an exact name, and before opening
 any form that needs a material. An empty query lists all active materials.""",
-     {"query": "Part of the material's name or its item code, as the user typed it. Empty = all active materials.",
+     {"query": "Part of the material's name or its item code, as the user typed it; or a rack such as R-12; or a kind such as bobbin. Empty = all active materials.",
       "stockType": "Optional filter: STANDING (kept in stock, has a minimum) or PER_JOB (bought for a job).",
       "includeInactive": "true to include deactivated materials. Default false."})
 
@@ -74,15 +75,20 @@ STANDING materials need a minimum level. """ + FORM,
       "uom": "The one unit: NOS (pieces), KG, MTR (metres), LTR (litres), ROLL or SET.",
       "stockType": "STANDING (kept in stock, needs a minimum) or PER_JOB (bought only for a job).",
       "minimumLevel": "Reorder level in the material's unit. Required for STANDING; leave empty for PER_JOB.",
+      "category": "The kind of material (CORE, BOBBIN, WIRE, SLEEVE ...), if the user groups them. Leave empty otherwise.",
+      "rack": "The rack where it is kept, like R-12, if the user says. Leave empty otherwise.",
+      "shelf": "The shelf on that rack, like C, if the user says. Leave empty otherwise.",
+      "notes": "A short note about the material in the user's words, only if they give one.",
       "hsnCode": "HSN code, if the user has it.", "gstRate": "GST %, if the user has it (e.g. 18).",
       "isScrap": "true only for scrap materials such as copper offcuts.",
       "confirmNotDuplicate": "true only after the user has said a similar existing material is a different one."})
 
 tool("update_material", "write", SK_OW, """
-Opens the form to change a material's name, minimum level, HSN code or GST rate. It cannot change the
+Opens the form to change a material's name, item code, rack, shelf, kind, minimum level, HSN code or GST rate. It cannot change the
 unit or stock type — if asked, explain that changing the unit would change the meaning of every past
 quantity. """ + FORM,
      {"materialId": "The material to change. " + IDS, "name": "New name, only if renaming.", "itemCode": "The company's own item code for it.",
+      "rack": "The rack where it is kept, like R-12.", "shelf": "The shelf on that rack, like C.", "category": "The kind of material (CORE, BOBBIN, WIRE, SLEEVE ...).",
       "minimumLevel": "New minimum level in the material's unit.", "hsnCode": "HSN code, as on the supplier's invoice.", "gstRate": "GST rate in %, e.g. 18."})
 
 tool("deactivate_material", "write", SK_OW, """

@@ -17,7 +17,8 @@ const STATUS_TEXT: Record<(typeof STATUSES)[number], string> = { DRAFT: 'In prog
 const OPEN = ['DRAFT', 'REJECTED', 'PENDING_APPROVAL'] as const;
 /** Pieces, rolls and sets are counted whole; kg, metres and litres take decimals. */
 const WHOLE_UNITS = new Set(['NOS', 'ROLL', 'SET']);
-const MAX_ROWS = 500;
+/** An opening count has a line for every material in the store, and the store's own sheet has over 600. The sheet on screen is virtualised; what the assistant sees is trimmed separately (agent/history.ts). */
+const MAX_ROWS = 2000;
 
 const num = (d: Prisma.Decimal | null | undefined) => (d === null || d === undefined ? null : Number(d));
 const dec = (x: number | string | Prisma.Decimal) => new Prisma.Decimal(x);
@@ -34,8 +35,8 @@ const emptyToUndef = (v: unknown) => (v === '' || v === null ? undefined : v);
 const countId = z.preprocess(emptyToUndef, z.string().min(1).max(64).optional());
 
 type Count = Prisma.StockCountGetPayload<object>;
-type Line = Prisma.StockCountLineGetPayload<{ include: { material: { select: { name: true; uom: true } } } }>;
-const withMaterial = { material: { select: { name: true, uom: true } } } as const;
+type Line = Prisma.StockCountLineGetPayload<{ include: { material: { select: { name: true; uom: true; rack: true; shelf: true } } } }>;
+const withMaterial = { material: { select: { name: true, uom: true, rack: true, shelf: true } } } as const;
 
 // ── looking things up ──────────────────────────────────────────────────────────────────────────────
 /** There is only ever one count open at a time (draft, sent back, or with the owner). */
@@ -71,7 +72,7 @@ function missingOf(isOpening: boolean, l: Pick<Line, 'countedQty' | 'unitRate'>)
 const toLine = (isOpening: boolean, l: Line) => {
   const counted = num(l.countedQty), rate = num(l.unitRate);
   return {
-    id: l.id, materialId: l.materialId, material: l.material.name, unit: l.material.uom,
+    id: l.id, materialId: l.materialId, material: l.material.name, where: [l.material.rack, l.material.shelf ? `shelf ${l.material.shelf}` : ''].filter(Boolean).join(', '), unit: l.material.uom,
     systemQty: isOpening ? null : Number(l.systemQty), countedQty: counted, difference: isOpening ? null : num(l.differenceQty),
     reason: l.reasonCode, unitRate: rate, sourceInvoiceNo: l.sourceInvoiceNo, sourceInvoiceDate: l.sourceInvoiceDate ? l.sourceInvoiceDate.toISOString().slice(0, 10) : null,
     notes: l.notes, value: counted !== null && rate !== null ? Math.round(counted * rate * 100) / 100 : null, missing: missingOf(isOpening, l),
@@ -83,7 +84,7 @@ const progressOf = (rows: { countedQty: number | null }[]) => ({ counted: rows.f
 
 /** The numbers an approval or a "send to owner" needs: value for the opening count, differences for a normal one. */
 export async function summarize(db: Db, c: Count) {
-  const lines = await db.stockCountLine.findMany({ where: { stockCountId: c.id }, include: { material: { select: { name: true, uom: true } } }, orderBy: { material: { name: 'asc' } } });
+  const lines = await db.stockCountLine.findMany({ where: { stockCountId: c.id }, include: { material: { select: { name: true, uom: true, rack: true, shelf: true } } }, orderBy: { material: { name: 'asc' } } });
   const balances = c.isOpening ? [] : await db.stockBalance.findMany({ where: { materialId: { in: lines.map((l) => l.materialId) } }, select: { materialId: true, averageRate: true } });
   const avg = new Map(balances.map((b) => [b.materialId, Number(b.averageRate)]));
   const counted = lines.filter((l) => l.countedQty !== null).length;

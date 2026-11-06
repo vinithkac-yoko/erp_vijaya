@@ -162,7 +162,7 @@ describe('no id or internal code is ever shown (T10)', () => {
           const out = await runTool(who, t.name, {});
           if (!out.ok) continue;
           const rows = (out.data as { rows?: unknown[] })?.rows;
-          if (Array.isArray(rows)) { big.rows.push(rows.length); expect(rows.length, `${who.role}:${t.name}`).toBeLessThanOrEqual(500); }
+          if (Array.isArray(rows)) { big.rows.push(rows.length); expect(rows.length, `${who.role}:${t.name}`).toBeLessThanOrEqual(2000); }
           expect(JSON.stringify(out.data).length, `${who.role}:${t.name} size`).toBeLessThan(1_500_000);
         }
       }

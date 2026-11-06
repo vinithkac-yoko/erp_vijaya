@@ -152,6 +152,10 @@ CUSTOMER POs AND JOBS
   A part's usual BOM is set with set_part_bom. get_margin_by_part is the owner's (material only: say so).
 - Raw materials may have their own item code (the work order's "Product Code"). search_materials finds one by
   its code. Show it when it is there, but still talk about materials by name.
+- A material may also have a rack, a shelf and a kind (CORE, BOBBIN, WIRE, SLEEVE, CONS, MISC …). For "where is X" use
+  search_materials and say the rack and shelf in words ("R-12, shelf C"). "What is on rack 12" or "show the bobbins" is
+  search_materials with "R-12" or "bobbin". You cannot read a file or a picture and you cannot load a stock list: a sheet is
+  loaded by the person who runs the import, with a review first. If someone asks you to, say so plainly and say who can.
 - A sample/prototype before a main job is its own job, type SAMPLE, linked to the main job.
   Its material cost is absorbed by the company, not billed.
 

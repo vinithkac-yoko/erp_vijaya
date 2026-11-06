@@ -33,13 +33,13 @@ export const TOOLS: Record<string, ToolMeta> = Object.fromEntries(
   [
     // ── materials ──
     t({ name: 'search_materials', kind: 'read', roles: BOTH, inputs: { query: {}, stockType: {}, includeInactive: {} },
-        outputs: ['name', 'itemCode', 'unit', 'stockType', 'onHand', 'minimumLevel', 'isScrap'], bindOnly: ['id'] }),
+        outputs: ['name', 'itemCode', 'unit', 'stockType', 'onHand', 'minimumLevel', 'isScrap', 'category', 'rack', 'shelf'], bindOnly: ['id'] }),
     t({ name: 'get_material_balance', kind: 'read', roles: BOTH, inputs: { materialIds: {}, materialNames: {} },
         outputs: ['material', 'unit', 'quantity', 'averageRate', 'value', 'minimumLevel', 'stockType', 'isNegative', 'belowMinimum'], bindOnly: ['materialId'] }),
     t({ name: 'get_movement_history', kind: 'read', roles: BOTH, inputs: { materialId: {}, materialNames: {}, jobId: {}, from: {}, to: {} },
         outputs: ['date', 'type', 'material', 'unit', 'quantity', 'rate', 'value', 'document', 'job', 'by', 'source', 'balanceAfter'], bindOnly: ['id', 'materialId', 'jobId'] }),
-    t({ name: 'create_material', kind: 'write', roles: BOTH, inputs: { name: { required: true }, itemCode: {}, uom: { required: true }, stockType: { required: true }, minimumLevel: {}, hsnCode: {}, gstRate: {}, isScrap: {}, confirmNotDuplicate: {} } }),
-    t({ name: 'update_material', kind: 'write', roles: BOTH, inputs: { materialId: { required: true }, name: {}, itemCode: {}, minimumLevel: {}, hsnCode: {}, gstRate: {} } }),
+    t({ name: 'create_material', kind: 'write', roles: BOTH, inputs: { name: { required: true }, itemCode: {}, category: {}, rack: {}, shelf: {}, notes: {}, uom: { required: true }, stockType: { required: true }, minimumLevel: {}, hsnCode: {}, gstRate: {}, isScrap: {}, confirmNotDuplicate: {} } }),
+    t({ name: 'update_material', kind: 'write', roles: BOTH, inputs: { materialId: { required: true }, name: {}, itemCode: {}, category: {}, rack: {}, shelf: {}, minimumLevel: {}, hsnCode: {}, gstRate: {} } }),
     t({ name: 'deactivate_material', kind: 'write', roles: BOTH, inputs: { materialId: { required: true }, reason: {} } }),
     // ── decisions (the owner's questions) ──
     t({ name: 'list_decisions', kind: 'read', roles: OWNER, inputs: { status: {}, topic: {}, query: {}, firstPassOnly: {} },

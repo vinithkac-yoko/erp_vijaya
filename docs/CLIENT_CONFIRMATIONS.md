@@ -10,7 +10,7 @@ bottom of each milestone's section.
 - ✅ = Kasi already agreed. The owner should still hear it once.
 - ❓ = nobody has agreed yet. **These are the important ones.**
 
-Last updated: after milestone 12 (section N). Since milestone 12 the owner answers these questions inside the app (the Questions panel); this file is where they are written and where Kasi keeps the wording.
+Last updated: after milestone 13 (section O). Since milestone 12 the owner answers these questions inside the app (the Questions panel); this file is where they are written and where Kasi keeps the wording.
 
 ---
 
@@ -264,3 +264,21 @@ Kasi's answers to the plan for putting these questions in the software, and what
 | N5 | The first 15–20 only. | 20 questions are marked "first": they are shown first, with "Show all of them" for the rest. |
 | N6, N7 | "Do the sensible ones." | Email to Kasi when an answer arrives (if set up); **no** reminders; "I don't know, ask the client" moves a question to *Waiting for the client* with who he will ask, and gives a note to copy and send. The assistant does not ask on its own yet ("later"): the owner can open a question and press *Ask the assistant about this*, or ask in the chat. |
 | N8 | Voice, as in the earlier project (Tamil, English or both). | A microphone beside the message box for both roles. The words land in the box; the person reads them and presses Send. Needs a Google (Gemini) key on the server; without it the button is not there. |
+
+## O. The store's stock sheet, loaded as the starting stock (2026-11-06)
+
+Kasi's rules: only the sheet **STOCK**; **MISC and CONS** are the things kept in stock, everything else is bought for each job; a row with no description is named **replace1, replace2 …**. What the sheet needed beyond that was decided the careful way and is listed here for the owner.
+
+| # | Status | The question | What we did | Why | Owner says |
+|---|---|---|---|---|---|
+| O1 | ❓ | **Rates.** | The 644 materials and 637 quantities are on the opening count sheet, but **611 materials with stock have no rate**, and the count cannot be sent to you until they all have one (the rule: the rate from the last purchase invoice, never an estimate). | The sheet has quantities but no rates. A small table on the right of the STOCK sheet has about 68 items with a rate and a value, dated 1 September. | Are those the last purchase rates? May we use them for those items? Can the accounts program give a list of the last purchase rate for every item? |
+| O2 | ❓ | **Units for five kept-in-stock items with no unit on the sheet.** | Not added yet: Enamel Remover (E-Sol), Enamel Remover Arbital, Dross Reducing Powder-18, arbital, vaculoy. | A unit can never be changed once a material exists. | Litres, kilos, pieces? |
+| O3 | ❓ | **Pieces or kilos?** | Not added yet: **TY-19 E** (3.35 pieces) and the second **TY-30 E** row (8.89 kilos, while another row of the same name is in pieces). | A fraction of a piece is not possible; one of the unit or the number is wrong. | Which is it? |
+| O4 | ❓ | **Three thin wires (0.45, 0.5, 0.6 mm TIW)** are written in grams with quantities like 0.91. | Added as **kilos**. | 0.91 grams of wire is nothing; 0.91 kilos is a spool. | Kilos, or really grams? |
+| O5 | ❓ | **A core counted in pairs** (EE100 28 CF139 OL CORE, 10 pairs). | Kept as **sets**. | There is no "pair" unit. | OK, or should it be pieces (20)? |
+| O6 | ❓ | **Minimum levels for the 11 kept-in-stock items** (4 MISC, 7 CONS). | Minimum **0** for now, so no alert comes until you set the real ones. | The sheet has no minimums and the form needs one. | What should each minimum be? |
+| O7 | ❓ | **Part numbers.** | 206 of the materials do **not** have an item code, because the same part number is written against several different descriptions on the sheet (85 of its 90 repeated numbers). The sheet's number is in each one's note. | Nobody can tell which description owns the number. | Can the store check and give the right number for each? |
+| O8 | ❓ | **Rows that are not items.** | Skipped: "Consumbles Items", "Production Maintenance", "ALL SAMPLE BOBBIN" (no kind, no number, quantity 0, "CHECK WITH ANI"). | They look like headings. | Right? Who is Ani, and should the other "CHECK WITH ANI" rows stand? |
+| O9 | ❓ | **Rows with no description** (7: a tape and six sleeves). | Named replace1 … replace7, each with its part number (where it has a usable one), rack and shelf; six have no quantity. | Your rule. | Who gives the real names? |
+| O10 | ❓ | **Same item in more than one place.** | Added into one material (31 rows); where each part was kept is in its note, and the first rack and shelf is the one shown. | A material has one name. | Fine? |
+| O11 | ❓ | **The date of the quantities.** | The sheet is from the days before 1 September (some racks from July). | Stock moves. | Will the store recount, or confirm each rack against these numbers, before the count is sent? |

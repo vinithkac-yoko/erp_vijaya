@@ -18,8 +18,12 @@ const num = (d: Prisma.Decimal | null | undefined) => (d === null || d === undef
 
 const toRow = (m: Row) => ({
   id: m.id, name: m.name, itemCode: m.itemCode, unit: m.uom, stockType: m.stockType, isScrap: m.isScrap, isActive: m.isActive,
-  onHand: num(m.balance?.quantity) ?? 0, minimumLevel: num(m.minimumLevel),
+  onHand: num(m.balance?.quantity) ?? 0, minimumLevel: num(m.minimumLevel), category: m.category, rack: m.rack, shelf: m.shelf,
 });
+
+/** "R-12, shelf C": where to walk to. */
+export const whereText = (m: { rack?: string | null; shelf?: string | null }) => [m.rack, m.shelf ? `shelf ${m.shelf}` : ''].filter(Boolean).join(', ');
+const placeKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const allMaterials = (db: Db, includeInactive = false) =>
   db.material.findMany({ where: includeInactive ? {} : { isActive: true }, include: { balance: true }, orderBy: { name: 'asc' } });
@@ -33,6 +37,18 @@ export const searchMaterials = defineTool({
   handler: async (ctx, input) => {
     let rows = (await allMaterials(ctx.db, input.includeInactive)).filter((m) => !input.stockType || m.stockType === input.stockType);
     if (input.query) {
+      // "R-12" (or "rack 12") lists what is on that rack; a kind of material ("bobbin", "core") lists that kind
+      const q = placeKey(input.query);
+      const rack = /^(rack)?r?0*(\d{1,3})$/.exec(q);
+      const kinds = new Set(rows.map((m) => (m.category ? placeKey(m.category) : '')).filter(Boolean));
+      if (rack && /^(rack|r)/.test(q) && rows.some((m) => m.rack && placeKey(m.rack) === `r${rack[2]!.padStart(2, '0')}`)) {
+        rows = rows.filter((m) => m.rack && placeKey(m.rack) === `r${rack[2]!.padStart(2, '0')}`);
+        return { total: rows.length, rows: rows.slice(0, 100).map(toRow) };
+      }
+      if (kinds.has(q) || kinds.has(`${q}s`) || kinds.has(q.replace(/s$/, ''))) {
+        rows = rows.filter((m) => m.category && [q, `${q}s`, q.replace(/s$/, '')].includes(placeKey(m.category)));
+        return { total: rows.length, rows: rows.slice(0, 100).map(toRow) };
+      }
       // an item code (or part of one) finds its material as well as the name does
       const key = itemCodeKey(input.query);
       const byCode = key.length >= 3 ? rows.filter((m) => m.itemCodeKey?.includes(key)) : [];
@@ -43,9 +59,9 @@ export const searchMaterials = defineTool({
   },
   view: (d) => [{
     kind: 'table',
-    columns: [{ key: 'name', label: 'Material' }, ...(d.rows.some((r) => r.itemCode) ? [{ key: 'code', label: 'Item code' }] : []), { key: 'kept', label: 'Kept as' }, { key: 'onHand', label: 'On hand', align: 'right' }, { key: 'min', label: 'Minimum', align: 'right' }],
+    columns: [{ key: 'name', label: 'Material' }, ...(d.rows.some((r) => r.itemCode) ? [{ key: 'code', label: 'Item code' }] : []), { key: 'kept', label: 'Kept as' }, ...(d.rows.some((r) => r.rack) ? [{ key: 'where', label: 'Where' }] : []), { key: 'onHand', label: 'On hand', align: 'right' }, { key: 'min', label: 'Minimum', align: 'right' }],
     rows: d.rows.slice(0, MAX_ROWS_IN_CHAT).map((r) => ({
-      name: r.name + (r.isActive ? '' : ' (no longer in use)'), code: r.itemCode ?? '', kept: KEPT_AS[r.stockType] ?? r.stockType,
+      name: r.name + (r.isActive ? '' : ' (no longer in use)'), code: r.itemCode ?? '', kept: KEPT_AS[r.stockType] ?? r.stockType, where: whereText(r),
       onHand: qty(r.onHand, r.unit), min: r.minimumLevel === null ? '–' : qty(r.minimumLevel, r.unit),
     })),
     note: d.total > MAX_ROWS_IN_CHAT ? `Showing ${MAX_ROWS_IN_CHAT} of ${d.total}.` : undefined,
@@ -102,12 +118,14 @@ export const createMaterial = defineTool({
   input: z.object({
     name: req('material name', 120),
     itemCode: opt(40),
+    category: opt(40), rack: opt(20), shelf: opt(20),
     uom: pick(UOMS, 'Choose the unit from the list.'),
     stockType: pick(STOCK_TYPES, 'Choose how it is bought.'),
     minimumLevel: optNum('minimum level'),
     hsnCode: opt(20),
     gstRate: optNum('GST rate', 0, 100),
     isScrap: flag.optional(),
+    notes: opt(500),
     confirmNotDuplicate: flag.optional(),
   }),
   form: {
@@ -119,13 +137,16 @@ export const createMaterial = defineTool({
         options: [{ value: 'STANDING', label: 'Kept in stock (has a minimum level)' }, { value: 'PER_JOB', label: 'Bought for each job' }] },
       { name: 'minimumLevel', label: 'Minimum level', type: 'number', required: true, showWhen: { field: 'stockType', in: ['STANDING'] }, hint: 'You are told when stock goes below this.' },
       { name: 'itemCode', label: 'Item code', type: 'text', hint: 'Your own code for it, if you use one.' },
+      { name: 'rack', label: 'Rack', type: 'text', hint: 'Where it is kept, like R-12.' },
+      { name: 'shelf', label: 'Shelf', type: 'text', hint: 'Like C.' },
+      { name: 'category', label: 'Kind', type: 'text', hint: 'Like CORE, BOBBIN, WIRE or SLEEVE, if you group them.' },
       { name: 'hsnCode', label: 'HSN code', type: 'text', hint: 'If you have it.' },
       { name: 'gstRate', label: 'GST rate', type: 'number', unit: '%', hint: 'If you have it, like 18.' },
       { name: 'isScrap', label: 'This is scrap we collect and sell', type: 'checkbox' },
     ],
   },
   stamp: 'MATERIAL ADDED',
-  describe: (a) => [String(a.name), ...(a.itemCode ? [`Item code: ${a.itemCode}`] : []), `Unit: ${UOM_LONG[String(a.uom)] ?? a.uom}`, a.stockType === 'STANDING' ? `Kept in stock, minimum ${qty(Number(a.minimumLevel), String(a.uom))}` : 'Bought for each job'],
+  describe: (a) => [String(a.name), ...(a.itemCode ? [`Item code: ${a.itemCode}`] : []), ...(a.rack ? [`Kept at ${whereText({ rack: String(a.rack), shelf: a.shelf ? String(a.shelf) : null })}`] : []), `Unit: ${UOM_LONG[String(a.uom)] ?? a.uom}`, a.stockType === 'STANDING' ? `Kept in stock, minimum ${qty(Number(a.minimumLevel), String(a.uom))}` : 'Bought for each job'],
   handler: async (ctx, input) => {
     const name = tidy(input.name);
     const key = materialNameKey(name);
@@ -158,14 +179,16 @@ export const createMaterial = defineTool({
         code: await nextCode(ctx.db, 'MAT'), name, nameKey: key, itemCode: input.itemCode ? tidy(input.itemCode) : null, itemCodeKey: codeKey || null, uom: input.uom, stockType: input.stockType,
         minimumLevel: input.stockType === 'STANDING' ? input.minimumLevel : null,
         hsnCode: input.hsnCode, gstRate: input.gstRate, isScrap: input.isScrap ?? false,
+        category: input.category ? tidy(input.category) : null, rack: input.rack ? tidy(input.rack) : null, shelf: input.shelf ? tidy(input.shelf) : null,
+        notes: input.notes ? tidy(input.notes) : null,
       },
     });
     // A material added while the opening count is still with the storekeeper joins that count (nothing counted yet), so it is not missed.
     const opening = await ctx.db.stockCount.findFirst({ where: { isOpening: true, status: { in: ['DRAFT', 'REJECTED'] } }, select: { id: true } });
     if (opening) await ctx.db.stockCountLine.create({ data: { stockCountId: opening.id, materialId: m.id, systemQty: 0 } });
     return {
-      data: { id: m.id, name: m.name, unit: m.uom },
-      audit: { entityType: 'Material', entityId: m.id, action: 'CREATE', after: { name: m.name, itemCode: m.itemCode, uom: m.uom, stockType: m.stockType, minimumLevel: num(m.minimumLevel), hsnCode: m.hsnCode, gstRate: num(m.gstRate), isScrap: m.isScrap } },
+      data: { id: m.id, name: m.name, unit: m.uom, rack: m.rack, shelf: m.shelf },
+      audit: { entityType: 'Material', entityId: m.id, action: 'CREATE', after: { name: m.name, itemCode: m.itemCode, category: m.category, rack: m.rack, shelf: m.shelf, uom: m.uom, stockType: m.stockType, minimumLevel: num(m.minimumLevel), hsnCode: m.hsnCode, gstRate: num(m.gstRate), isScrap: m.isScrap } },
     };
   },
 });
@@ -181,7 +204,7 @@ const refuseUnitChange = (v: unknown) => {
 export const updateMaterial = defineTool({
   name: 'update_material', kind: 'write', roles: ['STOREKEEPER', 'OWNER'],
   input: z.preprocess(refuseUnitChange, z.object({
-    materialId: id('material'), name: opt(120), itemCode: opt(40), minimumLevel: optNum('minimum level'), hsnCode: opt(20), gstRate: optNum('GST rate', 0, 100),
+    materialId: id('material'), name: opt(120), itemCode: opt(40), category: opt(40), rack: opt(20), shelf: opt(20), minimumLevel: optNum('minimum level'), hsnCode: opt(20), gstRate: optNum('GST rate', 0, 100),
   })),
   form: {
     title: 'Change a material', verb: 'Save changes', intro: "Leave a box empty to keep what is there. The unit and the way it is bought can't be changed.",
@@ -190,12 +213,15 @@ export const updateMaterial = defineTool({
       { name: 'name', label: 'New name', type: 'text', hint: 'Only if you are renaming it.' },
       { name: 'itemCode', label: 'Item code', type: 'text', hint: 'Your own code for it.' },
       { name: 'minimumLevel', label: 'Minimum level', type: 'number', hint: 'Only for material kept in stock.' },
+      { name: 'rack', label: 'Rack', type: 'text', hint: 'Where it is kept, like R-12.' },
+      { name: 'shelf', label: 'Shelf', type: 'text' },
+      { name: 'category', label: 'Kind', type: 'text', hint: 'Like CORE, BOBBIN, WIRE or SLEEVE.' },
       { name: 'hsnCode', label: 'HSN code', type: 'text' },
       { name: 'gstRate', label: 'GST rate', type: 'number', unit: '%' },
     ],
   },
   stamp: 'MATERIAL CHANGED',
-  describe: (a) => [String(a.name), ...Object.entries((a.changes ?? {}) as Record<string, unknown>).map(([k, v]) => `${k === 'name' ? 'Name' : k === 'itemCode' ? 'Item code' : k === 'minimumLevel' ? 'Minimum level' : k === 'hsnCode' ? 'HSN code' : 'GST rate'}: ${v}`)],
+  describe: (a) => [String(a.name), ...Object.entries((a.changes ?? {}) as Record<string, unknown>).map(([k, v]) => `${k === 'name' ? 'Name' : k === 'itemCode' ? 'Item code' : k === 'minimumLevel' ? 'Minimum level' : k === 'hsnCode' ? 'HSN code' : k === 'rack' ? 'Rack' : k === 'shelf' ? 'Shelf' : k === 'category' ? 'Kind' : 'GST rate'}: ${v}`)],
   handler: async (ctx, input) => {
     const m = await ctx.db.material.findUnique({ where: { id: input.materialId } });
     if (!m) throw new ToolError('NOT_FOUND', "Couldn't find that material. Check the spelling.", undefined, 'materialId');
@@ -217,14 +243,17 @@ export const updateMaterial = defineTool({
       if (m.stockType !== 'STANDING') throw new ToolError('MINIMUM_NOT_ALLOWED', 'Only material kept in stock has a minimum level.', undefined, 'minimumLevel');
       data.minimumLevel = input.minimumLevel; changes.minimumLevel = qty(input.minimumLevel, m.uom);
     }
+    for (const k of ['category', 'rack', 'shelf'] as const) {
+      if (input[k] !== undefined && tidy(input[k]!) !== (m[k] ?? '')) { data[k] = tidy(input[k]!) || null; changes[k] = tidy(input[k]!); }
+    }
     if (input.hsnCode !== undefined) { data.hsnCode = input.hsnCode; changes.hsnCode = input.hsnCode; }
     if (input.gstRate !== undefined) { data.gstRate = input.gstRate; changes.gstRate = `${input.gstRate}%`; }
     if (Object.keys(changes).length === 0) throw new ToolError('NOTHING_TO_CHANGE', 'Nothing to change. Fill in what should be different.');
     const u = await ctx.db.material.update({ where: { id: m.id }, data });
     return {
       data: { name: u.name },
-      audit: { entityType: 'Material', entityId: m.id, action: 'UPDATE', before: { name: m.name, minimumLevel: num(m.minimumLevel), hsnCode: m.hsnCode, gstRate: num(m.gstRate) },
-        after: { name: u.name, changes, minimumLevel: num(u.minimumLevel), hsnCode: u.hsnCode, gstRate: num(u.gstRate) } },
+      audit: { entityType: 'Material', entityId: m.id, action: 'UPDATE', before: { name: m.name, category: m.category, rack: m.rack, shelf: m.shelf, minimumLevel: num(m.minimumLevel), hsnCode: m.hsnCode, gstRate: num(m.gstRate) },
+        after: { name: u.name, changes, category: u.category, rack: u.rack, shelf: u.shelf, minimumLevel: num(u.minimumLevel), hsnCode: u.hsnCode, gstRate: num(u.gstRate) } },
     };
   },
 });

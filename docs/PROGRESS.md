@@ -2,6 +2,24 @@
 
 Read this at the start of every session (CLAUDE.md). Newest on top.
 
+## Milestone 13 — The store's stock sheet as the starting stock; rack, shelf and kind on every material — **built; waiting for Kasi's answers (section O) and the rates**
+
+Kasi sent the store's rack-wise workbook and said: use only the sheet STOCK; add it as the starting stock and change the database to suit; only MISC and CONS are kept in stock; a row with no description is named replace1, replace2 …; and asked whether "upload a sheet and the system updates" is agentic enough.
+
+Done
+- **Materials now carry a kind, a rack, a shelf and a note** (new migration, all optional): `create_material` and `update_material` take them; `search_materials` shows them and finds by rack ("R-12", "rack 12") and by kind ("bobbin"), so "where is the E30 bobbin" is a one-line answer; the **count sheet shows the rack and shelf beside each name**.
+- **The loader** `pnpm stock:import <file.xlsx> [--apply] [--report review.csv]`: reads only the STOCK sheet, decides what each row becomes (the rules are in `docs/TOOL_CATALOG.md` §D), prints and writes a **review** first, and with `--apply` saves **through the gateway** (644 `create_material`, then the opening count and its quantities with `save_count_sheet`): one audit row each, made as the owner. It never submits the count. Re-running is safe.
+- **Result on the real sheet (local database, checked with SQL):** 685 item rows → **644 materials** (11 kept in stock, 633 bought per job; CORE 275, BOBBIN 201, WIRE 88, SLEEVE 48, ROD 15, CONS 7, TAPE 6, MISC 4), 31 duplicate rows added into others, **7 named replace1–7**, **637 quantities on the opening count sheet** (26 of them zero), 7 left uncounted (no quantity on the sheet), quantity total 854,416.915 equal in the report and the database, 644 audit rows, **no stock posted**. **7 rows held back** (units the sheet does not give, a fraction of a piece) and **3 skipped** (headings). 206 materials have no item code because the sheet's part number is shared by several descriptions.
+- **Found and fixed on the way:** the count sheet read stopped at 500 rows, so a 644-line opening count would have shown only 500 on screen; the limit is now 2,000 (the screen is virtualised; what the assistant sees is trimmed separately).
+- **The live database was not touched:** it is on Railway, and this session cannot reach it. The migration arrives with the next deploy; the load is the two commands in `docs/DEPLOY.md`.
+
+Not done, on purpose
+- Rates. The count cannot go to the owner until 611 materials with stock have a rate from their last purchase invoice (the sheet has none; ~68 are in a side table, awaiting O1).
+- No upload button in the app. See the answer to "is it agentic enough" in the report: a button needs the same review step, and is the next piece if a sheet like this will come again.
+
+Proof (run in this session)
+- RESULTS_PLACEHOLDER
+
 ## Milestone 12 — The owner's questions in the app, Tamil, the microphone, changing a PO line — **built; waiting for Kasi's test and answers**
 
 Kasi's answers after milestone 11 (2026-10-23): the picture's name is "Need urgent qty for E30V due to E36 bobbin shortages" (an urgent request, not a PO); a customer can order a part again; prices must follow every order; do not round the PO; the owner answers the confirmation questions inside the software, in English with a button for Tamil, asking later is "later" (the owner can ask the assistant about a question); Kasi applies setting-type answers himself; the first 15–20 questions; email and the client-side handling "the sensible way"; add Tamil and the microphone from the earlier project for storekeeper and owner.

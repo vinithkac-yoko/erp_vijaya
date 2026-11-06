@@ -273,6 +273,13 @@ model Material {
   isActive Boolean @default(true)
 
   notes     String?
+
+  /// Where it is and what kind of thing it is, as the store's own sheet says (CORE, BOBBIN, WIRE, SLEEVE, CONS, MISC …; rack R-12, shelf C).
+  /// All optional and shown to people: a rack and a shelf are what the storekeeper walks to.
+  category String?
+  rack     String?
+  shelf    String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -287,6 +294,7 @@ model Material {
 
   @@index([name])
   @@index([stockType, isActive])
+  @@index([rack])
   @@map("materials")
 }
 

@@ -207,7 +207,7 @@ export function CountSheet({ onSend }: { onSend: () => void }) {
             );
             const name = (
               <div className="min-w-0">
-                <p className="truncate font-medium">{r.material}</p>
+                <p className="truncate font-medium">{r.material}{r.where && <span className="font-normal text-ink-soft"> · {r.where}</span>}</p>
                 {err && <p role="alert" className="flex items-start gap-1 text-sm text-alert"><CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />{err}</p>}
                 {!err && r.missing && (r.countedQty !== null || r.unitRate !== null) && <p className="text-sm text-ink-soft">still needs {r.missing}</p>}
               </div>

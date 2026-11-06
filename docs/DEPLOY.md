@@ -82,6 +82,15 @@ If the microphone shows a red message, open the service's **Deploy Logs** and lo
 
 What is said is sent to Google for the moment it takes to turn it into text, and is not kept by the app. Say so to the owner and the storekeeper before they use it. Browsers ask for the microphone the first time; on a phone the page must be opened over https (Railway's address is).
 
+**Loading the store's stock sheet (milestone 13, once).** The owner's sheet (the `STOCK` sheet of the rack-wise workbook) becomes the materials and the quantities of the **opening count**. It is a command run by you, not a button, and it saves nothing until you add `--apply`. Open the workbook in Excel, choose Save As, "Excel Workbook (.xlsx)" (the old `.xls` format is not read), then, with the Railway database address in `DATABASE_URL` (for example `railway run`):
+
+```
+pnpm stock:import STORES.xlsx --report review.csv          # reads it, saves nothing, writes the review
+pnpm stock:import STORES.xlsx --apply                     # saves it, through the same tools the forms use
+```
+
+Read `review.csv` (or the printed list) first: it says what is held back and why, which rows were added into one, which part numbers were not used, and which units to check. Running it again is safe. The opening count stays open and cannot be sent to the owner until every material with stock has a rate from its last purchase invoice; the count sheet shows how many still need one.
+
 **Reports, downloads and printouts (milestone 9).** They need a browser (to draw PDFs and pictures) and a program called pandoc (for Word files).
 The repo's `nixpacks.toml` makes Railway install both, so you do nothing. If a download says "Couldn't make that file", open the service's
 Variables and add `CHROMIUM_PATH` with the value `chromium`, then redeploy.

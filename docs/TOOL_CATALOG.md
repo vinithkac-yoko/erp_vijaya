@@ -32,11 +32,11 @@ and role in its context).
 
 | Tool | Kind | Roles | Purpose |
 |---|---|---|---|
-| `search_materials` | R | SK OW | Find by part of a name (ignore case, spaces, hyphens: "ferrite core e30" → "Ferrite Core E-30"). Returns name, unit, stock type, quantity on hand. Empty query lists all active |
+| `search_materials` | R | SK OW | Find by part of a name (ignore case, spaces, hyphens: "ferrite core e30" → "Ferrite Core E-30"). Returns name, unit, stock type, quantity on hand and, when known, kind, rack and shelf (milestone 13). "R-12" lists what is on that rack; a kind ("bobbin") lists that kind. Empty query lists all active |
 | `get_material_balance` | R | SK OW | Quantity + unit for one or more materials; average rate and value; minimum level and stock type; negative / below-minimum flags |
 | `get_movement_history` | R | SK OW | Movements for a material or a job, newest first: type, quantity, rate, job/document number, who, when, from chat, a button or an artifact. Paginated |
-| `create_material` | W | SK OW | Name, unit, stock type, minimum (STANDING only, required), HSN, GST, is-scrap |
-| `update_material` | W | SK OW | Name, minimum level, HSN, GST. **Not** unit or stock type |
+| `create_material` | W | SK OW | Name, unit, stock type, minimum (STANDING only, required), HSN, GST, is-scrap; optional item code, kind (CORE, BOBBIN …), rack, shelf, note |
+| `update_material` | W | SK OW | Name, item code, kind, rack, shelf, minimum level, HSN, GST. **Not** unit or stock type |
 | `deactivate_material` | W | SK OW | Only with zero stock |
 
 **create_material** — errors: `SIMILAR_MATERIAL_EXISTS` (returns the matches; the form offers
@@ -361,3 +361,9 @@ Neither touches business data, so neither is in the registry or the catalog.
 
 - **Tamil on request** (`translateAction`, a server action; both roles). A "தமிழ்" button under assistant answers, notices, saved cards, the opening card and the owner's questions sends the **English texts of the screen** (never rows, ids or tool output the person cannot already see) to Claude with a fixed system prompt that says the texts are content, not instructions, and that numbers, units, names, part numbers and codes stay as they are. A translation in which any number of the English is missing is **thrown away** and the English stays. Results are kept in `translations` (SHA-256 of the English + language), so the same words are translated once. At most 24 texts of 2,000 characters a call and 30 calls a person a minute. What is saved by a form or an answer is always the English value.
 - **Speaking** (`POST /api/speech/transcribe`; both roles, logged in only). A recording of at most 60 seconds (3 MB; webm, ogg, mp4, mpeg, wav or aac) is sent to Google's Gemini (`GEMINI_API_KEY`) and comes back as text in the message box (Tamil in Tamil script, English as English, numbers in digits). The person reads it and presses Send. Nothing is stored or logged; 30 recordings a person a minute; with no key the button is not drawn. The words then go through the same assistant, tools and forms as typed ones.
+
+## D. Not a tool: loading the store's stock sheet (milestone 13)
+
+`pnpm stock:import <file.xlsx | stock.csv> [--apply] [--report review.csv] [--as owner@email] [--date YYYY-MM-DD]` (`prisma/import-stock.ts`, with `src/server/tools/stock-import.ts` deciding, `stock-sheet-file.ts` reading and `stock-load.ts` saving). Run by the person who deploys, never by the assistant, and never from a web upload. Without `--apply` it saves nothing and prints a review. With `--apply` it saves **only through the gateway**, as the owner, one form's worth at a time: `create_material` for every material (with kind, rack, shelf, item code and a note), then `start_stock_count` (opening) and `save_count_sheet` for the quantities. It never calls `submit_stock_count`: the database refuses an opening count with stock and no rate (`COUNT_INCOMPLETE`), and the sheet has no rates. Safe to run again: existing materials are not made twice, an open count is continued, a typed quantity is never overwritten.
+
+Reads the sheet called **STOCK** only. Rules (the owner's, 2026-11-06): MISC and CONS are *kept in stock* (minimum level 0 until the owner sets the real one); every other kind is *bought for each job*; a row with no description is named `replace1`, `replace2` …. The same description on several rows is one material (quantities added; where each was is kept in its note). A part number written against different descriptions is given to none of them (it is in the note). A unit is never guessed from nothing: no unit on the row and none shared by its whole kind means the row is held back, because a unit cannot be changed later. A fraction in pieces or sets is held back. Rows with no kind and no part number are not items and are skipped. Every one of these is listed in the review.
