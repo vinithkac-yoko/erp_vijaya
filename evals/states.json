@@ -23,7 +23,7 @@
  "artifact-copper-open": "live + the owner's artifact 'Copper wire rates' v1 (line chart of rate by date and supplier, reads get_purchase_price_history) open in the panel, not saved, in this conversation",
  "artifact-copper-saved": "live + the same artifact saved (star) at v2 (bar chart), made in an earlier conversation, not shared",
  "artifact-below-min-saved": "live + the owner's saved artifact 'Below minimum' v1 (reference/artifacts/examples/good/stock-below-minimum.html), not shared",
- "artifact-below-min-shared": "artifact-below-min-saved, v1 shared with the storekeeper; the owner has since edited it to v2 (a Supplier column) and has NOT shared v2",
+ "artifact-below-min-shared": "artifact-below-min-saved, v1 shared with the storekeeper; the owner has since edited it to v2 (a line of advice added under the heading) and has NOT shared v2",
  "artifact-owner-stock-value": "live + the owner's saved artifact 'Stock value' (reference/artifacts/examples/good/stock-value.html: reads get_stock_value, owner-only)",
  "sk-artifact-saved": "live + the storekeeper's own saved artifact 'Issued this week' (reads get_movement_history), not shared",
  "document-receiving-flow-open": "live + the owner's document 'How we receive material' v1 (reference/artifacts/examples/good/receiving-sop.vdoc: a flow diagram, steps, no reads) open in the panel, not saved, in this conversation",

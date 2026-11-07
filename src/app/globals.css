@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/* Design tokens: docs/INTERFACE.md §12. Contrast-checked (WCAG 2.1 AA). Never use raw hex in components.
+   Light is the default. Dark follows the device unless the person chose a theme (data-theme on <html>). */
+:root {
+  --paper: #F4F0E6;
+  --surface: #FFFDF8;
+  --sunk: #ECE7DC;
+  --line: #D6CDB8;
+  --ink: #1B2A38;
+  --ink-soft: #4B5C6B;
+  --ink-faint: #66727F;
+  --copper: #A8571E;
+  --copper-deep: #8A4516;
+  --copper-wash: #F1E3D3;
+  --alert: #A63A2E;
+  --alert-wash: #F4DFDA;
+  --confirm: #2F6148;
+  --confirm-wash: #DEEBE3;
+  --attention: #8A5A00;
+  /* On the copper button. */
+  --on-copper: #FFFFFF;
+  /* The top bar is the same dark "rating plate" in both themes (reference/prototype.html). */
+  --plate: #1B2A38;
+  --plate-ink: #F4F0E6;
+  --plate-soft: #B9C2CB;
+  --copper-light: #C98A4B;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #121A22;
+    --surface: #1B2530;
+    --sunk: #243241;
+    --line: #34465A;
+    --ink: #ECE7DC;
+    --ink-soft: #A8B3BE;
+    --ink-faint: #93A1AE;
+    --copper: #E0995C;
+    --copper-deep: #F0B27F;
+    --copper-wash: #3A2B20;
+    --alert: #F08A7E;
+    --alert-wash: #3B2522;
+    --confirm: #7CC4A0;
+    --confirm-wash: #1F3329;
+    --attention: #E6B45A;
+    --on-copper: #121A22;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #121A22;
+  --surface: #1B2530;
+  --sunk: #243241;
+  --line: #34465A;
+  --ink: #ECE7DC;
+  --ink-soft: #A8B3BE;
+  --ink-faint: #93A1AE;
+  --copper: #E0995C;
+  --copper-deep: #F0B27F;
+  --copper-wash: #3A2B20;
+  --alert: #F08A7E;
+  --alert-wash: #3B2522;
+  --confirm: #7CC4A0;
+  --confirm-wash: #1F3329;
+  --attention: #E6B45A;
+  --on-copper: #121A22;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-sunk: var(--sunk);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-copper: var(--copper);
+  --color-copper-deep: var(--copper-deep);
+  --color-copper-wash: var(--copper-wash);
+  --color-alert: var(--alert);
+  --color-alert-wash: var(--alert-wash);
+  --color-confirm: var(--confirm);
+  --color-confirm-wash: var(--confirm-wash);
+  --color-attention: var(--attention);
+  --color-on-copper: var(--on-copper);
+  --color-plate: var(--plate);
+  --color-plate-ink: var(--plate-ink);
+  --color-plate-soft: var(--plate-soft);
+  --color-copper-light: var(--copper-light);
+
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: "Space Grotesk Variable", "IBM Plex Sans", system-ui, sans-serif;
+
+  /* Radius 4 px for cards and inputs; chips use rounded-full. */
+  --radius-md: 4px;
+  --radius-lg: 4px;
+}
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Visible copper focus ring everywhere. */
+:focus-visible { outline: 3px solid var(--copper-deep); outline-offset: 2px; }
+
+/* Numbers people read on paper: mono, tabular, right-aligned by the component. */
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Rubber-stamp confirmation (used from milestone 3; defined here so the look is in one place). */
+.stamp {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--confirm); border: 1.5px dashed var(--confirm); border-radius: 999px; padding: 3px 10px;
+  transform: rotate(-2deg);
+}
+
+/* The launcher row scrolls sideways on a phone; hide the bar, keep the scrolling. */
+.scroll-row { scrollbar-width: none; }
+.scroll-row::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
