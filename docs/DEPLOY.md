@@ -89,7 +89,7 @@ pnpm stock:import STORES.xlsx --report review.csv          # reads it, saves not
 pnpm stock:import STORES.xlsx --apply                     # saves it, through the same tools the forms use
 ```
 
-Read `review.csv` (or the printed list) first: it says what is held back and why, which rows were added into one, which part numbers were not used, and which units to check. Running it again is safe. The opening count stays open and cannot be sent to the owner until every material with stock has a rate from its last purchase invoice; the count sheet shows how many still need one.
+Read `review.csv` (or the printed list) first: it says what is held back and why, which rows were added into one, which part numbers were not used, and which units to check. Running it again is safe. A deploy alone does **not** load the stock: it applies the database change (the rack, shelf and kind columns) and nothing else. The load is this command. The opening count stays open and cannot be sent to the owner until every material with stock has a rate from its last purchase invoice; the count sheet shows how many still need one.
 
 **Reports, downloads and printouts (milestone 9).** They need a browser (to draw PDFs and pictures) and a program called pandoc (for Word files).
 The repo's `nixpacks.toml` makes Railway install both, so you do nothing. If a download says "Couldn't make that file", open the service's

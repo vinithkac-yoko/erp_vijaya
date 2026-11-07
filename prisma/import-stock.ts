@@ -16,6 +16,7 @@
 import { writeFileSync } from 'node:fs';
 import { PrismaClient } from '@prisma/client';
 import { planStockImport, type Plan } from '../src/server/tools/stock-import';
+import { STOCK_SHEET_DECISIONS } from '../src/server/tools/stock-decisions';
 import { applyStockPlan } from '../src/server/tools/stock-load';
 import { readStockSheet, SheetError } from '../src/server/tools/stock-sheet-file';
 
@@ -41,7 +42,7 @@ function print(plan: Plan) {
   const lines = [
     `Rows read from the sheet:                 ${c.rows}`,
     `Materials to add:                         ${c.materials}`,
-    `  kept in stock (MISC and CONS):          ${c.standing}   (minimum level 0 for now: the owner sets the real ones)`,
+    `  kept in stock (MISC and CONS):          ${c.standing}   (minimum level 5 for now: the owner sets the real ones)`,
     `  bought for each job (everything else):  ${c.perJob}`,
     `  with no description (replace1, 2 …):    ${c.replaceNamed}`,
     `  rows added into one (same description): ${c.merged}`,
@@ -69,7 +70,7 @@ async function main() {
     prisma.user.findFirst({ where: { role: 'OWNER', isActive: true, ...(arg('--as') ? { email: arg('--as')!.toLowerCase() } : {}) }, orderBy: { createdAt: 'asc' }, select: { id: true, name: true } }),
   ]);
   const replaceCount = Math.max(0, ...mats.map((m) => Number(/^replace(\d+)$/i.exec(m.name)?.[1] ?? 0)));
-  const plan = planStockImport(rows, { nameKeys: new Set(mats.map((m) => m.nameKey)), itemCodeKeys: new Set(mats.flatMap((m) => (m.itemCodeKey ? [m.itemCodeKey] : []))), replaceCount });
+  const plan = planStockImport(rows, { nameKeys: new Set(mats.map((m) => m.nameKey)), itemCodeKeys: new Set(mats.flatMap((m) => (m.itemCodeKey ? [m.itemCodeKey] : []))), replaceCount }, STOCK_SHEET_DECISIONS);
   print(plan);
   if (arg('--report')) { writeReport(arg('--report')!, plan); console.log(`\nThe full list is in ${arg('--report')}`); }
 

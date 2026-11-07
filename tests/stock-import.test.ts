@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { runTool } from '@/server/tools';
-import { planStockImport, quantityOf, unitOf, type SheetRow } from '@/server/tools/stock-import';
+import { KEPT_IN_STOCK_MINIMUM, planStockImport, quantityOf, unitOf, type SheetRow } from '@/server/tools/stock-import';
+import { STOCK_SHEET_DECISIONS } from '@/server/tools/stock-decisions';
 import { applyStockPlan } from '@/server/tools/stock-load';
 import { parseCsv } from '@/server/tools/stock-sheet-file';
 import { approveCount, prisma, resetDb } from './helpers/db';
@@ -8,7 +9,7 @@ import { ok, owner, seedSettings } from './helpers/tools';
 
 let n = 1;
 const row = (over: Partial<SheetRow> = {}): SheetRow => ({ line: ++n, category: 'CORE', code: '', description: 'EE42 CORE', qty: '10', uom: 'NOS', rack: 'R-01', shelf: 'A', remark: '', ...over });
-const plan = (rows: SheetRow[], existing?: Parameters<typeof planStockImport>[1]) => planStockImport(rows, existing);
+const plan = (rows: SheetRow[], existing?: Parameters<typeof planStockImport>[1], decisions?: Parameters<typeof planStockImport>[2]) => planStockImport(rows, existing, decisions);
 const only = (rows: SheetRow[]) => { const p = plan(rows); expect(p.materials).toHaveLength(1); return p.materials[0]!; };
 
 describe('units and quantities as the sheet writes them', () => {
@@ -41,7 +42,7 @@ describe("the owner's rules", () => {
   it('only MISC and CONS are kept in stock; everything else is bought for each job', () => {
     const p = plan([row({ category: 'MISC', description: 'label 20x10', code: 'WPL002' }), row({ category: 'cons', description: 'Thinner', uom: 'KGS' }), row({ category: 'CORE', description: 'EE42' }), row({ category: 'BOBBIN', description: 'E25 bobbin' }), row({ category: 'WIRE', description: '37 SS WIRE', uom: 'KGS' })]);
     const kind = (name: string) => p.materials.find((m) => m.name === name)!;
-    expect(kind('label 20x10')).toMatchObject({ stockType: 'STANDING', minimumLevel: 0, category: 'MISC' });
+    expect(kind('label 20x10')).toMatchObject({ stockType: 'STANDING', minimumLevel: 5, category: 'MISC' });
     expect(kind('Thinner')).toMatchObject({ stockType: 'STANDING', category: 'CONS' });
     for (const other of ['EE42', 'E25 bobbin', '37 SS WIRE']) expect(kind(other)).toMatchObject({ stockType: 'PER_JOB' });
     expect(kind('EE42').minimumLevel).toBeUndefined();
@@ -119,6 +120,20 @@ describe('what cannot be trusted is said, not guessed', () => {
     expect(p.materials).toHaveLength(0);
   });
 
+  it("the owner's unit decisions: kilos for the TY laminations, a unit for the items the sheet leaves out (and the two rows of one item add up)", () => {
+    const p = plan([
+      row({ description: 'TY-30 E', code: 'FTC004', qty: '33', uom: 'NOS' }), row({ description: 'TY-30 E', code: 'FTC008', qty: '8.89', uom: 'KGS' }), row({ description: 'TY-19 E', code: 'FTC005', qty: '3.35', uom: 'NOS' }),
+      row({ category: 'CONS', description: 'Enamil Remover (E - Sol)', code: 'LER303', qty: '', uom: '' }), row({ category: 'CONS', description: 'Dross Reducing Powder-18', code: 'LER305', qty: '', uom: '' }), row({ category: 'CONS', description: 'vaculoy', code: 'LHD302', qty: '', uom: '' }),
+    ], undefined, STOCK_SHEET_DECISIONS);
+    const by = (name: string) => p.materials.find((m) => m.name === name)!;
+    expect(p.heldBack).toEqual([]);
+    expect(by('TY-30 E')).toMatchObject({ uom: 'KG', counted: 41.89 });
+    expect(by('TY-19 E')).toMatchObject({ uom: 'KG', counted: 3.35 });
+    expect(by('Enamil Remover (E - Sol)')).toMatchObject({ uom: 'LTR', stockType: 'STANDING', minimumLevel: 5, counted: null });
+    expect(by('Dross Reducing Powder-18').uom).toBe('KG');
+    expect(by('vaculoy').uom).toBe('NOS');
+  });
+
   it('materials already in the list are left alone', () => {
     const p = plan([row({ description: 'EE42 CORE' })], { nameKeys: new Set(['ee42core']), itemCodeKeys: new Set(), replaceCount: 0 });
     expect(p.materials).toHaveLength(0);
@@ -155,7 +170,8 @@ describe('saving a plan through the gateway', () => {
     expect(mats).toHaveLength(5);
     const by = (name: string) => mats.find((m) => m.name === name)!;
     expect(by('label 20 x 10')).toMatchObject({ stockType: 'STANDING', category: 'MISC', rack: 'R-01', shelf: 'A', itemCode: 'WPL002' });
-    expect(Number(by('label 20 x 10').minimumLevel)).toBe(0);
+    expect(Number(by('label 20 x 10').minimumLevel)).toBe(KEPT_IN_STOCK_MINIMUM);
+    expect(KEPT_IN_STOCK_MINIMUM).toBe(5);
     expect(by('EE42 CORE')).toMatchObject({ stockType: 'PER_JOB', category: 'CORE', itemCode: 'FEE001', uom: 'NOS' });
     expect(by('37 SS WIRE')).toMatchObject({ uom: 'KG', rack: 'R-27' });
     expect(by('replace1')).toMatchObject({ itemCode: 'SHR020', uom: 'MTR', category: 'SLEEVE' });

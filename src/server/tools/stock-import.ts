@@ -72,6 +72,8 @@ export function quantityOf(text: string): { qty: number | null; unit: ReturnType
 
 const SHARE = 0.95;
 
+const byKey = (m: Record<string, Unit> | undefined, key: (s: string) => string) => Object.fromEntries(Object.entries(m ?? {}).map(([k, v]) => [key(k), v]));
+
 /** The one unit a whole kind of thing is counted in ("every SLEEVE row is in metres"), or null if it is not that clear. */
 function unitByKind(rows: { category: string; unit: Unit | null }[]): Map<string, Unit> {
   const seen = new Map<string, Map<Unit, number>>();
@@ -90,14 +92,20 @@ function unitByKind(rows: { category: string; unit: Unit | null }[]): Map<string
   return out;
 }
 
+/** What the owner has decided about particular rows (a unit for an item the sheet leaves out or gets wrong), by item code or by name. */
+export interface Decisions { unitByCode?: Record<string, Unit>; unitByName?: Record<string, Unit> }
+
+/** The minimum level given to every material kept in stock until the owner sets the real one ("make it 5 units", 2026-11-07). */
+export const KEPT_IN_STOCK_MINIMUM = 5;
+
 export interface Existing { nameKeys: Set<string>; itemCodeKeys: Set<string>; replaceCount: number }
 
-export function planStockImport(input: SheetRow[], existing: Existing = { nameKeys: new Set(), itemCodeKeys: new Set(), replaceCount: 0 }): Plan {
+export function planStockImport(input: SheetRow[], existing: Existing = { nameKeys: new Set(), itemCodeKeys: new Set(), replaceCount: 0 }, decisions: Decisions = {}): Plan {
   const heldBack: HeldBack[] = [];
   const skipped: HeldBack[] = [];
 
   // 1. Read every row: what it says about its quantity and its unit.
-  interface Parsed { row: SheetRow; category: string; code: string; description: string; qty: number | null; unit: Unit | null; unitFlag?: string; unitFrom?: 'qty' | 'column' }
+  interface Parsed { row: SheetRow; category: string; code: string; description: string; qty: number | null; unit: Unit | null; unitFlag?: string; unitFrom?: 'qty' | 'column' | 'owner' }
   const parsed: Parsed[] = [];
   let itemRows = 0;
   for (const raw of input) {
@@ -109,8 +117,9 @@ export function planStockImport(input: SheetRow[], existing: Existing = { nameKe
     if (q.bad) { heldBack.push({ line: row.line, reason: `The quantity "${row.qty}" is not a number`, row }); continue; }
     // the unit written with the quantity ("5 (ltr)") is more careful than the UOM column ("3 LTR"), so it wins
     const fromCol = row.uom ? unitOf(row.uom.replace(/^\d+\s*/, '')) : null;
-    const u = q.unit ?? fromCol;
-    parsed.push({ row, category: row.category, code: row.code, description: row.description, qty: q.qty, unit: u?.unit ?? null, unitFlag: u?.flag, unitFrom: q.unit ? 'qty' : fromCol ? 'column' : undefined });
+    const decided = byKey(decisions.unitByCode, itemCodeKey)[itemCodeKey(row.code)] ?? byKey(decisions.unitByName, materialNameKey)[materialNameKey(row.description)];
+    const u = decided ? { unit: decided, flag: 'the unit was set by the owner' } : q.unit ?? fromCol;
+    parsed.push({ row, category: row.category, code: row.code, description: row.description, qty: q.qty, unit: u?.unit ?? null, unitFlag: u?.flag, unitFrom: decided ? 'owner' : q.unit ? 'qty' : fromCol ? 'column' : undefined });
   }
   const kindUnit = unitByKind(parsed.map((p) => ({ category: p.category, unit: p.unit })));
 
@@ -167,7 +176,7 @@ export function planStockImport(input: SheetRow[], existing: Existing = { nameKe
       codes, notes,
       m: {
         name: first.name, itemCode: codes.length === 1 ? codes[0]! : null, category: first.category || null, uom: first.unit as Unit,
-        stockType: kept ? 'STANDING' : 'PER_JOB', ...(kept ? { minimumLevel: 0 } : {}),
+        stockType: kept ? 'STANDING' : 'PER_JOB', ...(kept ? { minimumLevel: KEPT_IN_STOCK_MINIMUM } : {}),
         rack: first.row.rack || null, shelf: first.row.shelf || null, notes: null, counted, lines: same.map((r) => r.row.line), flags,
       },
     };
