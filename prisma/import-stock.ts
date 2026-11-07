@@ -3,6 +3,8 @@
  *
  *   pnpm stock:import <file.xlsx | stock.csv> [--apply] [--as owner@email] [--date YYYY-MM-DD] [--report review.csv]
  *
+ * (`--write-data prisma/data/opening-stock.json` writes the reviewed list for the start-up load instead of saving.)
+ *
  * Without --apply nothing is saved: it prints what each row would become and what needs a person's eye, and (with --report)
  * writes the whole list to a CSV that can be opened in Excel. With --apply it saves THROUGH THE TOOL GATEWAY, the same way a
  * person's form would (one audit row each): every material with create_material, then the opening count is started and the
@@ -13,9 +15,11 @@
  * typed on the count sheet is never overwritten. The only reads that do not go through a tool are the names already in the
  * list (to avoid duplicates) and who the owner is.
  */
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { basename, dirname } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import { planStockImport, type Plan } from '../src/server/tools/stock-import';
+import { toFile } from '../src/server/tools/stock-data';
 import { STOCK_SHEET_DECISIONS } from '../src/server/tools/stock-decisions';
 import { applyStockPlan } from '../src/server/tools/stock-load';
 import { readStockSheet, SheetError } from '../src/server/tools/stock-sheet-file';
@@ -74,7 +78,16 @@ async function main() {
   print(plan);
   if (arg('--report')) { writeReport(arg('--report')!, plan); console.log(`\nThe full list is in ${arg('--report')}`); }
 
-  if (!has('--apply')) { console.log('\nNothing was saved. Add --apply to save it.'); return; }
+  // the opening stock as a plain list kept with the code, loaded once at start-up (docs/DEPLOY.md)
+  if (arg('--write-data')) {
+    const out = arg('--write-data')!;
+    mkdirSync(dirname(out), { recursive: true });
+    // from the sheet alone, whatever is already in this database
+    const whole = planStockImport(rows, undefined, STOCK_SHEET_DECISIONS);
+    writeFileSync(out, JSON.stringify(toFile(whole.materials, arg('--source') ?? basename(file), today()), null, 1) + '\n');
+    console.log(`\nThe stock list for the start-up load is in ${out} (${whole.materials.length} materials). Nothing was saved to the database.`);
+  }
+  if (!has('--apply')) { if (!arg('--write-data')) console.log('\nNothing was saved. Add --apply to save it.'); return; }
   if (!owner) throw new Error('There is no owner login to save this as. Run the first-time setup, or name one with --as.');
   console.log('\nSaving …');
   await applyStockPlan(plan, { userId: owner.id, name: owner.name, role: 'OWNER' }, arg('--date') ?? today(), (line) => console.log(line));

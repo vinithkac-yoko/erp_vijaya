@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SETTINGS } from '../src/lib/settings';
 import { importDecisions } from '../src/server/tools/decisions-import';
+import { loadOpeningStockOnce } from '../src/server/tools/stock-startup';
 
 const prisma = new PrismaClient();
 const ifEmpty = process.argv.includes('--if-empty');
@@ -72,12 +73,18 @@ async function maybeSeedDemo() {
   console.log('[seed] Demo month built.');
 }
 
+/** The store's opening stock, once (prisma/data/opening-stock.json). Never stops the app from starting. */
+async function openingStock() {
+  try { await loadOpeningStockOnce({ say: (l) => console.log(`[seed] ${l}`) }); } catch (e) { console.log('[seed] Opening stock was not loaded:', e instanceof Error ? e.message : e); }
+}
+
 async function main() {
   await ensureSettings();
   await ensureDecisions();
   if (ifEmpty && (await prisma.user.count()) > 0) {
     console.log('[seed] Users already exist. Nothing to do.');
     await maybeSeedDemo();
+    await openingStock();
     return;
   }
 
@@ -107,6 +114,7 @@ async function main() {
     console.log('[seed] ──────────────────────────────────────────────────────────────');
   }
   await maybeSeedDemo();
+  await openingStock();
 }
 
 main().catch((e) => { console.error('[seed] Failed:', e instanceof Error ? e.message : e); process.exitCode = 1; }).finally(() => prisma.$disconnect());

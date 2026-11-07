@@ -188,7 +188,7 @@ from a supplier's email). The AI reads them. So:
 - **Secrets:** only in Railway env vars. Rotate `SESSION_SECRET` to sign everyone out.
 - **If something looks wrong:** (1) flip `AGENT_ENABLED=false`; (2) look at the Activity answer and `AgentRun`; (3) the
   ledger is append-only, so nothing is lost — the owner reverses wrong entries with `reverse_movement`.
-- **Loading a stock sheet:** only by the deploying person's command (`pnpm stock:import`), never by an upload route, and never by the assistant (it cannot read files). It saves through the gateway like a form, reviewed first; it never submits the opening count.
+- **Loading the opening stock:** from a reviewed list kept with the code (`prisma/data/opening-stock.json`: names, kinds, racks, quantities; no rates, no people, no secrets), by the start-up step once, or by the deploying person's command (`pnpm stock:import`). Never by an upload route and never by the assistant (it cannot read files). It saves through the gateway like a form, with an audit row each, as the owner; it never submits the opening count; a marker stops it running twice; `OPENING_STOCK_LOAD=off` stops it. The list stays in the code's history.
 - **Dependency hygiene:** `pnpm audit` in CI; pin `playwright`, `next`, `prisma`.
 - **Before go-live:** the production-readiness audit at milestone 10 includes: every tool has `roles`; every route has
   an auth check; response headers contain the CSP (with `frame-src about:`); no secret in git history; the hostile and

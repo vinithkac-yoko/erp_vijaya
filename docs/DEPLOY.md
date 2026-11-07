@@ -82,14 +82,18 @@ If the microphone shows a red message, open the service's **Deploy Logs** and lo
 
 What is said is sent to Google for the moment it takes to turn it into text, and is not kept by the app. Say so to the owner and the storekeeper before they use it. Browsers ask for the microphone the first time; on a phone the page must be opened over https (Railway's address is).
 
-**Loading the store's stock sheet (milestone 13, once).** The owner's sheet (the `STOCK` sheet of the rack-wise workbook) becomes the materials and the quantities of the **opening count**. It is a command run by you, not a button, and it saves nothing until you add `--apply`. Open the workbook in Excel, choose Save As, "Excel Workbook (.xlsx)" (the old `.xls` format is not read), then, with the Railway database address in `DATABASE_URL` (for example `railway run`):
+**The store's opening stock (milestone 13): loaded for you, once.** The owner's stock sheet is kept with the code as a plain list (`prisma/data/opening-stock.json`: 650 materials with unit, kind, rack, shelf and the quantity counted; no rates). On the **next deploy** the start-up step (`pnpm db:seed:if-empty`) loads it **once**, through the same tools the forms use, as the owner, with an audit row for each material, and starts the **opening count** with those quantities on its sheet. You run nothing. It takes about 15 seconds. In **Deploy Logs** look for:
 
 ```
-pnpm stock:import STORES.xlsx --report review.csv          # reads it, saves nothing, writes the review
-pnpm stock:import STORES.xlsx --apply                     # saves it, through the same tools the forms use
+[seed] Opening stock: loading 650 materials from STORES RACK WISE MATERIAL DETAILS … 
+[seed] Opening stock: done. 650 materials added, 638 quantities on CNT-…; 612 materials with stock still need a rate.
 ```
 
-Read `review.csv` (or the printed list) first: it says what is held back and why, which rows were added into one, which part numbers were not used, and which units to check. Running it again is safe. A deploy alone does **not** load the stock: it applies the database change (the rack, shelf and kind columns) and nothing else. The load is this command. The opening count stays open and cannot be sent to the owner until every material with stock has a rate from its last purchase invoice; the count sheet shows how many still need one.
+- It never runs again: a marker is saved when it finishes, so a restart, a redeploy or a renamed material cannot make it repeat. (If a start is cut off half way, the next start carries on without making anything twice.)
+- It does **nothing**, and says why in the log, when: it was loaded already; `OPENING_STOCK_LOAD=off` (set that variable to stop it); `DEMO_MODE=true`; stock has already moved or the opening count is approved (the opening count has to come first); or there is no owner login. A demo copy with its demo data is never touched.
+- It never sends the count to the owner. The count stays open until the store has recounted and typed the rate from the last purchase invoice for every material with stock (612 of them). The count sheet shows how many still need one.
+- The list also loads when you run `pnpm db:seed` on your own computer: your local copy then has the real stock.
+- To make a new list from a new sheet later: save the STOCK sheet as `.xlsx`, then `pnpm stock:import SHEET.xlsx --report review.csv` (reads, saves nothing), read the review, then `pnpm stock:import SHEET.xlsx --write-data prisma/data/opening-stock.json --source "its name"`. The old `.xls` format is not read.
 
 **Reports, downloads and printouts (milestone 9).** They need a browser (to draw PDFs and pictures) and a program called pandoc (for Word files).
 The repo's `nixpacks.toml` makes Railway install both, so you do nothing. If a download says "Couldn't make that file", open the service's

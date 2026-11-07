@@ -22,7 +22,7 @@ async function act(who: ToolSession, tool: string, input: Data): Promise<{ ok: t
 
 export interface LoadResult { made: number; refused: string[]; countNumber: string | null; countApproved: boolean; quantitiesSaved: number; counted: number; total: number; needRate: number }
 
-export async function applyStockPlan(plan: Plan, owner: ToolSession, date: string, say: (line: string) => void = () => {}): Promise<LoadResult> {
+export async function applyStockPlan(plan: Pick<Plan, 'materials' | 'alreadyThere'>, owner: ToolSession, date: string, say: (line: string) => void = () => {}): Promise<LoadResult> {
   const refused: string[] = [];
   let made = 0;
   for (const m of plan.materials) {
