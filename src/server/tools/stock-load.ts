@@ -20,7 +20,7 @@ async function act(who: ToolSession, tool: string, input: Data): Promise<{ ok: t
   return r.ok ? { ok: true, data: (r.data ?? {}) as Data } : { ok: false, message: r.message };
 }
 
-export interface LoadResult { made: number; refused: string[]; countNumber: string | null; countApproved: boolean; quantitiesSaved: number; counted: number; total: number; needRate: number }
+export interface LoadResult { countWithOwner?: boolean; made: number; refused: string[]; countNumber: string | null; countApproved: boolean; quantitiesSaved: number; counted: number; total: number; needRate: number }
 
 export async function applyStockPlan(plan: Pick<Plan, 'materials' | 'alreadyThere'>, owner: ToolSession, date: string, say: (line: string) => void = () => {}): Promise<LoadResult> {
   const refused: string[] = [];
@@ -43,6 +43,10 @@ export async function applyStockPlan(plan: Pick<Plan, 'materials' | 'alreadyTher
   if (opening?.status === 'APPROVED') {
     say(`The opening count (${opening.number}) is already approved, so the quantities cannot be added to it. The materials were added.`);
     return { ...result, countNumber: opening.number, countApproved: true };
+  }
+  if (opening?.status === 'PENDING_APPROVAL') {
+    say(`The opening count (${opening.number}) is with the owner, so it cannot take quantities. The owner can send it back; then run this again.`);
+    return { ...result, countNumber: opening.number, countWithOwner: true };
   }
   if (!opening) {
     const s = await act(owner, 'start_stock_count', { countDate: date, isOpening: true });

@@ -13,8 +13,8 @@ import { OPENING_STOCK_PATH, readOpeningStock } from './stock-data';
  * when the load has finished, so a restart, a redeploy or a renamed material can never make it run again.
  *
  * It does nothing, and says why in the log, when: it was done already; OPENING_STOCK_LOAD is off; this is a demo copy; the
- * file is not there; stock has already moved or the opening count is approved (an opening count has to come first); or there
- * is no owner login yet.
+ * file is not there; stock has already moved or the opening count is approved (an opening count has to come first); the
+ * opening count is with the owner (it is locked until he sends it back); or there is no owner login yet.
  */
 export const MARKER_KEY = 'system.opening_stock_loaded';
 
@@ -35,6 +35,8 @@ export async function loadOpeningStockOnce(opts: { env?: Record<string, string |
   if (await db.setting.findUnique({ where: { key: MARKER_KEY } })) return skip('it was loaded already.');
   if ((await db.stockMovement.count()) > 0) return skip('stock has already moved, and the opening count has to come first.');
   if ((await db.stockCount.count({ where: { isOpening: true, status: 'APPROVED' } })) > 0) return skip('the opening count is already approved.');
+  // a count that is with the owner is locked: nothing can be put on it, so nothing is started (the owner sends it back first)
+  if ((await db.stockCount.count({ where: { isOpening: true, status: 'PENDING_APPROVAL' } })) > 0) return skip('the opening count is with the owner. Send it back (do not approve it) and the stock is loaded onto it at the next start.');
   const owner = await db.user.findFirst({ where: { role: 'OWNER', isActive: true }, orderBy: { createdAt: 'asc' }, select: { id: true, name: true } });
   if (!owner) return skip('there is no owner login yet.');
 
@@ -50,7 +52,7 @@ export async function loadOpeningStockOnce(opts: { env?: Record<string, string |
   const r = await applyStockPlan({ materials: fresh, alreadyThere: known }, { userId: owner.id, name: owner.name, role: 'OWNER' }, date, say);
 
   // finished only if every material is in and the count is open; otherwise the next start carries on (it never makes a material twice)
-  if (r.refused.length > 0 || r.countNumber === null || r.countApproved) return { status: 'partial', reason: r.refused[0] ?? 'the opening count could not be started' };
+  if (r.refused.length > 0 || r.countNumber === null || r.countApproved || r.countWithOwner) return { status: 'partial', reason: r.refused[0] ?? (r.countWithOwner ? 'the opening count is with the owner' : 'the opening count could not be started') };
   await db.setting.upsert({ where: { key: MARKER_KEY }, create: { key: MARKER_KEY, value: now.toISOString(), valueType: 'string', description: 'Set when the opening stock file has been loaded. Never shown in the settings list.' }, update: { value: now.toISOString() } });
   say(`Opening stock: done. ${r.made} materials added, ${r.quantitiesSaved} quantities on ${r.countNumber}; ${r.needRate} materials with stock still need a rate.`);
   return { status: 'loaded', materials: r.made, quantities: r.quantitiesSaved, needRate: r.needRate, refused: 0 };

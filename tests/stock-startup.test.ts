@@ -6,7 +6,7 @@ import { readOpeningStock } from '@/server/tools/stock-data';
 import { loadOpeningStockOnce, MARKER_KEY } from '@/server/tools/stock-startup';
 import { runTool, pendingActions } from '@/server/tools';
 import { approveCount, makeMaterial, prisma, receive, resetDb } from './helpers/db';
-import { ok, owner, seedSettings } from './helpers/tools';
+import { ok, owner, save, seedSettings } from './helpers/tools';
 
 const dir = mkdtempSync(join(tmpdir(), 'opening-stock-'));
 let n = 0;
@@ -130,5 +130,50 @@ describe('the stock file', () => {
       expect(m.counted === null || m.counted >= 0).toBe(true);
     }
     expect(materials.filter((m) => /^replace\d+$/.test(m.name))).toHaveLength(7);
+  });
+});
+
+describe('when the opening count is already with the owner (what happened on the live copy)', () => {
+  const today = () => new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
+  /** An opening count with one counted and rated material, sent to the owner. */
+  async function countWithOwner() {
+    const o = await owner();
+    await ok(save(o, 'create_material', { name: 'Old item', uom: 'NOS', stockType: 'PER_JOB' }));
+    await ok(save(o, 'start_stock_count', { countDate: today(), isOpening: true }));
+    const sheet = await ok<{ count: { id: string }; rows: { id: string }[] }>(runTool(o, 'list_count_lines', {}));
+    await ok(save(o, 'save_count_sheet', { stockCountId: sheet.count.id, lines: [{ stockCountLineId: sheet.rows[0]!.id, countedQty: 7, unitRate: 25 }] }));
+    await ok(save(o, 'submit_stock_count', {}));
+    return o;
+  }
+
+  it('starts nothing while the count is locked, and says what to do', async () => {
+    await countWithOwner();
+    const r = await run(standard());
+    expect(r).toMatchObject({ status: 'skipped', reason: expect.stringContaining('Send it back') });
+    expect(await prisma.material.count()).toBe(1); // no half load
+    expect(await prisma.setting.findUnique({ where: { key: MARKER_KEY } })).toBeNull();
+  });
+
+  it('after the owner sends it back, every material is on the count and the next start loads the quantities onto it; the old line is kept', async () => {
+    const o = await countWithOwner();
+    // materials made while the count was locked (the half load the live copy got) have no line yet
+    await ok(save(o, 'create_material', { name: 'EE42 CORE', uom: 'NOS', stockType: 'PER_JOB', rack: 'R-07' }));
+    const before = await prisma.stockCountLine.count();
+    expect(before).toBe(1);
+
+    await ok(save(o, 'reject_stock_count', { rejectionNote: 'Recount with the stock sheet' }));
+    expect(await prisma.stockCountLine.count()).toBe(2); // 'EE42 CORE' joined the count when it came back
+    expect(await prisma.auditEvent.findFirstOrThrow({ where: { toolName: 'reject_stock_count' } })).toMatchObject({ afterJson: expect.objectContaining({ materialsAddedToTheCount: 1 }) });
+
+    const r = await run(standard());
+    expect(r).toMatchObject({ status: 'loaded', materials: 3, quantities: 3 }); // 'EE42 CORE' was there; the other three were made; three quantities typed
+    const lines = await prisma.stockCountLine.findMany({ include: { material: true } });
+    const q = (name: string) => Number(lines.find((l) => l.material.name === name)!.countedQty);
+    expect(q('Old item')).toBe(7); // never overwritten
+    expect(q('EE42 CORE')).toBe(120);
+    expect(q('label 20 x 10')).toBe(9500);
+    expect(await prisma.stockCount.count()).toBe(1); // the same count, not a second one
+    expect(await prisma.stockMovement.count()).toBe(0);
+    expect(await prisma.setting.findUnique({ where: { key: MARKER_KEY } })).not.toBeNull();
   });
 });

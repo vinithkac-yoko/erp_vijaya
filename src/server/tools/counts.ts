@@ -508,10 +508,17 @@ export const rejectStockCount = defineTool({
     const count = await resolveCount(ctx.db, input.stockCountId, 'PENDING_APPROVAL');
     if (count.status !== 'PENDING_APPROVAL') throw new ToolError('NOT_PENDING', `${count.number} is not waiting for approval.`);
     await ctx.db.stockCount.update({ where: { id: count.id }, data: { status: 'REJECTED', rejectionNote: input.rejectionNote } });
+    // The opening count covers every material in the store. Materials added while it was with the owner (a locked count takes no new lines) join it now it is back, so none is missed.
+    let joined = 0;
+    if (count.isOpening) {
+      const have = (await ctx.db.stockCountLine.findMany({ where: { stockCountId: count.id }, select: { materialId: true } })).map((l) => l.materialId);
+      const missing = await ctx.db.material.findMany({ where: { isActive: true, id: { notIn: have } }, select: { id: true } });
+      if (missing.length) { await ctx.db.stockCountLine.createMany({ data: missing.map((m) => ({ stockCountId: count.id, materialId: m.id, systemQty: 0 })) }); joined = missing.length; }
+    }
     await notify(ctx.db, [count.countedById], { type: 'RECOUNT_REQUIRED', title: 'Recount needed', body: `${count.number}: ${input.rejectionNote}`, entityType: 'StockCount', entityId: count.id }, ctx.session.userId);
     return {
       data: { number: count.number, note: input.rejectionNote },
-      audit: { entityType: 'StockCount', entityId: count.id, action: 'REJECT', reason: input.rejectionNote, after: { number: count.number, note: input.rejectionNote } },
+      audit: { entityType: 'StockCount', entityId: count.id, action: 'REJECT', reason: input.rejectionNote, after: { number: count.number, note: input.rejectionNote, ...(joined ? { materialsAddedToTheCount: joined } : {}) } },
     };
   },
 });
