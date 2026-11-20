@@ -2,7 +2,7 @@
 
 Read this at the start of every session (CLAUDE.md). Newest on top.
 
-## Milestone 14 — Readable answers; a fresh start (waiting for Kasi's answers on scope)
+## Milestone 14 — Readable answers (the fresh start was dropped: Kasi, 2026-11-20, "no need for reset")
 
 Kasi (2026-11-20, with the assistant working again after the new key): the assistant's messages showed stars, dashes and bars; and he wants a full reset, keeping only the stock loaded from the sheet.
 
@@ -11,8 +11,10 @@ Done
 - The assistant is also told how to write (`docs/AGENT_PROMPT.md`, HOW TO WRITE): short sentences, short lists, never a table drawn with bars (the app already draws the table from the tools above its words).
 - Tests: 11 for the parser (the exact text from the screen, awkward and hostile text, Tamil), 2 in the browser (bold, table, list drawn and no marks left; accessibility in light and dark).
 
-Not done yet
-- The fresh start: see the questions put to Kasi (what to keep: logins, settings, the owner's answers to the questions; a backup first; how to trigger it).
+Dropped
+- The fresh start (a full reset keeping only the sheet's stock): Kasi said no need; the app and its data stay as they are, and the team starts working in it.
+
+Proof (run in this session): `pnpm test` 596 passed (25 live skipped), `pnpm e2e` 234 passed (6 skipped on purpose), lint, typecheck and build clean.
 
 ## Milestone 13 — The store's stock sheet as the starting stock; rack, shelf and kind on every material — **built; waiting for Kasi's answers (section O) and the rates**
 
