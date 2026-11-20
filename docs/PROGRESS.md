@@ -2,6 +2,18 @@
 
 Read this at the start of every session (CLAUDE.md). Newest on top.
 
+## Milestone 14 — Readable answers; a fresh start (waiting for Kasi's answers on scope)
+
+Kasi (2026-11-20, with the assistant working again after the new key): the assistant's messages showed stars, dashes and bars; and he wants a full reset, keeping only the stock loaded from the sheet.
+
+Done
+- **The assistant's words are drawn, not printed with their marks.** `**bold**` is bold; `- lists` and `1. lists` are lists; `# headings` are headings; `| tables |` are real tables (numbers to the right, scrolls sideways on a phone); `---` is a line; `` `code` `` is code. Done by a small parser (`src/lib/rich-text.ts`) and a renderer that draws React elements only: no HTML, link or script the assistant writes can reach the page. A star or underscore that marks nothing ("5 * 3", `part_no`) is left alone; a half-streamed `**bold` shows as typed until it closes. Works under the Tamil button too.
+- The assistant is also told how to write (`docs/AGENT_PROMPT.md`, HOW TO WRITE): short sentences, short lists, never a table drawn with bars (the app already draws the table from the tools above its words).
+- Tests: 11 for the parser (the exact text from the screen, awkward and hostile text, Tamil), 2 in the browser (bold, table, list drawn and no marks left; accessibility in light and dark).
+
+Not done yet
+- The fresh start: see the questions put to Kasi (what to keep: logins, settings, the owner's answers to the questions; a backup first; how to trigger it).
+
 ## Milestone 13 — The store's stock sheet as the starting stock; rack, shelf and kind on every material — **built; waiting for Kasi's answers (section O) and the rates**
 
 Kasi sent the store's rack-wise workbook and said: use only the sheet STOCK; add it as the starting stock and change the database to suit; only MISC and CONS are kept in stock; a row with no description is named replace1, replace2 …; and asked whether "upload a sheet and the system updates" is agentic enough.

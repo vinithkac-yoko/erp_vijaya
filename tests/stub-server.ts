@@ -94,6 +94,7 @@ function script(r: StubRequest): StubReply {
   if (t.includes('margin by part')) return owner ? (answered ? say('Here is the margin by part, material only.') : call('get_margin_by_part', {})) : say('The margin is the owner\'s.');
   if (t.includes('explain this question')) return answered ? say('That question is about what goes on the top of your printouts.') : call('get_decision', { decisionId: 'company letterhead printouts' });
   if (t.includes('my answer on the letterhead')) return owner ? call('answer_decision', { decisionId: 'company letterhead printouts', choice: 'Name / address / GSTIN / state / phone', note: 'Vijaya Electronics, Kollapakkam' }, 'Check your answer.') : say('Only the owner answers those.');
+  if (t.includes('markdown sample')) return say('**Open jobs:** There are none.\n\n**Below minimum level:** 2 materials.\n\n| Material | Unit | On hand | Minimum |\n|---|---|---|---|\n| AGNI ROD | KG | 0 | 5 |\n| Flux RLS45 | LTR | 0 | 5 |\n\n- first thing\n- second thing\n\nSend it to the *owner* when `ready`.');
   if (t.includes('collected scrap')) return call('record_scrap_in', {}, 'Check the scrap and the quantity.');
   if (t.includes('sold scrap')) return call('record_scrap_sale', {}, 'Check the buyer, the quantity and the rate.');
   if (t.includes('reverse an entry')) return owner ? call('reverse_movement', {}, 'Choose the entry and say why.') : say('Only the owner can reverse an entry.');

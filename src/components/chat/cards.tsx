@@ -5,6 +5,7 @@ import { Download, FileText, Info, LayoutDashboard, Printer, TriangleAlert } fro
 import type { Card } from '@/lib/cards';
 import { cn } from '@/lib/cn';
 import { TamilButton, useTamil } from '@/components/translate/tamil';
+import { RichText } from './rich-text';
 
 type Of<K extends Card['kind']> = Extract<Card, { kind: K }>;
 
@@ -66,7 +67,7 @@ export function AssistantText({ text }: { text: string }) {
   const ta = useTamil([text]);
   return (
     <div>
-      <p lang={ta.lang(text)} className="whitespace-pre-wrap rounded-md border border-line border-l-4 border-l-copper bg-surface px-4 py-3">{ta.show(text)}</p>
+      <div lang={ta.lang(text)} className="rounded-md border border-line border-l-4 border-l-copper bg-surface px-4 py-3"><RichText text={ta.show(text)} /></div>
       <TamilButton tamil={ta} className="mt-1" />
     </div>
   );

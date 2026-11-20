@@ -23,9 +23,9 @@ test.describe('Tamil on request', () => {
       const reply = page.getByText('There is no 22 SWG Copper Wire in the list yet.');
       await expect(reply).toBeVisible({ timeout: 30_000 });
       await page.getByRole('button', { name: 'Show in Tamil' }).last().click();
-      const tamil = page.getByText(/^தமிழில்: There is no 22 SWG Copper Wire/);
+      // the Tamil words are in an element marked lang="ta" (the bubble around the drawn text)
+      const tamil = page.locator('[lang="ta"]', { hasText: /^தமிழில்: There is no 22 SWG Copper Wire/ });
       await expect(tamil).toBeVisible();
-      await expect(tamil).toHaveAttribute('lang', 'ta');
       await page.getByRole('button', { name: 'Show in English' }).click();
       await expect(reply).toBeVisible();
       expect(await prisma.translation.count()).toBeGreaterThan(0);
