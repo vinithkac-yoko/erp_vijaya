@@ -21,7 +21,7 @@ describe('settings', () => {
       expect.objectContaining({ key: 'notify.owner_email', value: 'None' }),
     ]);
     // the letterhead printouts use (milestone 9): the name is there from day one, the rest is for the owner to fill in
-    expect(rows.slice(3).map((r) => r.key)).toEqual(['company.name', 'company.address', 'company.gstin', 'company.state', 'company.phone']);
+    expect(rows.slice(3).map((r) => r.key)).toEqual(['uploads.monthly_cap_inr', 'uploads.usd_to_inr', 'company.name', 'company.address', 'company.gstin', 'company.state', 'company.phone']);
     expect(rows.find((r) => r.key === 'company.name')?.value).toBe('Vijaya Electronics');
   });
 

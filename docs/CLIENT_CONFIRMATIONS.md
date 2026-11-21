@@ -301,14 +301,14 @@ Kasi asked for the client to update the system himself with sheets, documents an
 
 Assumptions I made (please say if any is wrong)
 
-| # | Status | What I assumed | Why | Question |
-|---|---|---|---|---|
-| Q1 | ❓ | The **₹1,000 limit is per calendar month** (India time), and counts only PDFs and photos. The assistant's ordinary chat is still limited by its own daily limit. | Sheets, CSV and Word files cost nothing to read. | Per month, or per something else (per week, in total)? |
-| Q2 | ❓ | **Original files are kept 30 days**, then dropped (what was read from them too). | Long enough to come back to a half-done import; short enough not to hoard the client's papers. | Is 30 days right? |
-| Q3 | ❓ | **Quantities only go on the opening count**, and only while it is open. A file cannot add stock later (goods received, issues): those come from the receiving and issuing forms. | The opening count is the only way stock gets in without a purchase or an issue; it needs a rate for every material with stock, which no sheet gives. | Is that what you want? If the client will send "stock now" sheets after go-live, that needs a different rule. |
-| Q4 | ❓ | **Old `.xls` and macro files are refused** with "save as .xlsx". | You said xlsx only. | OK? |
-| Q5 | ❓ | **Undo for 7 days** puts back only what nobody changed since; things it added are marked "no longer in use" (kept in the history, since nothing is ever deleted); a material only if no stock has moved on it; a filled blank cannot become blank again. | Undo must never overwrite somebody's later work. | OK? |
-| Q6 | ❓ | A **unit is never guessed**: from the sheet, a default you agreed to, or a question (the assistant suggests pieces when it does not know). | A unit cannot be changed once a material exists. | OK? |
-| Q7 | ❓ | When the sheet and the system **disagree**, the assistant asks, and suggests "keep the system's". When the system has a **blank** and the sheet has a value, it fills it and says so (it is not an overwrite). | You said never overwrite silently. | Should it ask even for blanks? |
-| Q8 | ❓ | Customer PO lines, jobs and purchase orders **cannot be imported yet** (only materials, suppliers and customers, parts and their bills of materials, and opening quantities). | You listed those four. | Do you want customer POs next? |
+| # | Status | The question | What we did | Why | Owner says |
+|---|---|---|---|---|---|
+| Q1 | ❓ | Is the ₹1,000 limit for reading PDFs and photos per month (or per week, or in total)? | The **₹1,000 limit is per calendar month** (India time), and counts only PDFs and photos. The assistant's ordinary chat is still limited by its own daily limit. | Sheets, CSV and Word files cost nothing to read. |  |
+| Q2 | ❓ | Is 30 days the right time to keep the files he sends? | **Original files are kept 30 days**, then dropped (what was read from them too). | Long enough to come back to a half-done import; short enough not to hoard the client's papers. |  |
+| Q3 | ❓ | Is it right that a file can only put quantities on the opening count? (If the client will send "stock now" sheets after go-live, that needs a different rule.) | **Quantities only go on the opening count**, and only while it is open. A file cannot add stock later (goods received, issues): those come from the receiving and issuing forms. | The opening count is the only way stock gets in without a purchase or an issue; it needs a rate for every material with stock, which no sheet gives. |  |
+| Q4 | ❓ | Is it right to refuse old .xls files and files with macros? | **Old `.xls` and macro files are refused** with "save as .xlsx". | You said xlsx only. |  |
+| Q5 | ❓ | Is that the right way to undo an import? | **Undo for 7 days** puts back only what nobody changed since; things it added are marked "no longer in use" (kept in the history, since nothing is ever deleted); a material only if no stock has moved on it; a filled blank cannot become blank again. | Undo must never overwrite somebody's later work. |  |
+| Q6 | ❓ | Is it right that a unit is asked about, never guessed? | A **unit is never guessed**: from the sheet, a default you agreed to, or a question (the assistant suggests pieces when it does not know). | A unit cannot be changed once a material exists. |  |
+| Q7 | ❓ | Should it ask even for blanks? | When the sheet and the system **disagree**, the assistant asks, and suggests "keep the system's". When the system has a **blank** and the sheet has a value, it fills it and says so (it is not an overwrite). | You said never overwrite silently. |  |
+| Q8 | ❓ | Do you want customer POs next? | Customer PO lines, jobs and purchase orders **cannot be imported yet** (only materials, suppliers and customers, parts and their bills of materials, and opening quantities). | You listed those four. |  |
 
