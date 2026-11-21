@@ -38,7 +38,7 @@ const rowsFrom = (grid: string[][]): SheetRow[] => {
 };
 
 /** A small CSV reader: quotes, doubled quotes, commas and new lines inside quotes. */
-export function parseCsv(text: string): string[][] {
+export function parseCsv(text: string, delimiter = ','): string[][] {
   const out: string[][] = [];
   let row: string[] = [], cell = '', quoted = false;
   const src = text.replace(/^﻿/, '');
@@ -47,7 +47,7 @@ export function parseCsv(text: string): string[][] {
     if (quoted) {
       if (ch === '"' && src[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') quoted = false; else cell += ch;
     } else if (ch === '"') quoted = true;
-    else if (ch === ',') { row.push(cell); cell = ''; }
+    else if (ch === delimiter) { row.push(cell); cell = ''; }
     else if (ch === '\n' || ch === '\r') { if (ch === '\r' && src[i + 1] === '\n') i++; row.push(cell); out.push(row); row = []; cell = ''; }
     else cell += ch;
   }

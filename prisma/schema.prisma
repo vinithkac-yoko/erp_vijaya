@@ -63,6 +63,9 @@ model User {
   agentRuns        AgentRun[]
   artifacts        Artifact[]      @relation("ArtifactOwner")
   sharesReceived   ArtifactShare[] @relation("ShareTo")
+  uploads          Upload[]
+  importDrafts     ImportDraft[]
+  aiSpend          AiSpend[]
   sharesGiven      ArtifactShare[] @relation("ShareBy")
 
   decisionsAnswered Decision[]
@@ -1077,4 +1080,98 @@ model ArtifactShare {
   @@index([sharedById])
   @@index([artifactId])
   @@map("artifact_shares")
+}
+
+// ── Uploads and imports (milestone 16) ──
+// The owner attaches sheets, documents and photos in the chat; the assistant reads them and proposes changes. These tables hold
+// the workspace around that (the files, what was read, the proposals, what it cost). They are NOT business data: the business
+// tables are still written only by the Tool Gateway, when the owner presses Apply.
+
+enum UploadKind {
+  XLSX
+  CSV
+  DOCX
+  TXT
+  PDF
+  IMAGE
+}
+
+model Upload {
+  id             String     @id @default(uuid())
+  userId         String
+  conversationId String?
+  filename       String
+  mime           String
+  kind           UploadKind
+  sizeBytes      Int
+  sha256         String
+  /// The original file. Dropped (null) when the file is purged after the retention days; the row stays as a record.
+  bytes          Bytes?
+  /// What was read from it: { sheets: [{ name, rows: string[][] }], text }. For a PDF or photo, what the model read from it (once).
+  content        Json?
+  /// Why it could not be read, in plain words.
+  readError      String?
+  createdAt      DateTime   @default(now())
+  expiresAt      DateTime
+  purgedAt       DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+  @@map("uploads")
+}
+
+enum ImportStatus {
+  DRAFT
+  APPLIED
+  DISCARDED
+  UNDONE
+}
+
+model ImportDraft {
+  id             String       @id @default(uuid())
+  userId         String
+  conversationId String?
+  title          String
+  status         ImportStatus @default(DRAFT)
+  /// What each sheet is and which column is what (the model's reading), as given to the planners.
+  spec           Json
+  /// What the planners worked out from the spec, the database and the answers: steps, questions, counts.
+  plan           Json
+  /// The owner's answers to the questions, by question key.
+  answers        Json         @default("{}")
+  uploadIds      String[]
+  revision       Int          @default(1)
+  /// Per step: what was done (or why not), written by apply_import. Undo reads this.
+  result         Json?
+  appliedAt      DateTime?
+  appliedAuditId String?
+  undoneAt       DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@map("import_drafts")
+}
+
+/// What reading PDFs and photos cost (the owner's monthly cap is checked against this).
+model AiSpend {
+  id           String   @id @default(uuid())
+  userId       String
+  uploadId     String?
+  purpose      String
+  model        String
+  inputTokens  Int
+  outputTokens Int
+  costInr      Decimal  @db.Decimal(10, 4)
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("ai_spend")
 }

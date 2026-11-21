@@ -20,6 +20,7 @@ import { getPrintData } from './printdata';
 import { shareArtifact, unshareArtifact } from './artifactshare';
 import { resetDemoData } from './demo';
 import { estimateJobCost, getActivity, getMarginByPart, getCountHistory, getJobCostReport, getLeakReport } from './reports';
+import { applyImport, getImportDraft, listImports, undoImport } from './imports/tools';
 import { Registry } from './registry';
 import { createRunTool } from './run-tool';
 import type { RunOptions, ToolOutcome, ToolSession } from './types';
@@ -39,6 +40,7 @@ export const registry = new Registry([
   listPurchaseOrders, getPurchaseOrder, getPurchasePriceHistory, createPurchaseOrder, cancelPurchaseOrder, approvePurchaseOrder, rejectPurchaseOrder, listGoodsReceipts, recordGoodsReceipt,
   issueMaterial, returnMaterial, closeJob, recordScrapIn, recordScrapSale, getScrapSummary, getMovementHistory, reverseMovement,
   getPrintData, resetDemoData, shareArtifact, unshareArtifact, getLeakReport, getCountHistory, getJobCostReport, getMarginByPart, estimateJobCost, getActivity,
+  listImports, getImportDraft, applyImport, undoImport,
   listCounts, listCountLines, startStockCount, submitCountLine, saveCountSheet, submitStockCount, approveStockCount, rejectStockCount,
 ]);
 

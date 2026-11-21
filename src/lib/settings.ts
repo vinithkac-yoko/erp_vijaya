@@ -23,6 +23,11 @@ export const SETTINGS: SettingDef[] = [
     help: 'Type off to switch the assistant off. The buttons, forms and approvals keep working. Type on to switch it back on.' },
   { key: 'notify.owner_email', label: 'Owner notification email', type: 'email', initial: '',
     help: 'Where the owner gets an email about approvals and alerts. Leave empty for no email.' },
+  // Reading uploaded PDFs and photos costs money (the model reads them once). Sheets, CSV, Word and text files cost nothing.
+  { key: 'uploads.monthly_cap_inr', label: 'Monthly limit for reading PDFs and photos', type: 'inr', initial: '1000',
+    help: 'The most, in rupees, that reading uploaded PDFs and photos may cost in one calendar month. Past it, those files are refused until next month (sheets still work). Type the amount, e.g. 1000.' },
+  { key: 'uploads.usd_to_inr', label: 'Rupees per US dollar (for the cost of reading files)', type: 'inr', initial: '90',
+    help: 'Used to turn the model\'s dollar price into rupees for the monthly limit. Round up a little so the limit is safe.' },
   // The letterhead on the printouts (purchase order, goods receipt note, issue slip, count sheet, job cost sheet).
   { key: 'company.name', label: 'Company name on printouts', type: 'text', initial: 'Vijaya Electronics', help: 'The name at the top of every printout.' },
   { key: 'company.address', label: 'Company address on printouts', type: 'text', initial: '', help: 'Street, city and PIN code, on one line.' },

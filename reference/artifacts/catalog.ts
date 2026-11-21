@@ -156,6 +156,11 @@ export const TOOLS: Record<string, ToolMeta> = Object.fromEntries(
     t({ name: 'deactivate_user', kind: 'write', roles: OWNER, inputs: { userId: { required: true } } }),
     t({ name: 'list_settings', kind: 'read', roles: BOTH, inputs: {}, outputs: ['setting', 'value'] }),
     t({ name: 'update_setting', kind: 'write', roles: OWNER, inputs: { key: { required: true }, value: { required: true } } }),
+    // ── imports from the owner's files (owner only) ──
+    t({ name: 'list_imports', kind: 'read', roles: OWNER, inputs: {}, outputs: ['title', 'statusText', 'when', 'summary', 'undoUntil'], bindOnly: ['id'] }),
+    t({ name: 'get_import_draft', kind: 'read', roles: OWNER, inputs: { draftId: { required: true } }, outputs: ['title', 'statusText', 'summary', 'question', 'reason'], bindOnly: ['id'] }),
+    t({ name: 'apply_import', kind: 'write', roles: OWNER, inputs: { draftId: { required: true } } }),
+    t({ name: 'undo_import', kind: 'write', roles: OWNER, inputs: { draftId: { required: true } } }),
   ].map((m) => [m.name, m]),
 );
 

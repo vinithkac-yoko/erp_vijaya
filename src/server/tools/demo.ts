@@ -9,7 +9,7 @@ import { defineTool } from './define';
  * It clears the business data, the audit trail and the numbers; it keeps the logins, the settings and the chats. Then the
  * demo month is built again through the same tools the people use.
  */
-const WIPE = ['materials', 'parties', 'number_series', 'audit_events', 'stock_movements', 'stock_counts', 'notifications'];
+const WIPE = ['materials', 'parties', 'number_series', 'audit_events', 'stock_movements', 'stock_counts', 'notifications', 'import_drafts'];
 
 export const resetDemoData = defineTool({
   name: 'reset_demo_data', kind: 'write', roles: ['OWNER'],
