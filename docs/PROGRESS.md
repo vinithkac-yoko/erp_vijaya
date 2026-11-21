@@ -14,7 +14,7 @@ Done
 Questions to the owner: section P of `docs/CLIENT_CONFIRMATIONS.md` (pieces or rolls; the repeated part number; the ten tapes without one; where the tape stock is counted; racks).
 
 Proof (run in this session)
-- RESULTS_PLACEHOLDER
+- `pnpm test` 610 passed (25 live skipped), `pnpm e2e` 234 passed (6 skipped on purpose), lint, typecheck and build clean. New: 14 tests (the planner on the sheet's awkward rows, the once-only loader, a list that stops half way, the opening count open or with the owner, the real list in the code). The browser tests' setup switches both start-up loads off for its own database.
 
 ## Milestone 14 — Readable answers (the fresh start was dropped: Kasi, 2026-11-20, "no need for reset")
 
