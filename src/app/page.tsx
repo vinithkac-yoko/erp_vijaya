@@ -35,7 +35,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
       decisionsCount={opening.decisionsToAnswer}
       chat={{
         initialItems: items, conversationId: existing ? (c ?? null) : null, launcher: state.launcher, formEnabled: state.formEnabled, chipEnabled: state.chipEnabled,
-        badges: opening.badges, assistantOn: on, offMessage: ASSISTANT_OFF, voiceOn: voiceAvailable(),
+        badges: opening.badges, assistantOn: on, offMessage: ASSISTANT_OFF, voiceOn: voiceAvailable(), filesOn: user.role === 'OWNER',
       }}
     />
   );

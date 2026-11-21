@@ -6,6 +6,8 @@ import { allowMessage } from '@/server/chat/rate-limit';
 import { assistantRuntime } from '@/server/chat/runtime';
 import type { ChatEvent } from '@/server/agent/events';
 import { openFor } from '@/server/artifacts/store';
+import { UploadError } from '@/server/tools/imports/files';
+import { verifyUploads } from '@/server/tools/imports/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,6 +18,8 @@ const body = z.object({
   chip: z.string().max(40).optional(),
   /** The artifact open beside the chat: "change it" and "download it" mean this one. Checked against what this person may open. */
   artifactId: z.string().uuid().optional().nullable(),
+  /** Owner only: files attached to this message (uploaded first, with POST /api/uploads). Checked to be his. */
+  uploadIds: z.array(z.string().uuid()).max(6).optional(),
 });
 
 const json = (status: number, message: string) => Response.json({ error: message }, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -39,6 +43,15 @@ export async function POST(req: Request) {
   let openArtifactId: string | undefined;
   if (parsed.data.artifactId) { try { openArtifactId = (await openFor(session, parsed.data.artifactId)).artifactId; } catch { openArtifactId = undefined; } }
 
+  // files: the owner's own, readable, and only the owner may attach any
+  let uploads: { id: string; name: string; kind: string; summary: string }[] = [];
+  if (parsed.data.uploadIds?.length) {
+    if (user.role !== 'OWNER') return json(403, 'Only the owner can attach files.');
+    try {
+      uploads = (await verifyUploads(session, parsed.data.uploadIds)).map((u) => ({ id: u.id, name: u.filename, kind: u.kindText, summary: u.sheets.length ? u.sheets.map((s) => `${s.name}: ${s.rows} rows, ${s.columns} columns`).join('; ') : u.textChars ? `text, ${u.textChars} characters` : 'no tables' }));
+    } catch (e) { return json(400, e instanceof UploadError ? e.message : 'I could not use those files.'); }
+  }
+
   const conv = await ensureConversation(session, conversationId);
   if (!conv) return json(404, "Couldn't find that chat.");
 
@@ -52,7 +65,7 @@ export async function POST(req: Request) {
       const send = (e: ChatEvent) => { try { controller.enqueue(encoder.encode(JSON.stringify(e) + '\n')); } catch { /* the browser went away */ } };
       send({ type: 'conversation', id: conv.id });
       try {
-        await agent.runTurn({ session, conversationId: conv.id, text: message, chip, openArtifactId, emit: send, signal: req.signal });
+        await agent.runTurn({ session, conversationId: conv.id, text: message, chip, openArtifactId, ...(uploads.length ? { uploads } : {}), emit: send, signal: req.signal });
       } finally {
         try { controller.close(); } catch { /* already closed */ }
       }

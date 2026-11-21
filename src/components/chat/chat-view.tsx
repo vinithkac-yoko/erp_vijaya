@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Send, Square } from 'lucide-react';
+import { FileText, Paperclip, Send, Square, X } from 'lucide-react';
 import type { ChatItem, Chip } from '@/lib/cards';
 import type { Launcher } from '@/lib/launcher/launcher';
 import { openFormAction } from '@/server/chat/actions';
@@ -25,6 +25,8 @@ export interface ChatViewProps {
   offMessage: string;
   /** The microphone button shows only when listening is set up on the server. */
   voiceOn?: boolean;
+  /** Owner only: the paperclip. A file is checked on the server again; this only decides whether the button is drawn. */
+  filesOn?: boolean;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   /** The shell calls this with a function that opens a form (for Alt+R, the Share button and friends). */
   registerOpenForm: (fn: (tool: string, prefill?: Record<string, unknown>) => void) => void;
@@ -43,6 +45,10 @@ export interface ChatViewProps {
   registerArtifactForm: (fn: (artifactId: string, tool: string, prefill: Record<string, unknown>) => Promise<void>) => void;
 }
 
+/** A file chosen in the composer: being read, ready to send, or refused (and then it is gone with its reason shown). */
+interface Attached { key: string; name: string; id?: string; state: 'reading' | 'ready' }
+const ACCEPT = '.xlsx,.csv,.docx,.txt,.pdf,.png,.jpg,.jpeg,.webp,.gif';
+
 const NOTICE = (text: string): ChatItem => ({ id: `n-${Date.now()}-${Math.random()}`, role: 'card', card: { kind: 'notice', tone: 'info', text } });
 
 export function ChatView(p: ChatViewProps) {
@@ -53,6 +59,9 @@ export function ChatView(p: ChatViewProps) {
   const [status, setStatus] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [newForm, setNewForm] = useState<string | null>(null);
+  const [files, setFiles] = useState<Attached[]>([]);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const picker = useRef<HTMLInputElement>(null);
   const abort = useRef<AbortController | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const convRef = useRef(conversationId);
@@ -99,17 +108,21 @@ export function ChatView(p: ChatViewProps) {
     } else if (e.type === 'chips') setChips(e.chips);
   }, [adopt]);
 
+  const filesRef = useRef(files);
+  filesRef.current = files;
   const send = useCallback(async (message: string, chip?: string) => {
-    const msg = message.trim();
-    if (!msg || busy) return;
-    setChips([]); setBusy(true); setStatus('Working on it…'); setText('');
+    const attached = filesRef.current.filter((f) => f.state === 'ready' && f.id);
+    // files with no words: say what to do with them
+    const msg = message.trim() || (attached.length ? `I attached ${attached.length === 1 ? 'a file' : `${attached.length} files`}. Please look at ${attached.length === 1 ? 'it' : 'them'} and tell me what you find.` : '');
+    if (!msg || busy || filesRef.current.some((f) => f.state === 'reading')) return;
+    setChips([]); setBusy(true); setStatus('Working on it…'); setText(''); setFiles([]); setFileError(null);
     // the opening card stays; the person's words join the chat
     // (a password typed here is shown hidden, the same as it is kept)
-    setItems((cur) => [...cur, { id: `u-${Date.now()}`, role: 'user', text: redactSecrets(msg).text }]);
+    setItems((cur) => [...cur, { id: `u-${Date.now()}`, role: 'user', text: redactSecrets(msg).text, ...(attached.length ? { uploads: attached.map((f) => ({ name: f.name, kind: '' })) } : {}) }]);
     const ac = new AbortController();
     abort.current = ac;
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: ac.signal, body: JSON.stringify({ conversationId: convRef.current, message: msg, chip, artifactId: artifactRef.current }) });
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: ac.signal, body: JSON.stringify({ conversationId: convRef.current, message: msg, chip, artifactId: artifactRef.current, ...(attached.length ? { uploadIds: attached.map((f) => f.id) } : {}) }) });
       if (!res.ok || !res.body) {
         const err = (await res.json().catch(() => null)) as { error?: string } | null;
         setItems((cur) => [...cur, NOTICE(res.status === 401 ? 'Please log in again.' : err?.error ?? "I can't answer right now. The buttons above still work.")]);
@@ -135,6 +148,29 @@ export function ChatView(p: ChatViewProps) {
       setBusy(false); setStatus(null); abort.current = null;
     }
   }, [busy, handle]);
+
+  /** Sends each chosen file to the server, which checks it and reads it; the chip shows "Reading…" until then. */
+  const attach = useCallback(async (list: FileList | null) => {
+    if (!list || list.length === 0) return;
+    setFileError(null);
+    for (const file of Array.from(list).slice(0, 6)) {
+      const key = `f-${Date.now()}-${Math.random()}`;
+      setFiles((cur) => [...cur, { key, name: file.name, state: 'reading' }]);
+      try {
+        const body = new FormData();
+        body.set('file', file);
+        if (convRef.current) body.set('conversationId', convRef.current);
+        const res = await fetch('/api/uploads', { method: 'POST', body, credentials: 'same-origin' });
+        const data = (await res.json().catch(() => null)) as { upload?: { id: string }; error?: string } | null;
+        if (!res.ok || !data?.upload) throw new Error(res.status === 401 ? 'Please log in again.' : data?.error ?? "I couldn't take that file. Please try again.");
+        setFiles((cur) => cur.map((f) => (f.key === key ? { ...f, id: data.upload!.id, state: 'ready' } : f)));
+      } catch (e) {
+        setFiles((cur) => cur.filter((f) => f.key !== key));
+        setFileError(`${file.name}: ${(e as Error).message}`);
+      }
+    }
+    if (picker.current) picker.current.value = '';
+  }, []);
 
   const openForm = useCallback(async (tool: string, prefill?: Record<string, unknown>) => {
     setChips([]);
@@ -172,7 +208,18 @@ export function ChatView(p: ChatViewProps) {
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto" role="log" aria-label="Chat" aria-live="polite" aria-relevant="additions">
         <div className="mx-auto w-full max-w-[720px] space-y-4 px-4 py-5 md:py-8">
           {items.map((it) => {
-            if (it.role === 'user') return <div key={it.id} className="flex justify-end"><p className="max-w-[85%] whitespace-pre-wrap rounded-md bg-plate px-4 py-2.5 text-plate-ink">{it.text}</p></div>;
+            if (it.role === 'user') {
+              return (
+                <div key={it.id} className="flex flex-col items-end gap-1.5">
+                  {it.uploads && it.uploads.length > 0 && (
+                    <ul aria-label="Attached files" className="flex max-w-[85%] flex-wrap justify-end gap-1.5">
+                      {it.uploads.map((u, i) => <li key={i} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 text-sm text-ink-soft"><FileText aria-hidden className="size-4 shrink-0" /><span className="truncate">{u.name}</span></li>)}
+                    </ul>
+                  )}
+                  <p className="max-w-[85%] whitespace-pre-wrap rounded-md bg-plate px-4 py-2.5 text-plate-ink">{it.text}</p>
+                </div>
+              );
+            }
             if (it.role === 'assistant') return <AssistantText key={it.id} text={it.text} />;
             const c = it.card;
             if (c.kind === 'opening') return <OpeningCard key={it.id} card={c} assistantOn={p.assistantOn} onAsk={(ask, label) => void send(ask, label)} onSheet={p.onOpenSheet} onDecisions={p.onOpenDecisions} onForm={(tool, prefill) => void openForm(tool, prefill)} />;
@@ -207,7 +254,31 @@ export function ChatView(p: ChatViewProps) {
         <div className="mx-auto w-full max-w-[720px] space-y-3 px-4 py-3">
           <LauncherRow launcher={p.launcher} formEnabled={p.formEnabled} chipEnabled={p.chipEnabled} badges={p.badges}
             onForm={(tool) => void openForm(tool)} onChip={(label, ask) => void send(ask, label)} />
+          {(files.length > 0 || fileError) && (
+            <div className="space-y-1.5">
+              {files.length > 0 && (
+                <ul aria-label="Files to send" className="flex flex-wrap gap-1.5">
+                  {files.map((f) => (
+                    <li key={f.key} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-surface py-1 pl-3 pr-1 text-sm">
+                      <FileText aria-hidden className="size-4 shrink-0 text-ink-soft" />
+                      <span className="truncate">{f.name}</span>
+                      {f.state === 'reading' ? <span role="status" className="px-1 text-ink-soft">Reading…</span>
+                        : <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles((cur) => cur.filter((x) => x.key !== f.key))} className="inline-flex size-7 items-center justify-center rounded-full hover:bg-copper-wash"><X aria-hidden className="size-4" /></button>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {fileError && <p role="alert" className="text-alert">{fileError}</p>}
+            </div>
+          )}
           <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); void send(text); }}>
+            {p.filesOn && (
+              <>
+                <input ref={picker} type="file" multiple accept={ACCEPT} className="sr-only" tabIndex={-1} aria-hidden onChange={(e) => void attach(e.target.files)} data-testid="file-input" />
+                <button type="button" aria-label="Attach a file" disabled={composerOff || busy} onClick={() => picker.current?.click()}
+                  className="inline-flex size-12 shrink-0 items-center justify-center rounded-md border border-line bg-surface text-ink hover:bg-copper-wash disabled:cursor-not-allowed disabled:opacity-50"><Paperclip aria-hidden className="size-5" /></button>
+              </>
+            )}
             <label htmlFor="chat-input" className="sr-only">Type a message</label>
             <textarea id="chat-input" ref={p.inputRef} rows={1} disabled={composerOff} value={text} onChange={(e) => setText(e.target.value)} maxLength={2000}
               placeholder={composerOff ? p.offMessage : 'Ask a question, or say what you want to do…'}
@@ -219,7 +290,7 @@ export function ChatView(p: ChatViewProps) {
               <button type="button" aria-label="Stop" onClick={() => abort.current?.abort()}
                 className="inline-flex size-12 shrink-0 items-center justify-center rounded-md border border-line bg-surface text-ink hover:bg-copper-wash"><Square aria-hidden className="size-5" /></button>
             ) : (
-              <button type="submit" aria-label="Send" disabled={composerOff || !text.trim()}
+              <button type="submit" aria-label="Send" disabled={composerOff || (!text.trim() && !files.some((f) => f.state === 'ready')) || files.some((f) => f.state === 'reading')}
                 className={cn('inline-flex size-12 shrink-0 items-center justify-center rounded-md border border-copper bg-copper text-on-copper', 'disabled:cursor-not-allowed disabled:opacity-50')}><Send aria-hidden className="size-5" /></button>
             )}
           </form>

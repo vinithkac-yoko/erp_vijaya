@@ -60,18 +60,21 @@ export const getImportDraft = defineTool({
       ...(result ? { result: { finished: result.finished, ...tally(result.steps), notDone: problemsOf(result.steps), ...(result.undo ? { undone: { finished: result.undo.finished, ...tally(result.undo.steps), notUndone: problemsOf(result.undo.steps) } } : {}) } } : {}),
     };
   },
-  view: (d) => {
-    const cards: Card[] = [];
-    const res = (d as { result?: { done: number; skipped: number; failed: number; notDone: { what: string; outcome: string; reason: string }[] } }).result;
-    if (res) {
-      cards.push({ kind: 'table', title: `${d.title}: what happened`, columns: [{ key: 'k', label: '' }, { key: 'n', label: '', align: 'right' }], rows: [{ k: 'Done', n: String(res.done) }, { k: 'Not done', n: String(res.skipped) }, { k: 'Failed', n: String(res.failed) }] });
-      if (res.notDone.length) cards.push({ kind: 'table', title: 'Not done', columns: [{ key: 'w', label: 'What' }, { key: 'r', label: 'Why' }], rows: res.notDone.slice(0, 10).map((x) => ({ w: x.what, r: x.reason || x.outcome })) });
-    } else {
-      cards.push({ kind: 'table', title: d.title, columns: [{ key: 'w', label: 'What will change' }], rows: d.willDo.map((w) => ({ w })) });
-    }
-    return cards;
-  },
+  view: (d) => draftCards(d),
 });
+
+/** The cards for an import: what it will change, or, once applied, what happened (and what was not done). */
+function draftCards(d: { title: string; willDo: string[]; result?: unknown }): Card[] {
+  const cards: Card[] = [];
+  const res = d.result as { done: number; skipped: number; failed: number; notDone: { what: string; outcome: string; reason: string }[]; undone?: { done: number; skipped: number; failed: number } } | undefined;
+  if (res) {
+    cards.push({ kind: 'table', title: `${d.title}: what happened`, columns: [{ key: 'k', label: 'Changes' }, { key: 'n', label: 'How many', align: 'right' }], rows: [{ k: 'Done', n: String(res.done) }, { k: 'Not done', n: String(res.skipped) }, { k: 'Failed', n: String(res.failed) }, ...(res.undone ? [{ k: 'Undone', n: String(res.undone.done) }] : [])] });
+    if (res.notDone.length) cards.push({ kind: 'table', title: 'Not done', columns: [{ key: 'w', label: 'What' }, { key: 'r', label: 'Why' }], rows: res.notDone.slice(0, 10).map((x) => ({ w: x.what, r: x.reason || x.outcome })), note: res.notDone.length > 10 ? `Showing 10 of ${res.notDone.length}.` : undefined });
+  } else {
+    cards.push({ kind: 'table', title: d.title, columns: [{ key: 'w', label: 'What will change' }], rows: d.willDo.map((w) => ({ w })) });
+  }
+  return cards;
+}
 
 // ── apply_import ───────────────────────────────────────────────────────────────────────────────────
 export const applyImport = defineTool({
@@ -131,7 +134,7 @@ export const applyImport = defineTool({
     if (!r.ok) return { facts: [], chips: [] };
     const res = (r.data as { result?: { done: number; skipped: number; failed: number } }).result;
     const facts = res ? [`Done: ${res.done}. Not done: ${res.skipped}. Failed: ${res.failed}.`] : [];
-    return { facts, chips: [{ label: 'What was not done?', ask: 'Which parts of that import were not done, and why?' }, { label: 'Undo this import', form: 'undo_import', prefill: { draftId: String(input.draftId) } }] };
+    return { facts, cards: draftCards(r.data as Parameters<typeof draftCards>[0]), chips: [{ label: 'What was not done?', ask: 'Which parts of that import were not done, and why?' }, { label: 'Undo this import', form: 'undo_import', prefill: { draftId: String(input.draftId) } }] };
   },
 });
 
@@ -177,7 +180,7 @@ export const undoImport = defineTool({
   followUps: async (ctx, input) => {
     const r = await ctx.read('get_import_draft', { draftId: input.draftId });
     const u = r.ok ? (r.data as { result?: { undone?: { done: number; skipped: number; failed: number } } }).result?.undone : undefined;
-    return { facts: u ? [`Undone: ${u.done}. Left as they were: ${u.skipped + u.failed}.`] : [], chips: [{ label: 'What stayed?', ask: 'What could not be undone from that import, and why?' }] };
+    return { facts: u ? [`Undone: ${u.done}. Left as they were: ${u.skipped + u.failed}.`] : [], cards: r.ok ? draftCards(r.data as Parameters<typeof draftCards>[0]) : [], chips: [{ label: 'What stayed?', ask: 'What could not be undone from that import, and why?' }] };
   },
 });
 

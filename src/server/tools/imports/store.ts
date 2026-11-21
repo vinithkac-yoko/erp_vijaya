@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
-import type { Prisma, Upload } from '@prisma/client';
+import { Prisma, type Upload } from '@prisma/client';
 import { agentConfig } from '../../agent/config';
 import { db } from '../../db';
 import type { ToolSession } from '../types';
@@ -43,8 +43,7 @@ export const ownerOnly = (s: ToolSession) => { if (s.role !== 'OWNER') throw new
 
 /** Files past their days are dropped (the row stays, as a record that there was one). */
 export async function purgeExpired(now: Date): Promise<number> {
-  const r = await db.upload.updateMany({ where: { expiresAt: { lte: now }, purgedAt: null }, data: { bytes: null, content: undefined, purgedAt: now } });
-  await db.$executeRaw`UPDATE uploads SET content = NULL WHERE "purgedAt" IS NOT NULL AND content IS NOT NULL`;
+  const r = await db.upload.updateMany({ where: { expiresAt: { lte: now }, purgedAt: null }, data: { bytes: null, content: Prisma.DbNull, purgedAt: now } });
   return r.count;
 }
 
@@ -98,6 +97,16 @@ export async function getUpload(session: ToolSession, id: string): Promise<{ row
   if (!row) throw new UploadError("I can't find that file.");
   if (row.purgedAt || !row.content) throw new UploadError(`That file was removed after ${RETENTION_DAYS} days. Attach it again.`);
   return { row, content: row.content as unknown as Content };
+}
+
+/** The files a chat message says it attaches: all must be this owner's, readable, and not removed. */
+export async function verifyUploads(session: ToolSession, ids: string[]): Promise<UploadInfo[]> {
+  ownerOnly(session);
+  if (ids.length === 0) return [];
+  const rows = await db.upload.findMany({ where: { id: { in: ids }, userId: session.userId, purgedAt: null, readError: null } });
+  if (rows.length !== new Set(ids).size) throw new UploadError("One of those files isn't available any more. Please attach it again.");
+  const order = new Map(ids.map((id, i) => [id, i]));
+  return rows.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)).map(infoOf);
 }
 
 export async function listUploads(session: ToolSession, opts: { conversationId?: string; limit?: number } = {}): Promise<UploadInfo[]> {

@@ -637,16 +637,14 @@ to check what the file says about one thing, or to find where a section starts. 
 
 tool("propose_import", "app", OW, """
 OWNER ONLY. Turns what you read in the owner's files into a PROPOSAL he can answer questions about and then apply. It saves nothing in the business.
-You do not type rows: you say what each TABLE is (which file, which sheet, which row has the headings, which COLUMN holds which field) and the server reads every row with that
-description, compares with what is in the system, and works out the changes, the questions and the rows it cannot use. A file can hold several tables, and several files can go in one proposal;
-give one entry per table. Add materials before the parts and bills of materials that use them (the server orders them itself).
-""" + IMPORT_FIELDS + """ Use defaults for a value that is the same on every row (the unit of the whole list, stockType, role) ONLY if the owner said so or the sheet makes it plain;
-a unit is never guessed (it cannot be changed later): leave it out and the server asks. Quantities go on the opening count (the only way stock gets in from a file).
-Returns what will change, the questions that need his answer (with a suggested choice for each), the rows left out with the reason, and notes. If it returns problems with your description, fix the
-description and call again. Then tell him what you found in plain words, ask the questions together in one message with your suggestions, and wait.
+You do not type rows: you say what each TABLE is (file, sheet, heading row, which COLUMN holds which field) and the server reads every row, compares with
+the system, and works out the changes, the questions and the rows it cannot use. One entry per table; a proposal can hold several tables from several files.
+Never guess a unit (it cannot be changed later): leave it out and the server asks. Use defaults only for a value the owner said or the sheet makes plain for every row.
+Quantities go on the opening count. Returns what will change, the open questions (each with a suggested choice), the rows left out with the reason, and notes.
+If it returns problems with your description, fix it and call again. Then tell him what you found, ask the questions together in one message, and wait.
 Never say anything is saved: it is not until he presses Apply.""",
      {"title": "A short name for this import, like \"Tape list and suppliers\".",
-      "tables": "One entry per table: {uploadId, sheet (if the file has several), kind (materials, parties, parts or bom), headerRow (the row number of the headings; 0 if none), columns ({field: column letter}), defaults ({field: value for every row}), standingCategories (categories kept in stock, if the sheet has kinds but no stock type), lastRow, skipRows}.",
+      "tables": "One entry per table: {uploadId, sheet (if the file has several), kind (materials, parties, parts or bom), headerRow (the row number of the headings; 0 if none), columns ({field: column letter}), defaults ({field: value for every row}), standingCategories (categories kept in stock, if the sheet has kinds but no stock type), lastRow, skipRows}. " + IMPORT_FIELDS,
       "answers": "Answers the owner has already given: {questionKey: {choice, perItem}}. Normally leave out; use revise_import for answers."})
 
 tool("revise_import", "app", OW, """

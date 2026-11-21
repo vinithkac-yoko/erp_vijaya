@@ -29,10 +29,10 @@ const body = (r: { text: string }) => JSON.parse(r.text) as Record<string, unkno
 const mk = (ownerId: string, kind: 'document' | 'page', source: string, title = 'A report') => store.createArtifact(db, { ownerId, kind, title, source, request: 'x', checkReport: {} });
 
 describe('which artifact tools each role is offered', () => {
-  it('both roles get the same six, with the words from the generated file', () => {
-    for (const role of ['OWNER', 'STOREKEEPER'] as const) {
-      expect(appToolDefs(role).map((t) => t.name)).toEqual(['list_artifacts', 'open_artifact', 'make_artifact', 'edit_artifact', 'open_printout', 'download_data']);
-    }
+  it('both roles get the same six, with the words from the generated file; only the owner also gets the six for his files', () => {
+    const SIX = ['list_artifacts', 'open_artifact', 'make_artifact', 'edit_artifact', 'open_printout', 'download_data'];
+    expect(appToolDefs('STOREKEEPER').map((t) => t.name)).toEqual(SIX);
+    expect(appToolDefs('OWNER').map((t) => t.name)).toEqual([...SIX, 'list_uploads', 'read_upload', 'search_upload', 'propose_import', 'revise_import', 'discard_import']);
     expect(appToolDefs('OWNER').find((t) => t.name === 'make_artifact')?.description).toMatch(/ONLY when the user asks for a report/);
   });
 });

@@ -24,6 +24,6 @@ export type Chip =
 
 /** One line of the chat as the browser receives it. */
 export type ChatItem =
-  | { id: string; role: 'user'; text: string }
+  | { id: string; role: 'user'; text: string; /** Files the owner attached to this message (names only). */ uploads?: { name: string; kind: string }[] }
   | { id: string; role: 'assistant'; text: string }
   | { id: string; role: 'card'; card: Card; /** forms only: what became of it */ state?: 'open' | 'saved' | 'closed' };

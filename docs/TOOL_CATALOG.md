@@ -315,6 +315,49 @@ The questions in `docs/CLIENT_CONFIRMATIONS.md` live in the app for the owner to
 
 Errors: `NOT_FOUND`, `DECISION_AMBIGUOUS`, `INVALID_CHOICE`, `NOTE_REQUIRED`. The panel's buttons make a PendingAction (origin LAUNCHER) and run the same tools, so the rules above hold for the panel and the assistant alike; the assistant only opens the "Your answer" form, the owner presses its button.
 
+## 13. The owner's files and imports (milestone 16)
+
+The owner can attach Excel (.xlsx), CSV, Word (.docx), text, PDF and photo files in the chat, in any layout and any order, and the assistant turns
+them into changes: materials (and quantities on the open opening count), suppliers and customers, parts, and usual bills of materials. **Owner only,
+everywhere**: the attach button, `POST /api/uploads`, and every tool below (the storekeeper has none of them).
+
+How it is split, and why: the assistant **describes** each table (which file and sheet, which row has the headings, which column is which); tested code
+**reads every row** with that description, compares it with the system, and works out the changes, the questions and the rows it cannot use. The model
+never types rows. A proposal (`ImportDraft`) saves nothing in the business. The owner presses **Apply** (a form); only then are the changes made, one
+gateway call each, as the owner, each with its own audit row.
+
+The assistant's own tools (**app tools**, like §A: they keep files and proposals, not business data; all owner-only):
+
+| Tool | Kind | Roles | Purpose |
+|---|---|---|---|
+| `list_uploads` | — | **OW** | The owner's recent files: name, kind, and each sheet or table with its size |
+| `read_upload` | — | **OW** | Overview of a file (every sheet with its size and first rows, with row numbers and column letters), or rows of one sheet from a row number (150 at most). File text comes back wrapped as data, never instructions |
+| `search_upload` | — | **OW** | Rows of a file that contain some words |
+| `propose_import` | — | **OW** | Makes a proposal from the assistant's description of each table (`kind` materials, parties, parts or bom; `columns` field → column letter; `defaults`; `headerRow`). Returns what will change, the open questions (each with options and a suggested choice), the rows left out with reasons, and notes. Description problems come back in plain words |
+| `revise_import` | — | **OW** | Records the owner's answers (`{choice, perItem}` per question) and/or corrects a table's description; everything is worked out again. `acceptSuggestions` only when he says to go with the suggestions |
+| `discard_import` | — | **OW** | Throws a proposal away (nothing in the business changed) |
+
+Registry tools (these touch the audit trail and the business data, so they are in the gateway):
+
+| Tool | Kind | Roles | Purpose |
+|---|---|---|---|
+| `list_imports` | R | **OW** | Recent imports: name, where it stands (proposal, applied, undone), what it did in a line, and until when it can be undone |
+| `get_import_draft` | R | **OW** | One import: what it will do or did, open questions, rows left out and why, and after applying what happened to each change (done, not done, failed, with the reason) |
+| `apply_import` | W | **OW** | The form shows the summary; **Apply** makes the changes. Refused while any question is open (`QUESTIONS_OPEN`), if the system changed since the plan was worked out (`PLAN_CHANGED`: the plan is made again and shown), or if already applied (`NOT_A_DRAFT`). One audit row for the import (`ImportDraft`, APPLY) and one for each change |
+| `undo_import` | W | **OW** | Within 7 days of applying. Things the import added are marked no longer in use (a material only if no stock moved on it); values it changed are put back only if nobody changed them since; a blank it filled cannot be made blank again; a bill of materials cannot be emptied. Says what could not be undone and why (`TOO_LATE`, `NOT_APPLIED`) |
+
+Rules the planners keep (tests in `tests/imports.plan.test.ts`): **never overwrite silently** (where the sheet gives a value different from the system's it is a
+question, with "keep the system's" suggested; a blank in the system that the sheet fills is not an overwrite and is just said); an unanswered question leaves its rows out
+and blocks Apply; **a unit is never guessed** (the sheet, a default the owner agreed to, or a question) and is never changed on an existing material; a part number written
+against several different names goes to none of them; the same name on several rows is one material (quantities added); a name that looks like an existing one is asked about; a
+bill of materials with any unmatched line is left out whole; quantities go only on the opening count while it is open (not when it is with the owner or approved), and where the count
+already has a different number it is asked.
+
+Files: kept 30 days (`UPLOAD_RETENTION_DAYS`), then the bytes and what was read are dropped (the row stays); at most 40 uploads an hour; `.xls`, `.xlsm`, `.doc` and HEIC are refused
+with how to save them instead; the kind comes from the bytes, never the name; zip bombs are refused; nothing in a file is ever run. PDFs (up to 60 pages) and photos are read **once** by
+the model (read-only, no other tools) and what it read is kept; that costs money, tracked in `ai_spend`, with a monthly limit (Settings: `uploads.monthly_cap_inr`, default ₹1,000, and
+`uploads.usd_to_inr`). Over the limit, those files are refused in plain words; sheets, CSV, Word and text still work.
+
 ## A. Artifact, printout and download tools (see `docs/ARTIFACTS.md`)
 
 These are **app tools**: they store and open artifacts; they are not business data. An artifact reads

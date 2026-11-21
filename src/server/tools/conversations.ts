@@ -7,11 +7,14 @@ import { db } from '../db';
  * next turn can send them back unchanged; the browser's view is worked out from these rows.
  */
 export type Stored =
-  | { kind: 'text'; text: string; chip?: string }            // what the person typed
+  | { kind: 'text'; text: string; chip?: string; uploads?: StoredUpload[] } // what the person typed (and the files he attached)
   | { kind: 'api'; blocks: unknown[] }                       // the assistant's reply, as returned
   | { kind: 'tool_results'; blocks: unknown[] }              // answers to the assistant's tool calls (hidden)
   | { kind: 'notice'; text: string }                         // a note from the server to the assistant (hidden)
   | { kind: 'card'; card: Card };                            // a card the server drew
+
+/** A file attached to a message: what the screen shows (name, kind) and what the assistant is told (id, summary). */
+export interface StoredUpload { id: string; name: string; kind: string; summary: string }
 
 const toJson = (v: unknown) => v as Prisma.InputJsonValue;
 export const DAY_MS = 24 * 60 * 60 * 1000;
@@ -70,7 +73,7 @@ export function conversationStore(client: PrismaClient = db) {
       const out: ChatItem[] = [];
       for (const r of rows) {
         const c = r.content as unknown as Stored;
-        if (c.kind === 'text') out.push({ id: r.id, role: 'user', text: c.text });
+        if (c.kind === 'text') out.push({ id: r.id, role: 'user', text: c.text, ...(c.uploads?.length ? { uploads: c.uploads.map((u) => ({ name: u.name, kind: u.kind })) } : {}) });
         else if (c.kind === 'api') {
           const text = (c.blocks as { type?: string; text?: string }[]).filter((b) => b.type === 'text' && b.text).map((b) => b.text).join('\n\n').trim();
           if (text) out.push({ id: r.id, role: 'assistant', text });

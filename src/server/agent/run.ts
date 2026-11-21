@@ -10,7 +10,7 @@ import { redactSecrets } from './redact';
 import { agentTools, stripHidden } from './schemas';
 import { APP_TOOLS, appToolDefs, runAppTool } from '../artifacts/app-tools';
 import type { BuilderModel } from '../artifacts/builder';
-import type { conversationStore } from '../tools/conversations';
+import type { conversationStore, StoredUpload } from '../tools/conversations';
 import type { createPendingService } from '../tools/pending';
 import type { Registry } from '../tools/registry';
 import type { createRunTool } from '../tools/run-tool';
@@ -41,14 +41,19 @@ export interface TurnInput {
   chip?: string;
   /** The artifact open beside the chat, if any: the default for "change it" and "download it". */
   openArtifactId?: string;
+  /** Owner only: the files attached to this message (already checked to be his). */
+  uploads?: StoredUpload[];
   emit: (e: ChatEvent) => void;
   signal?: AbortSignal;
 }
 
+/** The most steps and time one turn that comes with files may take (a question keeps the normal limits). */
+const FILE_TURN = { calls: 16, ms: 150_000 };
+
 /** What the person sees while a tool runs. Never a bare spinner (INTERFACE §11). */
 const STATUS: Record<string, string> = {
   search_materials: 'Looking up materials…', get_material_balance: 'Checking stock…', search_parties: 'Looking up suppliers and customers…',
-  list_reorder_alerts: 'Checking what is low…', make_artifact: 'Building it. This can take a little while…', edit_artifact: 'Making the change…', open_printout: 'Getting the printout ready…', list_artifacts: 'Looking at what you have made…', list_pending_approvals: 'Checking what is waiting…', list_settings: 'Looking at the settings…', list_users: 'Looking up the logins…',
+  list_reorder_alerts: 'Checking what is low…', list_uploads: 'Looking at your files…', read_upload: 'Reading your file…', search_upload: 'Searching your file…', propose_import: 'Working out the changes. This can take a moment…', revise_import: 'Working out the changes again…', discard_import: 'Putting that aside…', list_imports: 'Looking at the imports…', get_import_draft: 'Looking at the import…', make_artifact: 'Building it. This can take a little while…', edit_artifact: 'Making the change…', open_printout: 'Getting the printout ready…', list_artifacts: 'Looking at what you have made…', list_pending_approvals: 'Checking what is waiting…', list_settings: 'Looking at the settings…', list_users: 'Looking up the logins…',
 };
 
 const SAY_IT = 'Now write the one short sentence the user needs before they check the form: what is filled in and what to check, following the rules for what it says. Plain words. Do not say it is done or saved.';
@@ -75,7 +80,7 @@ export function createAgent(deps: AgentDeps) {
 
     // A password typed into the chat is hidden before anything is saved or sent to the model.
     const safe = redactSecrets(input.text);
-    await store.append(conversationId, 'USER', { kind: 'text', text: safe.text, chip: input.chip });
+    await store.append(conversationId, 'USER', { kind: 'text', text: safe.text, chip: input.chip, ...(input.uploads?.length ? { uploads: input.uploads } : {}) });
     await store.setTitleIfEmpty(conversationId, safe.text);
     if (safe.hidden) {
       await show(conversationId, { kind: 'notice', tone: 'warn', text: 'I hid the password you typed. Please type passwords only in the form, never in the chat.' }, emit);
@@ -98,7 +103,10 @@ export function createAgent(deps: AgentDeps) {
     const tools = [...agentTools(registry, session.role), ...appToolDefs(session.role)].sort((a, b) => a.name.localeCompare(b.name));
 
     const timeout = new AbortController();
-    const timer = setTimeout(() => timeout.abort(new Error('turn timed out')), config.turnTimeoutMs);
+    // a turn with files in it looks at them, asks for the description and proposes: it needs more steps and more time than a question
+    const maxCalls = input.uploads?.length ? Math.max(config.maxToolCalls, FILE_TURN.calls) : config.maxToolCalls;
+    const turnMs = input.uploads?.length ? Math.max(config.turnTimeoutMs, FILE_TURN.ms) : config.turnTimeoutMs;
+    const timer = setTimeout(() => timeout.abort(new Error('turn timed out')), turnMs);
     const onAbort = () => timeout.abort(new Error('cancelled'));
     input.signal?.addEventListener('abort', onAbort);
 
@@ -158,7 +166,7 @@ export function createAgent(deps: AgentDeps) {
         let limited = false;
 
         for (const use of uses) {
-          if (toolCalls >= config.maxToolCalls) {
+          if (toolCalls >= maxCalls) {
             limited = true;
             results.push({ type: 'tool_result', tool_use_id: use.id, is_error: true, content: 'Too many steps in one turn. Stop and tell the user what you found so far.' });
             continue;
@@ -236,7 +244,7 @@ export function createAgent(deps: AgentDeps) {
         if (formOpened) break; // the turn ends with the form on the screen
         if (limited) {
           status = 'LIMITED';
-          await show(conversationId, { kind: 'notice', tone: 'info', text: `I stopped after ${config.maxToolCalls} steps. Please ask again, a little more simply.` }, emit, run.id);
+          await show(conversationId, { kind: 'notice', tone: 'info', text: `I stopped after ${maxCalls} steps. Please ask again, a little more simply.` }, emit, run.id);
           break;
         }
       }

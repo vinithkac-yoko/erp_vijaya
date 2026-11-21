@@ -14,6 +14,7 @@ import { BuilderError, buildEdit, buildNew, type BuilderModel } from './builder'
 import { FORMATS_BY_KIND, type Format } from './export';
 import { accessFor, addVersion, auditArtifact, BUILDS_PER_HOUR, buildsLastHour, createArtifact, listFor, type Kind } from './store';
 import { db } from '../db';
+import { IMPORT_APP_TOOLS } from '../tools/imports/app-tools';
 
 /**
  * The assistant's artifact tools (docs/TOOL_CATALOG.md §A): not business data, so they are not in the registry. They store
@@ -179,6 +180,8 @@ const downloadData: AppTool = {
 
 export const APP_TOOLS: Record<string, AppTool> = {
   list_artifacts: listArtifacts, open_artifact: openArtifact, make_artifact: makeArtifact, edit_artifact: editArtifact, open_printout: openPrintout, download_data: downloadData,
+  // the owner's files and imports (milestone 16): owner-only, they look at files and keep proposals, and save nothing in the business
+  ...(Object.fromEntries(Object.entries(IMPORT_APP_TOOLS).map(([name, t]) => [name, { roles: t.roles, input: t.input, run: (ctx: AppToolContext, input: never) => t.run({ session: ctx.session, conversationId: ctx.conversationId }, input as never) }])) as Record<string, AppTool>),
 };
 
 /** What the model sees for these tools (the words come from prompts/tool-descriptions.json, like every other tool). */
