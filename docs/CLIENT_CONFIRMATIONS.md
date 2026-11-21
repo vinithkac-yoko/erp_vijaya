@@ -10,7 +10,7 @@ bottom of each milestone's section.
 - ✅ = Kasi already agreed. The owner should still hear it once.
 - ❓ = nobody has agreed yet. **These are the important ones.**
 
-Last updated: after milestone 13 (section O). Since milestone 12 the owner answers these questions inside the app (the Questions panel); this file is where they are written and where Kasi keeps the wording.
+Last updated: after milestone 15 (section P). Since milestone 12 the owner answers these questions inside the app (the Questions panel); this file is where they are written and where Kasi keeps the wording.
 
 ---
 
@@ -282,3 +282,15 @@ Kasi's rules: only the sheet **STOCK**; **MISC and CONS** are the things kept in
 | O9 | ✅ | **Rows with no description** (7: a tape and six sleeves). | Kasi: "ok". Named replace1 … replace7, each with its part number (where it has a usable one), rack and shelf; six have no quantity. | Kasi's rule. | Who gives the real names? |
 | O10 | ✅ | **Same item in more than one place.** | Kasi: "ok". Added into one material (32 rows); where each part was kept is in its note, and the first rack and shelf is the one shown. | A material has one name. | |
 | O11 | ✅ | **The date of the quantities.** | Kasi: "yes, they will" recount. The quantities are a starting point on the opening count sheet; the store recounts and types the rates before sending it. | Stock moves. | |
+
+## P. The tape list (2026-11-21)
+
+Kasi sent the accounts program's workbook; its sheet **Tape** has 141 tape descriptions with part numbers. They were added as materials (131 after repeats were merged), kind TAPE, bought for each job, with the part number as the item code and no quantities.
+
+| # | Status | The question | What we did | Why | Owner says |
+|---|---|---|---|---|---|
+| P1 | ❓ | **The unit of the tapes.** | Pieces (NOS), as the store's own stock sheet counts its tapes. | A unit cannot be changed once there is stock. | Pieces or rolls? (Say before any stock goes in.) |
+| P2 | ❓ | **Two tapes with the same part number.** | The 24.0 mm and the 25.0 mm yellow tapes both say TY1046. Neither got the number (it is in each one's note). The pattern of the numbers suggests 25.0 mm is TY1048. | Nobody can tell which owns it. | What is the right number for each? |
+| P3 | ❓ | **Tapes with no part number** (10: cotton tape, F-302 6 mm, T-090/R 7 mm, T-180 7 mm, two T-910U films, yellow 3 mm and 4 mm, and the two above). | Added with no item code. | The list has none. | Please give them. |
+| P4 | ❓ | **Quantities of tape.** | None on the list. They join the opening count as **not counted yet**, so the store counts them (zero included) before the count is sent. | The accounts program shows tape in stock, but the store's own stock sheet lists only six tapes. | Is the tape on the shelf counted somewhere else? |
+| P5 | ❓ | **Rack and shelf for the tapes.** | None given. | The list has none. | Where are they kept? |

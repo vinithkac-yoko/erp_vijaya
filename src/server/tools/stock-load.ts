@@ -20,6 +20,32 @@ async function act(who: ToolSession, tool: string, input: Data): Promise<{ ok: t
   return r.ok ? { ok: true, data: (r.data ?? {}) as Data } : { ok: false, message: r.message };
 }
 
+/**
+ * Adds materials only (no quantities, no count work), one create_material each, through the gateway as the owner. A material
+ * whose name is already in the list is left alone; one whose item code is already taken is added without the code. A count
+ * that is open picks the new materials up by itself (create_material does that).
+ */
+export async function addMaterials(materials: Plan['materials'], owner: ToolSession, say: (line: string) => void = () => {}): Promise<{ made: number; refused: string[]; skippedExisting: number }> {
+  const have = new Set((await db.material.findMany({ select: { nameKey: true } })).map((m) => m.nameKey));
+  const codes = new Set((await db.material.findMany({ where: { itemCodeKey: { not: null } }, select: { itemCodeKey: true } })).map((m) => m.itemCodeKey as string));
+  const { itemCodeKey } = await import('@/lib/names');
+  const refused: string[] = [];
+  let made = 0, skippedExisting = 0;
+  for (const m of materials) {
+    if (have.has(materialNameKey(m.name))) { skippedExisting++; continue; }
+    const taken = !!m.itemCode && codes.has(itemCodeKey(m.itemCode));
+    const r = await act(owner, 'create_material', {
+      name: m.name, uom: m.uom, stockType: m.stockType, ...(m.minimumLevel !== undefined ? { minimumLevel: m.minimumLevel } : {}),
+      ...(m.itemCode && !taken ? { itemCode: m.itemCode } : {}), ...(m.category ? { category: m.category } : {}), ...(m.rack ? { rack: m.rack } : {}), ...(m.shelf ? { shelf: m.shelf } : {}),
+      ...(m.notes || taken ? { notes: [m.notes, taken ? `Part number on the list: ${m.itemCode} (already used for another material)` : ''].filter(Boolean).join('. ') } : {}), confirmNotDuplicate: true,
+    });
+    if (r.ok) { made++; have.add(materialNameKey(m.name)); if (m.itemCode && !taken) codes.add(itemCodeKey(m.itemCode)); if (made % 100 === 0) say(`  … ${made} materials added`); } else refused.push(`${m.name}: ${r.message}`);
+  }
+  say(`Materials added: ${made}${skippedExisting ? ` (${skippedExisting} were already there)` : ''}${refused.length ? `, ${refused.length} refused` : ''}`);
+  for (const f of refused) say(`  refused: ${f}`);
+  return { made, refused, skippedExisting };
+}
+
 export interface LoadResult { countWithOwner?: boolean; made: number; refused: string[]; countNumber: string | null; countApproved: boolean; quantitiesSaved: number; counted: number; total: number; needRate: number }
 
 export async function applyStockPlan(plan: Pick<Plan, 'materials' | 'alreadyThere'>, owner: ToolSession, date: string, say: (line: string) => void = () => {}): Promise<LoadResult> {

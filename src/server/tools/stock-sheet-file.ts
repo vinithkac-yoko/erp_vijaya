@@ -55,6 +55,24 @@ export function parseCsv(text: string): string[][] {
   return out;
 }
 
+/** A sheet of two things per line, the description and the part number (the store's tape list): the first two columns of the named sheet, or of a CSV. */
+export async function readNameCodeSheet(path: string, sheet: string): Promise<{ line: number; description: string; code: string }[]> {
+  const ext = extname(path).toLowerCase();
+  let grid: string[][];
+  if (ext === '.csv') grid = parseCsv(await readFile(path, 'utf8'));
+  else if (ext === '.xls') throw new SheetError('This is an old-style Excel file (.xls). Open it in Excel, choose File, Save As, "Excel Workbook (.xlsx)", and use that file.');
+  else if (ext === '.xlsx') {
+    const { default: ExcelJS } = await import('exceljs');
+    const wb = new ExcelJS.Workbook();
+    try { await wb.xlsx.readFile(path); } catch { throw new SheetError("Couldn't open that file. Is it a real .xlsx file?"); }
+    const ws = wb.worksheets.find((w) => w.name.trim().toUpperCase() === sheet.trim().toUpperCase());
+    if (!ws) throw new SheetError(`There is no sheet called ${sheet} in this file (it has: ${wb.worksheets.map((w) => w.name.trim()).join(', ')}).`);
+    grid = [];
+    ws.eachRow({ includeEmpty: true }, (row, n) => { grid[n - 1] = [1, 2].map((c) => { const cell = row.getCell(c); const v = cell.value; return v === null || v === undefined ? '' : typeof v === 'object' && 'result' in v ? String(v.result ?? '') : cell.text; }); });
+  } else throw new SheetError('Use an Excel file (.xlsx), or the sheet saved as a CSV.');
+  return Array.from(grid, (r) => r ?? []).map((r, i) => ({ line: i + 1, description: String(r[0] ?? ''), code: String(r[1] ?? '') }));
+}
+
 export async function readStockSheet(path: string): Promise<SheetRow[]> {
   const ext = extname(path).toLowerCase();
   if (ext === '.csv') return rowsFrom(parseCsv(await readFile(path, 'utf8')));

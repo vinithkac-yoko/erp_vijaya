@@ -8,7 +8,7 @@ export default function globalSetup() {
     env: {
       ...process.env,
       // the test database starts empty: the store's real opening stock (loaded by the seed on a real start) stays out of it
-      OPENING_STOCK_LOAD: 'off',
+      OPENING_STOCK_LOAD: 'off', MATERIAL_LISTS_LOAD: 'off',
       SEED_OWNER_NAME: OWNER.name, SEED_OWNER_EMAIL: OWNER.email, SEED_OWNER_PASSWORD: OWNER.password,
       SEED_STOREKEEPER_NAME: STOREKEEPER.name, SEED_STOREKEEPER_EMAIL: STOREKEEPER.email, SEED_STOREKEEPER_PASSWORD: STOREKEEPER.password,
     },

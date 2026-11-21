@@ -2,6 +2,20 @@
 
 Read this at the start of every session (CLAUDE.md). Newest on top.
 
+## Milestone 15 — The tape list added as materials
+
+Kasi (2026-11-21) sent the accounts program's workbook and said these materials are needed: "add it". Only its sheet **Tape** is a list of materials (description + part number); the other sheets are accounts printouts (stock group summaries, a ledger).
+
+Done
+- **131 tape materials** (from 144 lines: 9 repeats merged, a heading, a "Grand Total", the header and a lone part number skipped): kind TAPE, pieces, bought for each job, the part number as the item code (121 have one), no quantities. The bracket at the end of each description is taken out of the name (it is the item code). **TY1046** is on two different yellow tapes (24 mm and 25 mm), so neither got it (it is in their notes); 8 more have no number on the list.
+- **How it reaches the live copy:** as with the opening stock, this session cannot reach Railway, so the list is kept with the code (`prisma/data/materials/tape-part-numbers.json`) and the **start-up step adds it once** at the next deploy, through the gateway as the owner, with an audit row each, a marker per file, and the same guards (`MATERIAL_LISTS_LOAD=off`, demo copy). New command `pnpm materials:list` makes such lists from a sheet (review first).
+- Rehearsed with Railway's exact start sequence on a fresh database: the opening stock (650) and then the tapes (131) loaded, 781 materials, an audit row each, no stock posted; a restart added nothing. With the opening count open the new materials join it **uncounted**; with it with the owner they join when he sends it back (the earlier fix).
+
+Questions to the owner: section P of `docs/CLIENT_CONFIRMATIONS.md` (pieces or rolls; the repeated part number; the ten tapes without one; where the tape stock is counted; racks).
+
+Proof (run in this session)
+- RESULTS_PLACEHOLDER
+
 ## Milestone 14 — Readable answers (the fresh start was dropped: Kasi, 2026-11-20, "no need for reset")
 
 Kasi (2026-11-20, with the assistant working again after the new key): the assistant's messages showed stars, dashes and bars; and he wants a full reset, keeping only the stock loaded from the sheet.

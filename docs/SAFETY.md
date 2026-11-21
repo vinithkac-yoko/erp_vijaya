@@ -189,6 +189,7 @@ from a supplier's email). The AI reads them. So:
 - **If something looks wrong:** (1) flip `AGENT_ENABLED=false`; (2) look at the Activity answer and `AgentRun`; (3) the
   ledger is append-only, so nothing is lost — the owner reverses wrong entries with `reverse_movement`.
 - **Loading the opening stock:** from a reviewed list kept with the code (`prisma/data/opening-stock.json`: names, kinds, racks, quantities; no rates, no people, no secrets), by the start-up step once, or by the deploying person's command (`pnpm stock:import`). Never by an upload route and never by the assistant (it cannot read files). It saves through the gateway like a form, with an audit row each, as the owner; it never submits the opening count; a marker stops it running twice; `OPENING_STOCK_LOAD=off` stops it. The list stays in the code's history.
+- **Lists of materials to add:** reviewed lists kept with the code (`prisma/data/materials/*.json`: descriptions and part numbers, no quantities, no people, no secrets), added once each at start-up through the gateway as the owner (one audit row each), with a marker per file; `MATERIAL_LISTS_LOAD=off` stops it. Never by an upload route and never by the assistant.
 - **Dependency hygiene:** `pnpm audit` in CI; pin `playwright`, `next`, `prisma`.
 - **Before go-live:** the production-readiness audit at milestone 10 includes: every tool has `roles`; every route has
   an auth check; response headers contain the CSP (with `frame-src about:`); no secret in git history; the hostile and

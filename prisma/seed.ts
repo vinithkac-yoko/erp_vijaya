@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SETTINGS } from '../src/lib/settings';
 import { importDecisions } from '../src/server/tools/decisions-import';
+import { loadMaterialListsOnce } from '../src/server/tools/material-lists-startup';
 import { loadOpeningStockOnce } from '../src/server/tools/stock-startup';
 
 const prisma = new PrismaClient();
@@ -73,9 +74,11 @@ async function maybeSeedDemo() {
   console.log('[seed] Demo month built.');
 }
 
-/** The store's opening stock, once (prisma/data/opening-stock.json). Never stops the app from starting. */
+/** The store's opening stock and its lists of materials, once each (prisma/data). Never stops the app from starting. */
 async function openingStock() {
   try { await loadOpeningStockOnce({ say: (l) => console.log(`[seed] ${l}`) }); } catch (e) { console.log('[seed] Opening stock was not loaded:', e instanceof Error ? e.message : e); }
+  // then the lists of materials the store asked to be added (prisma/data/materials), each once
+  try { await loadMaterialListsOnce({ say: (l) => console.log(`[seed] ${l}`) }); } catch (e) { console.log('[seed] A material list was not added:', e instanceof Error ? e.message : e); }
 }
 
 async function main() {
