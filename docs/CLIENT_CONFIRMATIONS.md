@@ -294,3 +294,21 @@ Kasi sent the accounts program's workbook; its sheet **Tape** has 141 tape descr
 | P3 | ❓ | **Tapes with no part number** (10: cotton tape, F-302 6 mm, T-090/R 7 mm, T-180 7 mm, two T-910U films, yellow 3 mm and 4 mm, and the two above). | Added with no item code. | The list has none. | Please give them. |
 | P4 | ❓ | **Quantities of tape.** | None on the list. They join the opening count as **not counted yet**, so the store counts them (zero included) before the count is sent. | The accounts program shows tape in stock, but the store's own stock sheet lists only six tapes. | Is the tape on the shelf counted somewhere else? |
 | P5 | ❓ | **Rack and shelf for the tapes.** | None given. | The list has none. | Where are they kept? |
+
+## Q. The owner's files: the assistant reads any sheet, document, PDF or photo and makes the changes (2026-11-21)
+
+Kasi asked for the client to update the system himself with sheets, documents and PDFs in any format and any order, with the assistant asking questions first. His answers to my twelve questions: owner only (attach and use); no sample files (no real format exists); never overwrite silently; ask every time the sheet disagrees with the system; a summary is enough (no row-by-row review); Excel `.xlsx` only; PDFs and photos may go to the model's provider; undo for 7 days; a cost limit of ₹1,000; no Tamil needed for this; build all of it (materials, then suppliers and customers, parts and bills of materials, then PDFs and photos).
+
+Assumptions I made (please say if any is wrong)
+
+| # | Status | What I assumed | Why | Question |
+|---|---|---|---|---|
+| Q1 | ❓ | The **₹1,000 limit is per calendar month** (India time), and counts only PDFs and photos. The assistant's ordinary chat is still limited by its own daily limit. | Sheets, CSV and Word files cost nothing to read. | Per month, or per something else (per week, in total)? |
+| Q2 | ❓ | **Original files are kept 30 days**, then dropped (what was read from them too). | Long enough to come back to a half-done import; short enough not to hoard the client's papers. | Is 30 days right? |
+| Q3 | ❓ | **Quantities only go on the opening count**, and only while it is open. A file cannot add stock later (goods received, issues): those come from the receiving and issuing forms. | The opening count is the only way stock gets in without a purchase or an issue; it needs a rate for every material with stock, which no sheet gives. | Is that what you want? If the client will send "stock now" sheets after go-live, that needs a different rule. |
+| Q4 | ❓ | **Old `.xls` and macro files are refused** with "save as .xlsx". | You said xlsx only. | OK? |
+| Q5 | ❓ | **Undo for 7 days** puts back only what nobody changed since; things it added are marked "no longer in use" (kept in the history, since nothing is ever deleted); a material only if no stock has moved on it; a filled blank cannot become blank again. | Undo must never overwrite somebody's later work. | OK? |
+| Q6 | ❓ | A **unit is never guessed**: from the sheet, a default you agreed to, or a question (the assistant suggests pieces when it does not know). | A unit cannot be changed once a material exists. | OK? |
+| Q7 | ❓ | When the sheet and the system **disagree**, the assistant asks, and suggests "keep the system's". When the system has a **blank** and the sheet has a value, it fills it and says so (it is not an overwrite). | You said never overwrite silently. | Should it ask even for blanks? |
+| Q8 | ❓ | Customer PO lines, jobs and purchase orders **cannot be imported yet** (only materials, suppliers and customers, parts and their bills of materials, and opening quantities). | You listed those four. | Do you want customer POs next? |
+

@@ -51,7 +51,7 @@ export const TableSpec = z.object({
   /** field → column letter (A, B … AA). */
   columns: z.record(z.string().regex(/^[A-Za-z]{1,2}$/, 'A column is a letter like C.')),
   /** field → one value for every row where the sheet has none (the unit of the whole list, the role of every party …). */
-  defaults: z.record(z.string().max(120)).optional(),
+  defaults: z.record(z.union([z.string().max(120), z.number()]).transform(String)).optional(),
   /** Categories that are kept in stock (the rest are bought for each job), when the sheet has a category but no stock type. */
   standingCategories: z.array(z.string().max(40)).max(20).optional(),
   skipRows: z.array(z.number().int().positive()).max(500).optional(),

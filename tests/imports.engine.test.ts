@@ -400,3 +400,43 @@ describe('businesses, parts and bills of materials from one workbook', () => {
     expect(secs).toBeLessThan(120);
   }, 180_000);
 });
+
+describe('the real stock list, in a layout the loader has never seen', () => {
+  it('gives the same 650 materials, units, places and quantities as the loader did, from scrambled columns with title lines on top and a total at the bottom', async () => {
+    const { readFileSync } = await import('node:fs');
+    const data = JSON.parse(readFileSync('prisma/data/opening-stock.json', 'utf8')) as { materials: { name: string; itemCode: string | null; category: string; uom: string; stockType: string; rack: string | null; shelf: string | null; counted: number | null }[] };
+    const UNITS: Record<string, string> = { NOS: 'Pcs', KG: 'kgs', MTR: 'Mtr', LTR: 'Ltr', ROLL: 'Roll', SET: 'Set' };
+    // columns: Where | Quantity (as text, with the unit written the way people write it) | What | Kind | Code
+    const rows: (string | number)[][] = [['Vijaya Electronics'], ['Stock as on 1 Nov'], [], ['Rack/Shelf', 'Qty', 'Material', 'Kind', 'Part no.']];
+    for (const m of data.materials) rows.push([[m.rack, m.shelf].filter(Boolean).join(' '), m.counted === null ? '' : `${m.counted} ${UNITS[m.uom]}`, m.name, m.category, m.itemCode ?? '']);
+    rows.push(['', '', 'TOTAL', '', '']);
+    const o = await owner();
+    const up = await saveUpload(o, { filename: 'Stock Nov.xlsx', bytes: await xlsx({ 'Old copy': [['ignore me']], Current: rows }) });
+    const last = rows.length - 1; // the row before the total
+    const draft = await createDraft(o, { spec: { title: 'Stock', tables: [{ uploadId: up.upload.id, sheet: 'Current', kind: 'materials', headerRow: 4, lastRow: last, columns: { name: 'C', itemCode: 'E', category: 'D', quantity: 'B' }, standingCategories: ['MISC', 'CONS'] }] } });
+    // a few rows give no unit anywhere (the loader was told them by the owner): that is the one thing it has to ask, and it names them
+    const v = viewOf(draft);
+    expect(v.openQuestions.map((q) => q.key)).toEqual(['materials.unit']);
+    expect(v.openQuestions[0]!.howMany).toBeLessThan(25);
+    expect(v.leftOut.count).toBe(0);
+    const asked = (await import('@/server/tools/imports/draft')).getDraft;
+    const open = ((await asked(o, draft.id)).plan as unknown as { questions: { items: string[] }[] }).questions[0]!.items;
+    const unitOf = new Map(data.materials.map((m) => [m.name, m.uom]));
+    const answered = await reviseDraft(o, draft.id, { answers: { 'materials.unit': { choice: 'NOS', perItem: Object.fromEntries(open.map((n) => [n, unitOf.get(n) ?? 'NOS'])) } } });
+    expect(viewOf(answered).canApply).toBe(true);
+    await ok(save(o, 'apply_import', { draftId: draft.id }));
+    const made = await prisma.material.findMany({ include: { balance: true } });
+    expect(made).toHaveLength(650);
+    const byKey = new Map(made.map((m) => [m.nameKey, m]));
+    let wrong = 0;
+    for (const m of data.materials) {
+      const got = byKey.get(materialNameKey(m.name));
+      if (!got || got.uom !== m.uom || got.stockType !== m.stockType || got.category !== m.category) wrong++;
+    }
+    expect(wrong).toBe(0);
+    const count = await prisma.stockCount.findFirstOrThrow({ where: { isOpening: true }, include: { lines: { include: { material: true } } } });
+    const counted = new Map(count.lines.map((l) => [l.material.nameKey, l.countedQty === null ? null : Number(l.countedQty)]));
+    const r4 = (n: number | null) => (n === null ? null : Math.round(n * 10_000) / 10_000); // the count keeps four decimals
+    expect(data.materials.filter((m) => r4(counted.get(materialNameKey(m.name)) ?? null) !== r4(m.counted)).map((m) => m.name)).toEqual([]);
+  }, 180_000);
+});

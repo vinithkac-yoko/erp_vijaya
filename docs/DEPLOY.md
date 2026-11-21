@@ -150,3 +150,10 @@ On its first start it fills itself with a realistic month (twelve jobs, receipts
 ## Putting the app on a phone
 
 The owner opens the web address in Chrome on his phone and chooses **Add to Home screen**. It then opens like an app. Nothing about the stock is kept on the phone: with no connection it says so, and nothing is lost.
+
+**The owner's files (milestone 16).** Nothing to set up: the paperclip appears for the owner and works with the assistant's key. What to know:
+- Files are kept in the database (table `uploads`) for **30 days** (`UPLOAD_RETENTION_DAYS`), then the file and what was read from it are dropped. The migration adds three tables (`uploads`, `import_drafts`, `ai_spend`) and two settings.
+- **PDFs and photos cost money** (the assistant's model reads each once). The limit is **₹1,000 a month** (Settings: "Monthly limit for reading PDFs and photos"; the owner can change it by asking the assistant or in Settings) and the dollar rate it uses is Settings "Rupees per US dollar" (90). The price per million tokens is a safe round-up in the code (5 in, 25 out dollars); if the provider's price changes set `UPLOAD_PRICE_USD_IN` / `UPLOAD_PRICE_USD_OUT`. The month's spend is the sum of `ai_spend`.
+- A big import (hundreds of materials) takes the seconds the forms would: 650 materials about 15 seconds. The Apply button waits for it.
+- Imports can be undone for 7 days (the assistant opens the form). The log shows `[import]` lines only when something goes wrong.
+

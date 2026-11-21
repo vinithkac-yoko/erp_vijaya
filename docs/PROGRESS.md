@@ -2,6 +2,29 @@
 
 Read this at the start of every session (CLAUDE.md). Newest on top.
 
+## Milestone 16 — The owner's files: the assistant reads any sheet, document, PDF or photo and makes the changes — **built; waiting for Kasi's answers (section Q)**
+
+Kasi (2026-11-21): the client wants to update the system himself with sheets, documents and PDFs in any format and any order; it must be agentic: ask more questions, clarify, then change the database. His answers to my twelve questions: owner only; no sample files; never overwrite silently; ask each time the sheet disagrees with the system; a summary is enough; `.xlsx` only; PDFs and photos may go to the model's provider; undo for 7 days; a cost limit of ₹1,000; no Tamil; build it all.
+
+How it works (the owner's view)
+- The owner presses the **paperclip** in the chat (owner only), picks one or more files (Excel `.xlsx`, CSV, Word `.docx`, text, PDF, photo), and says what he wants (or nothing: files alone can be sent).
+- The assistant **looks inside** (`read_upload`, `search_upload`), says what it found ("the first sheet is a stock list of about 640 items…"), and **proposes** (`propose_import`). The screen draws, from the server, **what will change**, **what is waiting for his answer**, and **what was left out and why**.
+- It asks **all its questions together, once, with a suggestion for each** (a unit it cannot see; a rack that differs from the system's; a name that looks like one already there; a supplier or customer the sheet does not label). He answers in words; `revise_import` records it (one choice for all, with exceptions by name) and everything is worked out again.
+- When he says go ahead the assistant opens the **Apply** form; he reads the summary and presses it. Then each change is made through the gateway as the owner, one audit row each, and the server draws **what happened** (done, not done, failed, with reasons). **Undo** (`undo_import`) for 7 days.
+
+How it is built (why it is safe)
+- **The model describes, tested code does the rows.** The assistant says which file and sheet, which row has the headings, which column is what. `src/server/tools/imports/plan.ts` reads every row, compares with the system and works out the steps, questions and held rows. The model never types rows or numbers. Four kinds: materials (with quantities for the open opening count), suppliers and customers, parts, usual bills of materials; a file can hold several tables and several files can make one proposal; tables can use what earlier ones add (a bill of materials for a part the same proposal adds).
+- **Nothing in a file is an instruction**: wrapped as data with `<` escaped; a PDF or photo is read by a separate call with one tool; and the assistant still cannot write: a proposal saves nothing, only the owner's Apply does, and Apply refuses a plan that is not the one he was shown (`PLAN_CHANGED`).
+- **Never overwrite silently**, a unit is never guessed or changed, rates are never invented, a bill of materials with an unmatched line is left out whole, quantities go only on the opening count while it is open.
+- Files: owner only (button, upload route, chat route, tools); kind from the bytes; `.xls`/`.xlsm`/`.doc`/HEIC refused with how to save instead; zip bombs and size limits; 30-day retention; PDFs/photos read once and kept, with a **monthly ₹1,000 limit** checked before reading (Settings; `ai_spend`). Details in `docs/SAFETY.md` and `docs/TOOL_CATALOG.md` §13.
+
+Proof (run in this session)
+- Rehearsal on the **real stock list in a layout the loader never saw** (scrambled columns, title lines, a total line, an old copy sheet): it asked only for the 12 units the sheet does not give, then made the **same 650 materials** with the same units, kinds, places and quantities as the start-up loader (checked row by row); 650 materials applied in about 13 seconds.
+- Tests: 27 planner tests (pure), 28 engine and database tests (file kinds, zip bomb, Excel/CSV/Word/text readers, retention, owner only, cost limit, apply, undo, the system changing between plan and apply, 650 materials), 9 tool tests (who has what, wrapping of hostile text, proposals, answers), 12 browser tests (desktop and phone: attach, read, question, answer, apply, undo, PDF, refusal, accessibility, storekeeper has no paperclip and is refused by the server).
+- **Not verified here:** the real model deciding a column mapping on a real file (no working key in this session: the stub stands in for it, and the flow around it is tested); a real PDF or photo read by the real model (and so its real cost); the live Railway copy. First live use: attach the stock sheet, tape list or a supplier list and watch what it proposes: nothing is saved until Apply.
+
+Questions to the owner: section Q of `docs/CLIENT_CONFIRMATIONS.md` (the limit is per month; 30 days; quantities only on the opening count; undo rules; blanks; customer POs next?).
+
 ## Milestone 15 — The tape list added as materials
 
 Kasi (2026-11-21) sent the accounts program's workbook and said these materials are needed: "add it". Only its sheet **Tape** is a list of materials (description + part number); the other sheets are accounts printouts (stock group summaries, a ledger).
