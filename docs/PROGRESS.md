@@ -291,7 +291,7 @@ Done
 - **The assistant never writes.** A write tool the model calls only makes a PendingAction and ends the turn; the form card in the chat opens filled in, marked
   "assistant filled this in — check it". Nothing is saved until the person presses the button (the verb, never "Submit"). Reads run and appear as tables
   drawn by the server; the model only receives their data wrapped in `<business_data>` and told it is data, not instructions.
-- **Limits.** 8 tool calls per turn, 60 seconds, 500,000 tokens per person per day, 20 messages a minute. If the API is down, the person is told in plain
+- **Limits.** 8 tool calls per turn, 60 seconds, 1,000,000 tokens per person per day (500,000 until 2026-11-26), 20 messages a minute. If the API is down, the person is told in plain
   words and the buttons still work. A dangling tool call from a dropped connection is repaired before the next turn.
 - **Kill switch.** `AGENT_ENABLED=false` or the Setting `agent.enabled` (the owner can say "switch the assistant off"). Off means the chat box explains and the
   buttons keep working.

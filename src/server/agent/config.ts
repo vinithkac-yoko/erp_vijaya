@@ -28,7 +28,7 @@ export function agentConfig(env: NodeJS.ProcessEnv = process.env): AgentConfig {
     effort: effort === 'low' || effort === 'high' ? effort : 'medium',
     maxToolCalls: int(env.AGENT_MAX_TOOL_CALLS, 8),
     turnTimeoutMs: int(env.AGENT_TURN_TIMEOUT_MS, 60_000),
-    dailyTokens: int(env.AGENT_DAILY_TOKENS, 500_000),
+    dailyTokens: int(env.AGENT_DAILY_TOKENS, 1_000_000),
     refusalFallback: env.ANTHROPIC_REFUSAL_FALLBACK !== 'false',
     messagesPerMinute: int(env.AGENT_MESSAGES_PER_MINUTE, 20),
   };

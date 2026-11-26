@@ -66,7 +66,7 @@ The address the email goes to is the **Owner notification email** the owner sets
 | `ANTHROPIC_MODEL` | optional, default `claude-sonnet-5-5` | Which model answers |
 | `ANTHROPIC_EFFORT` | optional, `low`, `medium` (default) or `high` | How hard it thinks. Higher is slower and costs more. |
 | `AGENT_ENABLED` | optional, `false` to switch the assistant off for everyone | The kill switch. The owner can also switch it off from the chat (a Setting). Either one turns it off. |
-| `AGENT_DAILY_TOKENS` | optional, default `500000` | Most one person can use in a day. After that the assistant says so; the buttons keep working. |
+| `AGENT_DAILY_TOKENS` | optional, default `1000000` (doubled from 500000 on 2026-11-26, Kasi: the cap was hit) | Most one person can use in a day. After that the assistant says so; the buttons keep working. |
 | `AGENT_MESSAGES_PER_MINUTE` | optional, default `20` | Most messages one person can send in a minute |
 | `ANTHROPIC_REFUSAL_FALLBACK` | optional, `off` to turn off the automatic fallback when the model declines | Leave it as it is unless Anthropic's support says otherwise |
 

@@ -162,7 +162,7 @@ from a supplier's email). The AI reads them. So:
 | Control | Detail |
 |---|---|
 | Kill switch | `AGENT_ENABLED=false`: the chat shows "The assistant is off. The buttons above still work."; form buttons, printouts, approvals keep working. Owner can flip it in Settings (`update_setting`) |
-| Limits | 8 tool calls per turn (16 and 150 s when files come with the message); 60 s timeout; `AGENT_DAILY_TOKENS` per user; artifact builds 20/h; builder repairs 3 |
+| Limits | 8 tool calls per turn (16 and 150 s when files come with the message); 60 s timeout; `AGENT_DAILY_TOKENS` per user (1,000,000); artifact builds 20/h; builder repairs 3 |
 | Role-filtered tools | The model is offered only its role's tools |
 | No write tool executes | Write tools create a PendingAction; the form is the confirmation |
 | Server-written confirmations | "Saved: 20 pcs issued to job 31" is drawn from the audit row, not from model text |
