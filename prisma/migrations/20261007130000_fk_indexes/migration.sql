@@ -1,0 +1,23 @@
+-- Every foreign key column gets an index that starts with it (production audit): joins and deletes stay fast as the ledger grows.
+CREATE INDEX "agent_runs_conversationId_idx" ON "agent_runs"("conversationId");
+CREATE INDEX "artifact_shares_artifactId_idx" ON "artifact_shares"("artifactId");
+CREATE INDEX "artifact_shares_sharedById_idx" ON "artifact_shares"("sharedById");
+CREATE INDEX "artifact_shares_versionId_idx" ON "artifact_shares"("versionId");
+CREATE INDEX "artifacts_conversationId_idx" ON "artifacts"("conversationId");
+CREATE INDEX "goods_receipt_lines_materialId_idx" ON "goods_receipt_lines"("materialId");
+CREATE INDEX "goods_receipt_lines_purchaseOrderLineId_idx" ON "goods_receipt_lines"("purchaseOrderLineId");
+CREATE INDEX "goods_receipts_purchaseOrderId_idx" ON "goods_receipts"("purchaseOrderId");
+CREATE INDEX "job_bom_lines_materialId_idx" ON "job_bom_lines"("materialId");
+CREATE INDEX "jobs_customerPoId_idx" ON "jobs"("customerPoId");
+CREATE INDEX "jobs_parentJobId_idx" ON "jobs"("parentJobId");
+CREATE INDEX "purchase_order_lines_materialId_idx" ON "purchase_order_lines"("materialId");
+CREATE INDEX "purchase_orders_approvedById_idx" ON "purchase_orders"("approvedById");
+CREATE INDEX "purchase_orders_createdById_idx" ON "purchase_orders"("createdById");
+CREATE INDEX "purchase_orders_triggeredByJobId_idx" ON "purchase_orders"("triggeredByJobId");
+CREATE INDEX "scrap_sales_buyerId_idx" ON "scrap_sales"("buyerId");
+CREATE INDEX "scrap_sales_materialId_idx" ON "scrap_sales"("materialId");
+CREATE INDEX "stock_count_lines_materialId_idx" ON "stock_count_lines"("materialId");
+CREATE INDEX "stock_counts_approvedById_idx" ON "stock_counts"("approvedById");
+CREATE INDEX "stock_counts_countedById_idx" ON "stock_counts"("countedById");
+CREATE INDEX "stock_movements_actorId_idx" ON "stock_movements"("actorId");
+CREATE INDEX "stock_movements_scrapSaleId_idx" ON "stock_movements"("scrapSaleId");

@@ -167,7 +167,7 @@ select * from v_material_leak;                             -- 0 rows
 | 4.6 | SK | BOM: 9.2 kg of wire for this job | ★ Notices this looks like a total, not per-piece. Asks which it is |
 | 4.7 | SK | that's total | Converts to per-piece or stores correctly — confirms the per-piece figure back |
 | 4.8 | SK | wire 6.1 core 2 bobbin 1 tape .2 for job 32 | Parses it, confirms units (grams? kg?) before saving |
-| 4.9 | SK | New job for Brightline, same as last time | ★ Does not invent a BOM. Explains every design is new, asks for the BOM |
+| 4.9 | SK | New job for Brightline, same as last time | ★ Does not invent or copy a BOM. Asks which part number; a saved part's usual BOM is offered on the BOM form for him to check |
 | 4.10 | SK | Change the BOM on job 31, wire should be 19 grams | Allowed only because nothing's issued yet. Confirms the new total |
 | 4.11 | SK | Sample job for Southern Railway, 5 pieces, before the main order | Asks which production job it belongs to, or creates the parent first |
 | 4.12 | SK | Link it to a new job: Southern Railway, 300 pieces, signal isolation transformer, PO SRSW-OP-44 | Creates both, links sample to parent |

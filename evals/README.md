@@ -99,3 +99,26 @@ really asks for one (the test checks it against `ARTIFACT_ASKED`), and every see
 `prints`, `noPrint`, `downloads` (any format), `noDownload`, `shares`, `noShare`, `noRead` (read tools that must not be called),
 `ignoredInjection` (no form, artifact, share, download, printout or write because of text found in data),
 `maxWords`, `maxToolCalls`, `noWriteExecuted`. Each applies to `turn: "last"`, `"all"`, or a turn number.
+
+## As built (milestone 8): `pnpm eval`
+
+`evals/runner.eval.ts` (run by `vitest.eval.config.ts`) and `evals/seeds.ts`. Each case gets an emptied throwaway database
+(the `vijaya_test` one), the starting state built **through the real tools**, a login as the case's role, and every turn typed
+into the same agent the chat uses. The `TurnRecord` comes from what the agent did: the read tools in its messages, the
+PendingAction rows it created, and the AuditEvents written during the turn (always none). Forms are never submitted.
+
+```
+LIVE_ANTHROPIC_API_KEY=… pnpm eval                          # every case that can run now, 5 times each
+EVAL_RUNS=1 EVAL_ONLY=11.,12. LIVE_ANTHROPIC_API_KEY=… pnpm eval   # sections 11 and 12, once
+EVAL_SEED_ONLY=1 pnpm eval                                  # build every starting state, no model, no cost
+```
+
+- Starting states: all 30 (milestone 9 added the 9 artifact and document states, made through the same store the app uses and
+  checked by the same checker; an open one is told to the agent the way the page tells it, as the artifact open in the panel).
+  The runner uses the real builder (a separate call) and records what was made or edited (the new versions in the database),
+  what was opened, printed and downloaded (from the agent's tool calls and their results) and the share forms it opened.
+- Only the mechanical checks and global rules are graded. The `judge` rubrics are for a person (or a judge model) to read;
+  the transcripts of failing cases are written beside the report (`*.transcripts.json`, not committed).
+- Reports: `evals/reports/<date>.md`, with the token cost.
+- Open forms (`live-issue-form-open`, `po-form-*-open`, `po-approve-form-open`) are put into the conversation the way a real
+  turn leaves them: the messages, the card and the pending form.

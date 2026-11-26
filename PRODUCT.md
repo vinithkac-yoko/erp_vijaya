@@ -60,8 +60,8 @@ person submits.
 - Vijaya Electronics, Chennai, founded 2009. Makes transformers and inductor coils (SMPS, EV
   charger, lamination, medical isolation, driver transformers, DC converters) for railways,
   solar, LED and CCTV customers.
-- **Every job is a one-off design** made to a customer's order. About 50 jobs a month,
-  hundreds to thousands of pieces each. Designs never repeat; there is no product catalogue.
+- **Everything runs by part number.** Every product a customer buys has a part number the factory puts on it. About 50
+  jobs a month, hundreds to thousands of pieces each. A part comes back in later orders (it keeps its usual BOM).
 - Some customers send an **open PO**: the same PO number, new items added one at a time after
   the previous one is delivered. Each release is a new job.
 - The BOM arrives per job as an Excel sheet, **quantities per piece**. All material is issued
